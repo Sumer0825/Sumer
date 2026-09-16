@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时光记录器</title>
+<link href="fonts/lxgwwenkai-regular.css" rel="stylesheet">
+<style>
+  :root {
+    --text: #1f2733;
+    --muted: #8a94a6;
+    --primary: #4f7cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'LXGW WenKai', -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background: linear-gradient(160deg, #fdf6f0 0%, #f6f3fb 45%, #eef3fb 100%);
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1.6; padding: 24px;
+  }
+  .box { text-align: center; max-width: 420px; }
+  .icon {
+    width: 84px; height: 84px; margin: 0 auto 22px;
+    border-radius: 24px; font-size: 44px; line-height: 84px;
+    background: linear-gradient(135deg, rgba(255,255,255,.8), rgba(255,255,255,.5));
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.9);
+    box-shadow: 0 12px 30px rgba(120, 100, 180, .14);
+    animation: breathe 3s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: 2px; }
+  .verse { color: #a86a8a; font-size: 15px; margin-top: 10px; letter-spacing: 3px; }
+  .divider { width: 46px; height: 2px; margin: 26px auto; background: linear-gradient(90deg, transparent, #c9b8e8, transparent); border: none; }
+  .status {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--muted);
+    background: rgba(255,255,255,.6); border: 1px solid rgba(200,195,220,.5);
+    padding: 8px 18px; border-radius: 99px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #f0a35e; animation: blink 1.6s infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+  .tip { margin-top: 26px; font-size: 12.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">⏳</div>
+    <h1>时光记录器</h1>
+    <div class="verse">愿无岁月可回头</div>
+    <hr class="divider">
+    <div class="status"><span class="dot"></span>功能建设中，敬请期待</div>
+    <p class="tip">这里以后会用来记录那些值得留住的时光</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>体重记录器</title>
+<link href="fonts/lxgwwenkai-regular.css" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="fonts/lxgwwenkai-regular.css" rel="stylesheet"></noscript>
+<link href="lib/flatpickr.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --primary: #4f7cff;
+    --primary-soft: #eaf0ff;
+    --text: #1f2733;
+    --muted: #8a94a6;
+    --line: #eef1f6;
+    --danger: #ff5d6c;
+    --success: #2bbf7a;
+    --shadow: 0 10px 30px rgba(31, 39, 51, 0.06);
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'LXGW WenKai', -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 24px; }
+  header h1 { font-size: 26px; font-weight: 700; }
+  header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+  .stat { text-align: center; padding: 8px; }
+  .stat .label { font-size: 12px; color: var(--muted); }
+  .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .stat .value small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .delta-up { color: var(--danger); }
+  .delta-down { color: var(--success); }
+
+  .chart-box { position: relative; }
+  svg.chart { width: 100%; height: 220px; display: block; }
+
+  form .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .field { flex: 1 1 120px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 10px; font-size: 15px; outline: none; background: #fbfcfe;
+    transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--primary); background: #fff; }
+  .field input[readonly] { cursor: pointer; }   /* 日期选择框：点击弹日历 */
+  .field select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 10px; font-size: 15px; outline: none; background: #fbfcfe;
+    font-family: inherit; cursor: pointer; transition: border-color .15s;
+  }
+  .field select:focus { border-color: var(--primary); background: #fff; }
+
+  /* 时段徽章 */
+  .seg-tag {
+    display: inline-block; min-width: 24px; text-align: center;
+    font-size: 12px; padding: 1px 7px; border-radius: 6px; line-height: 1.5;
+    font-weight: 600;
+  }
+  .seg-m { background: #fff3e0; color: #e65100; }   /* 早 */
+  .seg-n { background: #e3f2fd; color: #1565c0; }   /* 中 */
+  .seg-e { background: #ede7f6; color: #5e35b1; }   /* 晚 */
+
+  .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  button {
+    border: none; border-radius: 10px; padding: 11px 18px; font-size: 14px;
+    font-weight: 600; cursor: pointer; transition: transform .1s, opacity .15s;
+  }
+  button:active { transform: scale(.97); }
+  .btn-primary { background: var(--primary); color: #fff; flex: 1 1 auto; }
+  .btn-ghost { background: var(--primary-soft); color: var(--primary); }
+  .btn-line { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+
+  .goal-bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 14px; }
+  .goal-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #4f7cff, #7da2ff); border-radius: 99px; transition: width .4s; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 12px 8px; font-size: 14px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td .note { color: var(--muted); font-size: 12px; }
+  .del { color: var(--danger); background: none; padding: 4px 8px; font-size: 13px; }
+  .del:disabled { color: #c4c9d4; cursor: not-allowed; }
+  .empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 14px; }
+
+  .card h2 { font-size: 16px; margin-bottom: 14px; }
+  .tip { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  code { background: #f1f3f8; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+
+  /* GitHub 同步 */
+  .sync-bar { margin-top: 12px; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .sync-status { font-size: 13px; color: var(--muted); }
+  .sync-status.ok { color: var(--success); }
+  .sync-status.err { color: var(--danger); }
+  .sync-card .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .sync-card .field { flex: 1 1 160px; }
+  .sync-card .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .sync-card .field input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; outline: none; background: #fbfcfe; }
+  .sync-card .field input:focus { border-color: var(--primary); background: #fff; }
+  #gh-msg { margin-left: 6px; }
+
+  /* 左右分栏 */
+  .layout { display: flex; gap: 18px; align-items: flex-start; }
+  .col-left { flex: 1 1 0; min-width: 0; }
+  .col-right { flex: 1 1 0; min-width: 0; }
+  .col-right .card { margin-bottom: 0; }
+
+  /* 数量条 + 翻页 */
+  .hist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .hist-head h2 { margin-bottom: 0; }
+  .clock { color: #b30000; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .week-max { color: #e02020; font-weight: 700; }
+  .count-bar { font-size: 12px; color: var(--muted); }
+  .pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+  .pg { background: var(--primary-soft); color: var(--primary); padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+  .pg.active { background: var(--primary); color: #fff; }
+  .pg:disabled { opacity: .45; cursor: not-allowed; }
+  .pg-ellipsis { color: var(--muted); padding: 0 2px; }
+  .pg-size { margin-left: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe; font-size: 13px; color: var(--text); }
+
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; }
+    .col-right .card { margin-bottom: 18px; }
+  }
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📉 我的体重记录</h1>
+    <p>数据存储：<span id="store-mode">本机浏览器（localStorage）</span> · 可导入/导出 Excel</p>
+    <div class="sync-bar">
+      <span id="sync-status" class="sync-status">未连接 GitHub</span>
+      <button type="button" class="btn-line" id="sync-settings-btn">⚙ 同步设置</button>
+      <button type="button" class="btn-ghost" id="sync-now-btn" style="display:none">↻ 立即同步</button>
+    </div>
+  </header>
+
+  <section class="card sync-card" id="sync-card" style="display:none">
+    <h2>GitHub 同步设置</h2>
+    <p class="tip">把数据写入你仓库里的 <code>data/weight.xlsx</code>（Excel 文件，列：日期 / 时段 / 体重（斤） / 备注），多设备自动共享（每次保存 = 一次 commit）。Token 仅存于本机浏览器，不会上传到任何服务器。</p>
+    <div class="row">
+      <div class="field"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="ghp_xxx，需 contents 读写权限"></div>
+      <div class="field"><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
+      <div class="field"><label>仓库名</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
+      <div class="field"><label>分支</label><input type="text" id="gh-branch" placeholder="main"></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>数据文件路径</label><input type="text" id="gh-path" placeholder="data/weight.xlsx"></div>
+    <div class="actions">
+      <button type="button" class="btn-primary" id="gh-connect">保存并连接</button>
+      <button type="button" class="btn-line" id="gh-close">关闭</button>
+      <span id="gh-msg" class="tip"></span>
+    </div>
+  </section>
+
+  <div class="layout">
+  <div class="col-left">
+  <!-- 概览 -->
+  <section class="card">
+    <div class="stats">
+      <div class="stat"><div class="label">最新体重</div><div class="value" id="s-latest">--<small>斤</small></div></div>
+      <div class="stat"><div class="label">较前次</div><div class="value" id="s-delta">--</div></div>
+      <div class="stat"><div class="label">初始体重</div><div class="value" id="s-first">--<small>斤</small></div></div>
+      <div class="stat"><div class="label">平均</div><div class="value" id="s-avg">--<small>斤</small></div></div>
+      <div class="stat"><div class="label">距目标</div><div class="value" id="s-goal">--<small>斤</small></div></div>
+    </div>
+    <div class="goal-bar" title="距目标进度"><span id="goal-fill" style="width:0%"></span></div>
+    <div class="tip" id="goal-text">未设置目标体重</div>
+  </section>
+
+  <!-- 添加 -->
+  <section class="card">
+    <div class="hist-head">
+      <h2>添加记录</h2>
+      <span class="clock" id="clock"></span>
+    </div>
+    <form id="form">
+      <div class="row">
+        <div class="field" style="flex:1.4 1 150px"><label>日期</label><input type="text" id="f-date" required readonly placeholder="点击选择日期"></div>
+        <div class="field" style="flex:0.6 1 88px"><label>时段</label>
+          <select id="f-seg"><option value="早" selected>早</option><option value="中">中</option><option value="晚">晚</option></select>
+        </div>
+        <div class="field" style="flex:1 1 110px"><label>体重 (斤)</label><input type="number" id="f-weight" step="0.1" min="0" placeholder="如 140.5" required></div>
+        <div class="field" style="flex:1 1 110px"><label>目标 (斤)</label><input type="number" id="f-goal" step="0.1" min="0" placeholder="可选"></div>
+        <div class="field" style="flex:2 1 160px"><label>备注</label><input type="text" id="f-note" placeholder="可选，如 晨起空腹"></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-primary">保存记录</button>
+        <button type="button" class="btn-line" id="import-btn">导入</button>
+        <button type="button" class="btn-line" id="export-btn">导出</button>
+        <button type="button" class="btn-ghost" id="clear-btn" title="仅清空 24 小时内的记录">清空</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 趋势图 -->
+  <section class="card">
+    <h2>体重趋势</h2>
+    <div class="chart-box"><svg class="chart" id="chart" viewBox="0 0 700 220" preserveAspectRatio="none"></svg></div>
+  </section>
+  </div><!-- /col-left -->
+
+  <!-- 历史（右侧） -->
+  <div class="col-right">
+  <section class="card">
+    <div class="hist-head">
+      <h2>历史记录</h2>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="count-bar" id="count-bar"></div>
+      </div>
+    </div>
+    <div id="history"></div>
+    <div class="pager" id="pager"></div>
+  </section>
+  </div><!-- /col-right -->
+  </div><!-- /layout -->
+</div>
+
+<input type="file" id="file-input" accept=".xlsx,.json,application/json" style="display:none">
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/flatpickr.min.js"></script>
+<script src="lib/zh.js"></script>
+<script>
+const KEY = 'weight_records_v1';
+const SEED = 'data/weight.xlsx';                 // 同站种子 Excel（无缓存、无 token 时读取）
+const SHEET_NAME = 'Sheet1 (2)';                 // 与你的 Excel 保持一致
+const $ = id => document.getElementById(id);
+const fmt = n => (n == null || isNaN(n)) ? '--' : Number(n).toFixed(1);
+const K2J = v => Math.round(v * 2 * 10) / 10;     // kg → 斤（显示/换算用）
+const segCls = s => s === '中' ? 'seg-n' : s === '晚' ? 'seg-e' : 'seg-m';
+
+// 目标体重不进 Excel（那是页面设置项），单独存本机；默认 53kg
+const goalOf = () => { const g = parseFloat(localStorage.getItem('weight_goal')); return isNaN(g) ? 53 : g; };
+
+// 旧数据迁移：早期版本把时段（早/中/晚）存在 note 里，挪到 seg 字段
+const load = () => {
+  let d = [];
+  try { d = JSON.parse(localStorage.getItem(KEY)) || []; } catch { d = []; }
+  if (!Array.isArray(d)) d = [];
+  d.forEach(r => {
+    if (!r || typeof r !== 'object') return;
+    if (!r.seg) {
+      if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; }
+      else r.seg = '早';
+    }
+  });
+  return d;
+};
+const save = d => localStorage.setItem(KEY, JSON.stringify(d));   // 本地缓存（离线兜底）
+
+// ===== Excel ↔ 页面数据 转换层 =====
+// Excel 列结构：日期 | 时段 | 体重（斤） | 备注
+// 体重以「斤」存 Excel，页面以 kg 运算：存储 2 位小数保证 147.9斤 ↔ 73.95kg 往返无损。
+function xlDate(v) {
+  if (typeof v === 'number') {                                  // Excel 序列号 → yyyy-mm-dd
+    const d = new Date(Math.round((v - 25569) * 86400000));
+    return d.toISOString().slice(0, 10);
+  }
+  return String(v == null ? '' : v).trim();
+}
+function rowsToData(rows) {
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {                       // 跳过表头
+    const r = Array.isArray(rows[i]) ? rows[i] : [];
+    const date = xlDate(r[0]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const jin = parseFloat(r[2]);
+    if (isNaN(jin) || jin <= 0) continue;                        // 无体重的预留行跳过
+    const seg = ['早', '中', '晚'].includes(r[1]) ? r[1] : '早';
+    out.push({ date, weight: Math.round(jin / 2 * 100) / 100, goal: goalOf(), seg,
+               note: r[3] == null ? '' : String(r[3]).trim() });
+  }
+  out.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.seg === b.seg ? 0 : a.seg === '早' ? -1 : 1));
+  return out;
+}
+function dataToRows(data) {
+  const rows = [['日期', '时段', '体重（斤）', '备注']];
+  data.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.seg === b.seg ? 0 : a.seg === '早' ? -1 : 1))
+    .forEach(r => rows.push([r.date, r.seg || '早', Math.round(r.weight * 2 * 10) / 10, r.note || '']));
+  return rows;
+}
+function buildXlsx(data) {
+  const ws = XLSX.utils.aoa_to_sheet(dataToRows(data));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });    // ArrayBuffer
+}
+function parseXlsxBuf(buf) {                                     // ArrayBuffer/Uint8Array → 记录数组
+  const wb = XLSX.read(buf, { type: 'array' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null });
+  return rowsToData(rows);
+}
+// 二进制 ↔ base64（GitHub Contents API 要求）
+function bufToB64(buf) {
+  const u8 = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < u8.length; i += 0x8000)
+    s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function b64ToBuf(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
+// ===== GitHub 文件同步层 =====
+// 数据写入仓库里的 data/weight.xlsx（Excel 文件，每次保存 = 一次 commit）。
+// Token 仅存本机；无 token 时退化为纯 localStorage（与旧版一致）。
+let GH = {
+  owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/weight.xlsx',
+  token: localStorage.getItem('gh_token') || '',
+  sha: null
+};
+let DATA = load();   // 内存中的当前数据，渲染以此为准
+
+const ghHeaders = () => ({ Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json' });
+
+async function ghPull() {
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}?ref=${GH.branch}`;
+  const r = await fetch(url, { headers: ghHeaders() });
+  if (r.status === 404) return null;               // 云端还没有 Excel → 保留本地，首次保存时创建
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e.message || '') + ' (' + r.status + ')'); }
+  const j = await r.json();
+  GH.sha = j.sha;
+  return parseXlsxBuf(b64ToBuf(j.content));
+}
+async function ghPush(data) {
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`;
+  const body = { message: '更新体重数据 ' + new Date().toISOString().slice(0, 10), content: bufToB64(buildXlsx(data)), branch: GH.branch };
+  if (GH.sha) body.sha = GH.sha;                   // 带 sha = 更新；不带 = 创建（云端还没有文件时）
+  const r = await fetch(url, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e.message || '') + ' (' + r.status + ')'); }
+  GH.sha = (await r.json()).content.sha;
+}
+function setSync(text, type) {
+  const el = $('sync-status');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'sync-status' + (type === 'ok' ? ' ok' : type === 'err' ? ' err' : '');
+  $('sync-now-btn').style.display = GH.token ? '' : 'none';
+}
+// 持久化：先写本地缓存，有 token 再写 GitHub
+async function persist(data) {
+  DATA = data;
+  save(data);
+  if (GH.token) {
+    try { await ghPush(data); setSync('已写入 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok'); }
+    catch (e) { setSync('同步失败：' + e.message, 'err'); console.warn(e); }
+  }
+}
+// 启动加载策略：先用本地缓存立即渲染（秒开），再后台拉 GitHub/种子，到货后静默更新
+async function refresh() {
+  render();                                   // ① 本地缓存先上屏，不等网络
+  if (!DATA.length) {                         // ② 无缓存：读同站种子 Excel
+    try {
+      const r = await fetch(SEED, { cache: 'no-store' });
+      if (r.ok) {
+        const d = parseXlsxBuf(await r.arrayBuffer());
+        if (d.length) { DATA = d; save(d); render(); }
+      }
+    } catch (e) { /* file:// 或文件不存在时忽略 */ }
+  }
+  if (GH.token) {                             // ③ 有 token：后台同步 GitHub，不阻塞界面
+    try {
+      const d = await ghPull();
+      if (d === null) {
+        setSync('GitHub 云端暂无 Excel，首次保存将自动创建', '');
+      } else {
+        DATA = d; save(d); render();
+        setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok');
+      }
+    } catch (e) { setSync('GitHub 读取失败，使用本地缓存：' + e.message, 'err'); }
+  } else {
+    setSync('未连接 GitHub（仅本机）');
+  }
+}
+
+// 按日期算「每年的自然周」key（ISO 周，周一开始），如 2026-W36
+function isoWeekKey(s) {
+  const d = new Date(s + 'T00:00:00');
+  const dayNum = (d.getDay() + 6) % 7;        // 周一=0 … 周日=6
+  d.setDate(d.getDate() - dayNum + 3);         // 移到本周四
+  const yt = new Date(d.getFullYear(), 0, 4);  // 当年 1/4
+  const yd = (yt.getDay() + 6) % 7;
+  yt.setDate(yt.getDate() - yd + 3);
+  const week = 1 + Math.round((d - yt) / (7 * 864e5));
+  return d.getFullYear() + '-W' + week;
+}
+
+// 当前自然日（本地），与删除锁判断一致
+function todayStr() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+
+function render() {
+  let data = DATA.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  const len = data.length;
+  $('s-latest').innerHTML = len ? `${fmt(K2J(data[len-1].weight))}<small>斤</small>` : '--';
+  $('s-first').innerHTML  = len ? `${fmt(K2J(data[0].weight))}<small>斤</small>` : '--';
+  $('s-avg').innerHTML    = len ? `${fmt(K2J(data.reduce((s,x)=>s+x.weight,0)/len))}<small>斤</small>` : '--';
+  const delta = len >= 2 ? data[len-1].weight - data[len-2].weight : null;
+  const dEl = $('s-delta');
+  if (delta == null) { dEl.textContent = '--'; dEl.className = 'value'; }
+  else if (delta > 0) { dEl.innerHTML = `+${fmt(K2J(delta))}`; dEl.className = 'value delta-up'; }
+  else if (delta < 0) { dEl.innerHTML = fmt(K2J(delta)); dEl.className = 'value delta-down'; }
+  else { dEl.textContent = '0.0'; dEl.className = 'value'; }
+
+  // 距目标差值（最新体重 - 目标体重；正=还需减，负=已低于目标）
+  const goal = len ? (data[len-1].goal || null) : null;
+  const gEl = $('s-goal');
+  if (goal == null) { gEl.innerHTML = '--'; gEl.className = 'value'; }
+  else {
+    const diff = data[len-1].weight - goal;
+    if (Math.abs(diff) < 0.05) { gEl.innerHTML = '达成'; gEl.className = 'value delta-down'; }
+    else if (diff > 0) { gEl.innerHTML = `+${fmt(K2J(diff))}<small>斤</small>`; gEl.className = 'value delta-up'; }
+    else { gEl.innerHTML = `${fmt(K2J(diff))}<small>斤</small>`; gEl.className = 'value delta-down'; }
+  }
+
+  // 目标进度
+  const gt = $('goal-text'), gf = $('goal-fill');
+  if (goal && len) {
+    const first = data[0].weight, last = data[len-1].weight;
+    let pct;
+    if (first > goal) pct = Math.max(0, Math.min(100, (first - last) / (first - goal) * 100));
+    else if (first < goal) pct = Math.max(0, Math.min(100, (last - first) / (goal - first) * 100));
+    else pct = 100;
+    gf.style.width = pct.toFixed(0) + '%';
+    const diff = (last - goal);
+    const status = Math.abs(diff) < 0.05 ? '已达成目标 🎉' : (diff > 0 ? `还差 ${fmt(K2J(diff))} 斤` : `已超出 ${fmt(K2J(-diff))} 斤`);
+    gt.textContent = `目标 ${fmt(K2J(goal))} 斤 · ${status}`;
+  } else { gf.style.width = '0%'; gt.textContent = '未设置目标体重'; }
+
+  drawChart(data);
+  renderHistory(data);
+}
+
+function drawChart(data) {
+  const svg = $('chart'); svg.innerHTML = '';
+  if (data.length < 2) {
+    svg.innerHTML = `<text x="350" y="110" text-anchor="middle" fill="#8a94a6" font-size="14">至少记录 2 天即可显示趋势</text>`;
+    return;
+  }
+  const W = 700, H = 220, pad = 36;
+  const ws = data.map(d => d.weight);
+  const min = Math.min(...ws), max = Math.max(...ws);
+  const range = (max - min) || 1;
+  const x = i => pad + i * (W - 2*pad) / (data.length - 1);
+  const y = v => H - pad - (v - min) / range * (H - 2*pad);
+
+  // 网格 + Y 轴标签（斤）
+  for (let i = 0; i <= 4; i++) {
+    const val = min + range * i / 4;
+    const yy = y(val);
+    svg.insertAdjacentHTML('beforeend', `<line x1="${pad}" y1="${yy}" x2="${W-pad}" y2="${yy}" stroke="#eef1f6"/>`);
+    svg.insertAdjacentHTML('beforeend', `<text x="4" y="${yy+4}" fill="#8a94a6" font-size="10">${fmt(K2J(val))}</text>`);
+  }
+  // 折线
+  let path = '';
+  data.forEach((d, i) => path += (i ? 'L' : 'M') + x(i) + ' ' + y(d.weight) + ' ');
+  svg.insertAdjacentHTML('beforeend', `<path d="${path}" fill="none" stroke="#4f7cff" stroke-width="2.5" stroke-linecap="round"/>`);
+  // 点 + 日期
+  data.forEach((d, i) => {
+    svg.insertAdjacentHTML('beforeend', `<circle cx="${x(i)}" cy="${y(d.weight)}" r="3.5" fill="#4f7cff"/>`);
+    if (i % Math.ceil(data.length/6) === 0 || i === data.length-1)
+      svg.insertAdjacentHTML('beforeend', `<text x="${x(i)}" y="${H-12}" text-anchor="middle" fill="#8a94a6" font-size="9">${d.date.slice(5)}</text>`);
+  });
+}
+
+// 历史记录分页状态
+let curPage = 1;
+let pageSize = 10;
+
+function pageList(cur, pages) {
+  if (pages <= 9) { const a = []; for (let i = 1; i <= pages; i++) a.push(i); return a; }
+  const out = [1];
+  const lo = Math.max(2, cur - 1), hi = Math.min(pages - 1, cur + 1);
+  if (lo > 2) out.push('…');
+  for (let i = lo; i <= hi; i++) out.push(i);
+  if (hi < pages - 1) out.push('…');
+  out.push(pages);
+  return out;
+}
+
+function renderHistory(data) {
+  const box = $('history');
+  const total = data.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (curPage > pages) curPage = pages;
+  if (curPage < 1) curPage = 1;
+
+  const today = todayStr();
+  const sorted = [...data].reverse();               // 日期倒序（最新在上）
+  const start = (curPage - 1) * pageSize;
+  const items = sorted.slice(start, start + pageSize);
+
+  // 最新 7 条内，按自然周取每周最大体重 → 红字加粗标记
+  const weekMaxSet = new Set();
+  const scope = sorted.slice(0, 7);
+  const wkMax = {};
+  scope.forEach(d => {
+    const k = isoWeekKey(d.date);
+    if (!(k in wkMax) || d.weight > wkMax[k]) wkMax[k] = d.weight;
+  });
+  scope.forEach(d => { if (d.weight === wkMax[isoWeekKey(d.date)]) weekMaxSet.add(d); });
+
+  $('count-bar').textContent = total
+    ? `共 ${total} 条 · 第 ${curPage}/${pages} 页 · 显示 ${start + 1}–${start + items.length}`
+    : '共 0 条';
+
+  if (!items.length) {
+    box.innerHTML = '<div class="empty">还没有记录，添加第一条吧～</div>';
+  } else {
+    let html = '<table><thead><tr><th>日期</th><th>时段</th><th>体重</th><th>目标</th><th>备注</th><th></th></tr></thead><tbody>';
+    items.forEach(d => {
+      const canDel = d.date === today;   // 仅当前自然日（24 小时内）可删
+      const isMax = weekMaxSet.has(d);   // 本周最大体重
+      html += `<tr><td>${d.date}</td><td><span class="seg-tag ${segCls(d.seg)}">${d.seg || '早'}</span></td><td class="${isMax ? 'week-max' : ''}"><b>${fmt(K2J(d.weight))}</b> 斤</td><td>${d.goal ? fmt(K2J(d.goal))+' 斤' : '-'}</td>`;
+      html += `<td class="note">${d.note || ''}</td>`;
+      if (canDel)
+        html += `<td style="text-align:right"><button class="del" data-date="${d.date}" data-seg="${d.seg || '早'}">删除</button></td>`;
+      else
+        html += `<td style="text-align:right"><button class="del" disabled title="超过 24 小时，不可删除">删除</button></td>`;
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+  }
+
+  // 删除（按 日期+时段 定位，同一天早/晚两条可分别删除）
+  box.querySelectorAll('.del:not([disabled])').forEach(b => b.onclick = () => {
+    if (confirm(`删除 ${b.dataset.date} ${b.dataset.seg} 的记录？`)) {
+      persist(DATA.filter(x => !(x.date === b.dataset.date && (x.seg || '早') === b.dataset.seg))).then(render);
+    }
+  });
+
+  // 翻页 + 每页条数
+  let p = '<div class="pager-inner">';
+  p += `<button class="pg" data-pg="${curPage - 1}" ${curPage === 1 ? 'disabled' : ''}>上一页</button>`;
+  pageList(curPage, pages).forEach(n => {
+    if (n === '…') p += '<span class="pg-ellipsis">…</span>';
+    else p += `<button class="pg ${n === curPage ? 'active' : ''}" data-pg="${n}">${n}</button>`;
+  });
+  p += `<button class="pg" data-pg="${curPage + 1}" ${curPage === pages ? 'disabled' : ''}>下一页</button>`;
+  p += `<select id="pg-size" class="pg-size">` +
+       `<option value="10"${pageSize === 10 ? ' selected' : ''}>10/页</option>` +
+       `<option value="20"${pageSize === 20 ? ' selected' : ''}>20/页</option>` +
+       `<option value="50"${pageSize === 50 ? ' selected' : ''}>50/页</option></select>`;
+  p += '</div>';
+  const pager = $('pager');
+  pager.innerHTML = p;
+  pager.querySelectorAll('.pg:not([disabled])').forEach(b => b.onclick = () => { curPage = parseInt(b.dataset.pg, 10); render(); });
+  const sel = $('pg-size');
+  if (sel) sel.onchange = () => { pageSize = parseInt(sel.value, 10); curPage = 1; render(); };
+}
+
+$('form').onsubmit = async e => {
+  e.preventDefault();
+  const jin = parseFloat($('f-weight').value);            // 输入单位：斤
+  const entry = {
+    date: $('f-date').value,
+    seg: $('f-seg').value || '早',
+    weight: Math.round(jin / 2 * 100) / 100,              // 斤 → kg（2 位精度，Excel 往返无损）
+    goal: $('f-goal').value ? Math.round(parseFloat($('f-goal').value) / 2 * 100) / 100 : goalOf(),
+    note: $('f-note').value.trim()
+  };
+  if (!entry.date || isNaN(entry.weight) || isNaN(jin)) return;
+  localStorage.setItem('weight_goal', String(entry.goal));   // 目标持久化（不进 Excel）
+  let data = DATA.slice();
+  const i = data.findIndex(d => d.date === entry.date && (d.seg || '早') === entry.seg);
+  if (i >= 0) data[i] = entry; else data.push(entry);        // 同日同时段覆盖，不同时段共存
+  await persist(data); render();
+  $('f-weight').value = ''; $('f-note').value = '';
+};
+
+// 导出：生成与云端同格式的 Excel（日期 | 时段 | 体重（斤） | 备注）
+$('export-btn').onclick = () => {
+  const blob = new Blob([buildXlsx(DATA)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '体重数据-' + todayStr() + '.xlsx'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
+$('import-btn').onclick = () => $('file-input').click();
+$('file-input').onchange = e => {
+  const file = e.target.files[0];
+  e.target.value = '';                       // 先清空，便于重复选同一文件
+  if (!file) return;
+  const isXlsx = /\.xlsx$/i.test(file.name) || (file.type || '').includes('spreadsheet');
+  if (isXlsx) importXlsx(file);
+  else importJson(file);
+};
+
+async function importXlsx(file) {
+  let arr;
+  try {
+    arr = await file.arrayBuffer().then(parseXlsxBuf);
+  } catch (err) { alert('Excel 解析失败：' + (err.message || err)); return; }
+  if (!arr.length) { alert('导入失败：Excel 里没有读到有效记录（需要表头「日期/时段/体重（斤）」+ 数据行）'); return; }
+  const existing = DATA.length;
+  if (existing && !confirm(`将从 Excel 导入 ${arr.length} 条记录，并覆盖现有 ${existing} 条，确定继续？`)) return;
+  await persist(arr); curPage = 1; render();
+}
+
+function importJson(file) {
+  const reader = new FileReader();
+  reader.onerror = () => alert('文件读取失败，请重试');
+  reader.onload = async () => {
+    let text = String(reader.result || '').replace(/^﻿/, '');   // 去 UTF-8 BOM
+    let arr;
+    try { arr = JSON.parse(text); }
+    catch (err) { alert('文件不是合法 JSON：' + err.message); return; }
+    if (!Array.isArray(arr)) {
+      alert('导入失败：文件最外层应是记录的数组 [ ]，但当前是 ' + (Array.isArray(arr) ? '数组' : typeof arr));
+      return;
+    }
+    const bad = [];
+    arr.forEach((r, i) => {
+      if (!r || typeof r !== 'object') { bad.push((i + 1) + ': 不是对象'); return; }
+      if (typeof r.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) { bad.push((i + 1) + ': date 应为 YYYY-MM-DD'); return; }
+      if (typeof r.weight !== 'number' || isNaN(r.weight)) { bad.push((i + 1) + ': weight 应为数字'); }
+    });
+    if (bad.length) {
+      alert('导入失败，有 ' + bad.length + ' 条格式不对：\n' + bad.slice(0, 5).join('\n') + (bad.length > 5 ? '\n…' : ''));
+      return;
+    }
+    arr.forEach(r => { if (!r.seg) { if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; } else r.seg = '早'; } r.goal = r.goal || goalOf(); });
+    const existing = DATA.length;
+    if (existing && !confirm(`将导入 ${arr.length} 条记录，并覆盖现有 ${existing} 条，确定继续？`)) return;
+    await persist(arr);
+    curPage = 1;
+    render();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+$('clear-btn').onclick = () => {
+  const today = todayStr();
+  const removable = DATA.filter(d => d.date === today);   // 仅 24 小时内（当天）
+  if (!removable.length) { alert('没有可清空的当日（24 小时内）记录'); return; }
+  if (confirm(`仅清空当日（24 小时内）的 ${removable.length} 条记录？\n超过 24 小时的历史记录将保留，此操作不可恢复。`)) {
+    persist(DATA.filter(d => d.date !== today)).then(render);
+  }
+};
+
+// 初始化日期选择器（flatpickr：点击输入框任意位置即弹出日历，周一开头）
+if (flatpickr.l10ns && flatpickr.l10ns.zh) flatpickr.l10ns.zh.firstDayOfWeek = 1;   // 周一为第一列
+flatpickr('#f-date', { locale: 'zh', dateFormat: 'Y-m-d', defaultDate: 'today', disableMobile: true });
+
+// 实时时钟（暗红色，yyyy/m/d h:mm:ss）
+function tick() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  const el = $('clock');
+  if (el) el.textContent = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+tick();
+setInterval(tick, 1000);
+
+// ===== GitHub 同步面板交互 =====
+function ghCfgLoad() {
+  try { const c = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); Object.assign(GH, c); } catch {}
+  if (/\.json$/i.test(GH.path)) GH.path = GH.path.replace(/\.json$/i, '.xlsx');   // 旧 JSON 配置自动迁移到 Excel
+  if (GH.token) localStorage.setItem('gh_token', GH.token);
+}
+function ghCfgSave() {
+  GH.token = $('gh-token').value.trim();
+  GH.owner = $('gh-owner').value.trim() || 'sumer0825';
+  GH.repo = $('gh-repo').value.trim() || 'Sumer';
+  GH.branch = $('gh-branch').value.trim() || 'main';
+  GH.path = $('gh-path').value.trim() || 'data/weight.xlsx';
+  GH.sha = null;
+  localStorage.setItem('gh_token', GH.token);
+  localStorage.setItem('gh_cfg', JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path }));
+  $('store-mode').textContent = 'GitHub Excel（' + GH.owner + '/' + GH.repo + '）';
+}
+function ghPrefill() {
+  $('gh-token').value = GH.token;
+  $('gh-owner').value = GH.owner;
+  $('gh-repo').value = GH.repo;
+  $('gh-branch').value = GH.branch;
+  $('gh-path').value = GH.path;
+}
+ghCfgLoad(); ghPrefill();
+if (GH.token) $('store-mode').textContent = 'GitHub Excel（' + GH.owner + '/' + GH.repo + '）';
+$('f-goal').value = K2J(goalOf());   // 目标输入框预填当前目标（单位：斤）
+
+$('sync-settings-btn').onclick = () => {
+  ghPrefill();
+  $('sync-card').style.display = $('sync-card').style.display === 'none' ? '' : 'none';
+};
+$('gh-close').onclick = () => { $('sync-card').style.display = 'none'; };
+$('gh-connect').onclick = async () => {
+  ghCfgSave();
+  $('gh-msg').textContent = '连接中…';
+  try {
+    const d = await ghPull();
+    if (d === null) {
+      setSync('GitHub 云端暂无 Excel，首次保存将自动创建', '');
+      $('gh-msg').textContent = '云端还没有 ' + GH.path + '，保存记录后将自动创建该 Excel';
+    } else {
+      DATA = d; save(d);
+      setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok');
+      $('gh-msg').textContent = '连接成功，已从 Excel 拉取 ' + d.length + ' 条';
+      render();
+    }
+  } catch (e) {
+    setSync('连接失败：' + e.message, 'err');
+    $('gh-msg').textContent = '连接失败：' + e.message;
+  }
+};
+$('sync-now-btn').onclick = () => refresh();
+
+refresh();
+</script>
+</body>
+</html>

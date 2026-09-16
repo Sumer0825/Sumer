@@ -3,406 +3,190 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>体重记录</title>
+<title>暮之小工具</title>
+<link href="fonts/lxgwwenkai-regular.css" rel="stylesheet">
 <style>
   :root {
     --bg: #f4f6fb;
-    --card: #ffffff;
     --primary: #4f7cff;
-    --primary-soft: #eaf0ff;
     --text: #1f2733;
     --muted: #8a94a6;
-    --line: #eef1f6;
-    --danger: #ff5d6c;
-    --success: #2bbf7a;
-    --shadow: 0 10px 30px rgba(31, 39, 51, 0.06);
-    --radius: 16px;
+    --line: #e6eaf1;
+    --card: #ffffff;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
+  /* 根元素背景：按规范绘制覆盖整个屏幕画布（含 iOS 工具栏后方），各端必然铺满 */
+  html, body { margin: 0; min-height: 100%; }
+  html {
+    background: linear-gradient(rgba(255,255,255,.42), rgba(255,255,255,.55)), url('assets/bg.jpg') center / cover no-repeat #f4f6fb;
+  }
   body {
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, sans-serif;
-    background: var(--bg);
+    font-family: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     color: var(--text);
-    line-height: 1.5;
-    padding: 24px 16px 60px;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; }
-
-  header { text-align: center; margin-bottom: 24px; }
-  header h1 { font-size: 26px; font-weight: 700; }
-  header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
-
-  .card {
-    background: var(--card);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 20px;
-    margin-bottom: 18px;
+  .topbar {
+    height: 60px; display: flex; align-items: center; gap: 12px;
+    background: #fff; border-bottom: 1px solid var(--line); padding: 0 22px;
   }
-
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
-  .stat { text-align: center; padding: 8px; }
-  .stat .label { font-size: 12px; color: var(--muted); }
-  .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  .stat .value small { font-size: 12px; font-weight: 500; color: var(--muted); }
-  .delta-up { color: var(--danger); }
-  .delta-down { color: var(--success); }
-
-  .chart-box { position: relative; }
-  svg.chart { width: 100%; height: 220px; display: block; }
-
-  form .row { display: flex; gap: 12px; flex-wrap: wrap; }
-  .field { flex: 1 1 120px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .field input {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-    border-radius: 10px; font-size: 15px; outline: none; background: #fbfcfe;
-    transition: border-color .15s;
+  .topbar .logo { font-size: 22px; }
+  .topbar .title { font-size: 17px; font-weight: 700; }
+  .topbar .crumb { margin-left: auto; font-size: 14px; color: var(--muted); }
+  .topbar .crumb b { color: var(--primary); }
+  .topbar .back {
+    margin-left: auto; border: 1px solid var(--line); background: #fff; color: var(--text);
+    padding: 7px 14px; border-radius: 9px; cursor: pointer; font-size: 14px; display: none;
   }
-  .field input:focus { border-color: var(--primary); background: #fff; }
+  .topbar .back:hover { border-color: var(--primary); color: var(--primary); }
 
-  .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-  button {
-    border: none; border-radius: 10px; padding: 11px 18px; font-size: 14px;
-    font-weight: 600; cursor: pointer; transition: transform .1s, opacity .15s;
+  .wrap { max-width: 960px; margin: 0 auto; padding: 28px 22px 40px; }
+
+  /* 首页：按钮上下垂直排列，居中，自适应宽度 */
+  .home { }
+  .home h1 { font-size: 22px; margin: 4px 0 4px; text-align: center; }
+  .home .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; text-align: center; }
+  .tools {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
   }
-  button:active { transform: scale(.97); }
-  .btn-primary { background: var(--primary); color: #fff; flex: 1 1 auto; }
-  .btn-ghost { background: var(--primary-soft); color: var(--primary); }
-  .btn-line { background: transparent; color: var(--muted); border: 1px solid var(--line); }
-
-  .goal-bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 14px; }
-  .goal-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #4f7cff, #7da2ff); border-radius: 99px; transition: width .4s; }
-
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 12px 8px; font-size: 14px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 500; font-size: 12px; }
-  td .note { color: var(--muted); font-size: 12px; }
-  .del { color: var(--danger); background: none; padding: 4px 8px; font-size: 13px; }
-  .del:disabled { color: #c4c9d4; cursor: not-allowed; }
-  .empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 14px; }
-
-  .card h2 { font-size: 16px; margin-bottom: 14px; }
-  .tip { font-size: 12px; color: var(--muted); margin-top: 8px; }
-
-  /* 左右分栏 */
-  .layout { display: flex; gap: 18px; align-items: flex-start; }
-  .col-left { flex: 1 1 0; min-width: 0; }
-  .col-right { flex: 1 1 0; min-width: 0; }
-  .col-right .card { margin-bottom: 0; }
-
-  /* 数量条 + 翻页 */
-  .hist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-  .hist-head h2 { margin-bottom: 0; }
-  .clock { color: #b30000; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .week-max { color: #e02020; font-weight: 700; }
-  .count-bar { font-size: 12px; color: var(--muted); }
-  .pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
-  .pg { background: var(--primary-soft); color: var(--primary); padding: 6px 12px; font-size: 13px; border-radius: 8px; }
-  .pg.active { background: var(--primary); color: #fff; }
-  .pg:disabled { opacity: .45; cursor: not-allowed; }
-  .pg-ellipsis { color: var(--muted); padding: 0 2px; }
-  .pg-size { margin-left: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe; font-size: 13px; color: var(--text); }
-
-  @media (max-width: 860px) {
-    .layout { flex-direction: column; }
-    .col-right .card { margin-bottom: 18px; }
+  .tool-card {
+    width: min(240px, 100%);                        /* 水平长度不变 */
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,.55);                    /* 半透明卡片 */
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);   /* 毛玻璃 */
+    border: 1px solid rgba(255,255,255,.7);
+    border-radius: 14px;
+    padding: 11px 18px; cursor: pointer; transition: .15s; box-shadow: 0 1px 3px rgba(20,30,60,.05);
+    position: relative; overflow: hidden; text-align: center;
+    user-select: none; -webkit-tap-highlight-color: transparent;
   }
-  @media (max-width: 520px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
+  .tool-card:hover { border-color: rgba(255,255,255,.95); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(79,124,255,.18); background: rgba(255,255,255,.7); }
+  .tool-card:active { transform: scale(.96); }          /* 按压缩放 */
+  .tool-card .txt { flex: 1; min-width: 0; }              /* 文字块占剩余空间，名称居中显示 */
+  .tool-card .ico {
+    width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; background: rgba(238,243,255,.6);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
   }
+  .tool-card .name { font-size: 16px; font-weight: 600; color: #e02020; }
+  .tool-card .desc { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+  /* 点击波纹效果 */
+  .ripple {
+    position: absolute; border-radius: 50%; background: rgba(79,124,255,.28);
+    transform: scale(0); animation: ripple .55s ease-out forwards; pointer-events: none;
+  }
+  @keyframes ripple { to { transform: scale(2.4); opacity: 0; } }
+
+  /* iframe 容器 */
+  .frame-box { position: fixed; inset: 60px 0 0 0; background: #fff; display: none; }
+  iframe.frame { width: 100%; height: 100%; border: none; display: block; }
+  .loading {
+    position: absolute; inset: 0; z-index: 1; background: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    color: var(--muted); font-size: 15px;
+  }
+  .loading .spin {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 3px solid #e6eaf1; border-top-color: var(--primary);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>📉 我的体重记录</h1>
-    <p>数据保存在本机浏览器，不会上传 · 可导出备份</p>
-  </header>
+  <div class="topbar">
+    <span class="logo">🌆</span>
+    <span class="title">暮之小工具</span>
+    <span class="crumb" id="crumb">首页</span>
+    <button class="back" id="back">← 返回首页</button>
+  </div>
 
-  <div class="layout">
-  <div class="col-left">
-  <!-- 概览 -->
-  <section class="card">
-    <div class="stats">
-      <div class="stat"><div class="label">最新体重</div><div class="value" id="s-latest">--<small>kg</small></div></div>
-      <div class="stat"><div class="label">较前次</div><div class="value" id="s-delta">--</div></div>
-      <div class="stat"><div class="label">初始体重</div><div class="value" id="s-first">--<small>kg</small></div></div>
-      <div class="stat"><div class="label">平均</div><div class="value" id="s-avg">--<small>kg</small></div></div>
-      <div class="stat"><div class="label">距目标</div><div class="value" id="s-goal">--<small>kg</small></div></div>
+  <div class="wrap" id="home">
+    <div class="home">
+      <h1>欢迎使用我的百宝箱</h1>
+      <div class="sub">点击下方按钮即可打开对应工具</div>
+      <div class="tools" id="tools"><!-- 按钮卡片由 JS 根据 TOOLS 生成 --></div>
     </div>
-    <div class="goal-bar" title="距目标进度"><span id="goal-fill" style="width:0%"></span></div>
-    <div class="tip" id="goal-text">未设置目标体重</div>
-  </section>
+  </div>
 
-  <!-- 添加 -->
-  <section class="card">
-    <div class="hist-head">
-      <h2>添加记录</h2>
-      <span class="clock" id="clock"></span>
-    </div>
-    <form id="form">
-      <div class="row">
-        <div class="field"><label>日期</label><input type="date" id="f-date" required></div>
-        <div class="field"><label>体重 (kg)</label><input type="number" id="f-weight" step="0.1" min="0" placeholder="如 65.5" required></div>
-        <div class="field"><label>目标 (kg)</label><input type="number" id="f-goal" step="0.1" min="0" placeholder="可选"></div>
-        <div class="field"><label>备注</label><input type="text" id="f-note" placeholder="可选，如 晨起空腹"></div>
-      </div>
-      <div class="actions">
-        <button type="submit" class="btn-primary">保存记录</button>
-        <button type="button" class="btn-line" id="import-btn">导入</button>
-        <button type="button" class="btn-line" id="export-btn">导出</button>
-        <button type="button" class="btn-ghost" id="clear-btn">清空</button>
-      </div>
-    </form>
-  </section>
+  <div class="frame-box" id="frameBox">
+    <div class="loading" id="loading"><div class="spin"></div>正在打开工具…</div>
+    <iframe class="frame" id="frame" title=""></iframe>
+  </div>
 
-  <!-- 趋势图 -->
-  <section class="card">
-    <h2>体重趋势</h2>
-    <div class="chart-box"><svg class="chart" id="chart" viewBox="0 0 700 220" preserveAspectRatio="none"></svg></div>
-  </section>
-  </div><!-- /col-left -->
-
-  <!-- 历史（右侧） -->
-  <div class="col-right">
-  <section class="card">
-    <div class="hist-head">
-      <h2>历史记录</h2>
-      <div class="count-bar" id="count-bar"></div>
-    </div>
-    <div id="history"></div>
-    <div class="pager" id="pager"></div>
-  </section>
-  </div><!-- /col-right -->
-  </div><!-- /layout -->
-</div>
-
-<input type="file" id="file-input" accept="application/json" style="display:none">
 <script>
-const KEY = 'weight_records_v1';
-const $ = id => document.getElementById(id);
-const fmt = n => (n == null || isNaN(n)) ? '--' : Number(n).toFixed(1);
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
-const save = d => localStorage.setItem(KEY, JSON.stringify(d));
+/* =========================================================
+   工具清单：以后要新增嵌套页面，只要在这里加一行即可。
+   例： { name: '记账本', file: 'money.html', icon: '💰', desc: '日常记账' }
+   对应页面文件放在与本 index.html 同目录即可（同属一个静态站点）。
+   ========================================================= */
+const TOOLS = [
+  { name: '时光记录器', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
+  { name: '体重记录器', file: 'weight.html', icon: '🎯', desc: '记录与查看体重趋势' },
+];
 
-// 按日期算「每年的自然周」key（ISO 周，周一开始），如 2026-W36
-function isoWeekKey(s) {
-  const d = new Date(s + 'T00:00:00');
-  const dayNum = (d.getDay() + 6) % 7;        // 周一=0 … 周日=6
-  d.setDate(d.getDate() - dayNum + 3);         // 移到本周四
-  const yt = new Date(d.getFullYear(), 0, 4);  // 当年 1/4
-  const yd = (yt.getDay() + 6) % 7;
-  yt.setDate(yt.getDate() - yd + 3);
-  const week = 1 + Math.round((d - yt) / (7 * 864e5));
-  return d.getFullYear() + '-W' + week;
-}
+const tools = document.getElementById('tools');
+const home = document.getElementById('home');
+const frameBox = document.getElementById('frameBox');
+const frame = document.getElementById('frame');
+const crumb = document.getElementById('crumb');
+const back = document.getElementById('back');
 
-function render() {
-  let data = load().sort((a, b) => new Date(a.date) - new Date(b.date));
-  const len = data.length;
-  $('s-latest').innerHTML = len ? `${fmt(data[len-1].weight)}<small>kg</small>` : '--';
-  $('s-first').innerHTML  = len ? `${fmt(data[0].weight)}<small>kg</small>` : '--';
-  $('s-avg').innerHTML    = len ? `${fmt(data.reduce((s,x)=>s+x.weight,0)/len)}<small>kg</small>` : '--';
-  const delta = len >= 2 ? data[len-1].weight - data[len-2].weight : null;
-  const dEl = $('s-delta');
-  if (delta == null) { dEl.textContent = '--'; dEl.className = 'value'; }
-  else if (delta > 0) { dEl.innerHTML = `+${fmt(delta)}`; dEl.className = 'value delta-up'; }
-  else if (delta < 0) { dEl.innerHTML = fmt(delta); dEl.className = 'value delta-down'; }
-  else { dEl.textContent = '0.0'; dEl.className = 'value'; }
+/* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
+   即可强制所有访问者绕过缓存加载新版 */
+const TOOLS_VER = { 'time.html': 2, 'weight.html': 7 };
 
-  // 距目标差值（最新体重 - 目标体重；正=还需减，负=已低于目标）
-  const goal = len ? (data[len-1].goal || null) : null;
-  const gEl = $('s-goal');
-  if (goal == null) { gEl.innerHTML = '--'; gEl.className = 'value'; }
-  else {
-    const diff = data[len-1].weight - goal;
-    if (Math.abs(diff) < 0.05) { gEl.innerHTML = '达成'; gEl.className = 'value delta-down'; }
-    else if (diff > 0) { gEl.innerHTML = `+${fmt(diff)}<small>kg</small>`; gEl.className = 'value delta-up'; }
-    else { gEl.innerHTML = `${fmt(diff)}<small>kg</small>`; gEl.className = 'value delta-down'; }
-  }
-
-  // 目标进度
-  const gt = $('goal-text'), gf = $('goal-fill');
-  if (goal && len) {
-    const first = data[0].weight, last = data[len-1].weight;
-    let pct;
-    if (first > goal) pct = Math.max(0, Math.min(100, (first - last) / (first - goal) * 100));
-    else if (first < goal) pct = Math.max(0, Math.min(100, (last - first) / (goal - first) * 100));
-    else pct = 100;
-    gf.style.width = pct.toFixed(0) + '%';
-    const diff = (last - goal);
-    const status = Math.abs(diff) < 0.05 ? '已达成目标 🎉' : (diff > 0 ? `还差 ${fmt(diff)} kg` : `已超出 ${fmt(-diff)} kg`);
-    gt.textContent = `目标 ${fmt(goal)} kg · ${status}`;
-  } else { gf.style.width = '0%'; gt.textContent = '未设置目标体重'; }
-
-  drawChart(data);
-  renderHistory(data);
-}
-
-function drawChart(data) {
-  const svg = $('chart'); svg.innerHTML = '';
-  if (data.length < 2) {
-    svg.innerHTML = `<text x="350" y="110" text-anchor="middle" fill="#8a94a6" font-size="14">至少记录 2 天即可显示趋势</text>`;
-    return;
-  }
-  const W = 700, H = 220, pad = 36;
-  const ws = data.map(d => d.weight);
-  const min = Math.min(...ws), max = Math.max(...ws);
-  const range = (max - min) || 1;
-  const x = i => pad + i * (W - 2*pad) / (data.length - 1);
-  const y = v => H - pad - (v - min) / range * (H - 2*pad);
-
-  // 网格 + Y 轴标签
-  for (let i = 0; i <= 4; i++) {
-    const val = min + range * i / 4;
-    const yy = y(val);
-    svg.insertAdjacentHTML('beforeend', `<line x1="${pad}" y1="${yy}" x2="${W-pad}" y2="${yy}" stroke="#eef1f6"/>`);
-    svg.insertAdjacentHTML('beforeend', `<text x="4" y="${yy+4}" fill="#8a94a6" font-size="10">${fmt(val)}</text>`);
-  }
-  // 折线
-  let path = '';
-  data.forEach((d, i) => path += (i ? 'L' : 'M') + x(i) + ' ' + y(d.weight) + ' ');
-  svg.insertAdjacentHTML('beforeend', `<path d="${path}" fill="none" stroke="#4f7cff" stroke-width="2.5" stroke-linecap="round"/>`);
-  // 点 + 日期
-  data.forEach((d, i) => {
-    svg.insertAdjacentHTML('beforeend', `<circle cx="${x(i)}" cy="${y(d.weight)}" r="3.5" fill="#4f7cff"/>`);
-    if (i % Math.ceil(data.length/6) === 0 || i === data.length-1)
-      svg.insertAdjacentHTML('beforeend', `<text x="${x(i)}" y="${H-12}" text-anchor="middle" fill="#8a94a6" font-size="9">${d.date.slice(5)}</text>`);
+TOOLS.forEach((t, i) => {
+  const c = document.createElement('div');
+  c.className = 'tool-card';
+  c.innerHTML = `<div class="ico">${t.icon}</div><div class="txt"><div class="name">${t.name}</div><div class="desc">${t.desc || ''}</div></div>`;
+  c.onclick = () => openTool(i);
+  // 点击波纹效果：在点击位置生成一个扩散渐隐的圆
+  c.addEventListener('pointerdown', e => {
+    const rect = c.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    r.style.width = r.style.height = size + 'px';
+    r.style.left = (e.clientX - rect.left - size / 2) + 'px';
+    r.style.top = (e.clientY - rect.top - size / 2) + 'px';
+    c.appendChild(r);
+    setTimeout(() => r.remove(), 600);
   });
+  tools.appendChild(c);
+});
+
+let loadPoll = null;   // 加载探测定时器
+function openTool(i) {
+  const t = TOOLS[i];
+  home.style.display = 'none';
+  frameBox.style.display = 'block';
+  const ld = document.getElementById('loading');
+  ld.style.display = 'flex';                        // 打开时显示加载提示
+  const hide = () => { ld.style.display = 'none'; };
+  frame.onload = hide;                              // 常规：加载完成事件
+  if (loadPoll) clearInterval(loadPoll);            // 兜底：子页面真正渲染出内容即隐藏（防 iframe 空文档 load 误触发）
+  loadPoll = setInterval(() => {
+    try {
+      const d = frame.contentDocument;
+      if (d && d.body && d.body.children.length > 0) { clearInterval(loadPoll); loadPoll = null; hide(); }
+    } catch (e) {}
+  }, 150);
+  setTimeout(() => { if (loadPoll) { clearInterval(loadPoll); loadPoll = null; } }, 30000);
+  const v = TOOLS_VER[t.file];
+  frame.src = t.file + (v ? '?v=' + v : '');   // 带版本号，绕过 CDN/浏览器缓存
+  frame.title = t.name;
+  crumb.innerHTML = `当前：<b>${t.name}</b>`;
+  crumb.style.display = 'none';
+  back.style.display = 'block';
 }
 
-// 历史记录分页状态
-let curPage = 1;
-let pageSize = 10;
-
-function pageList(cur, pages) {
-  if (pages <= 9) { const a = []; for (let i = 1; i <= pages; i++) a.push(i); return a; }
-  const out = [1];
-  const lo = Math.max(2, cur - 1), hi = Math.min(pages - 1, cur + 1);
-  if (lo > 2) out.push('…');
-  for (let i = lo; i <= hi; i++) out.push(i);
-  if (hi < pages - 1) out.push('…');
-  out.push(pages);
-  return out;
-}
-
-function renderHistory(data) {
-  const box = $('history');
-  const total = data.length;
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (curPage > pages) curPage = pages;
-  if (curPage < 1) curPage = 1;
-
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const sorted = [...data].reverse();               // 日期倒序（最新在上）
-  const start = (curPage - 1) * pageSize;
-  const items = sorted.slice(start, start + pageSize);
-
-  // 最新 7 条内，按自然周取每周最大体重 → 红字加粗标记
-  const weekMaxSet = new Set();
-  const scope = sorted.slice(0, 7);
-  const wkMax = {};
-  scope.forEach(d => {
-    const k = isoWeekKey(d.date);
-    if (!(k in wkMax) || d.weight > wkMax[k]) wkMax[k] = d.weight;
-  });
-  scope.forEach(d => { if (d.weight === wkMax[isoWeekKey(d.date)]) weekMaxSet.add(d); });
-
-  $('count-bar').textContent = total
-    ? `共 ${total} 条 · 第 ${curPage}/${pages} 页 · 显示 ${start + 1}–${start + items.length}`
-    : '共 0 条';
-
-  if (!items.length) {
-    box.innerHTML = '<div class="empty">还没有记录，添加第一条吧～</div>';
-  } else {
-    let html = '<table><thead><tr><th>日期</th><th>体重</th><th>目标</th><th>备注</th><th></th></tr></thead><tbody>';
-    items.forEach(d => {
-      const canDel = d.date === today;   // 仅当前自然日（24 小时内）可删
-      const isMax = weekMaxSet.has(d);   // 本周最大体重
-      html += `<tr><td>${d.date}</td><td class="${isMax ? 'week-max' : ''}"><b>${fmt(d.weight)}</b> kg</td><td>${d.goal ? fmt(d.goal)+' kg' : '-'}</td>`;
-      html += `<td class="note">${d.note || ''}</td>`;
-      if (canDel)
-        html += `<td style="text-align:right"><button class="del" data-date="${d.date}">删除</button></td>`;
-      else
-        html += `<td style="text-align:right"><button class="del" disabled title="超过 24 小时，不可删除">删除</button></td>`;
-    });
-    html += '</tbody></table>';
-    box.innerHTML = html;
-  }
-
-  // 删除
-  box.querySelectorAll('.del:not([disabled])').forEach(b => b.onclick = () => {
-    if (confirm('删除这条记录？')) { save(load().filter(x => x.date !== b.dataset.date)); render(); }
-  });
-
-  // 翻页 + 每页条数
-  let p = '<div class="pager-inner">';
-  p += `<button class="pg" data-pg="${curPage - 1}" ${curPage === 1 ? 'disabled' : ''}>上一页</button>`;
-  pageList(curPage, pages).forEach(n => {
-    if (n === '…') p += '<span class="pg-ellipsis">…</span>';
-    else p += `<button class="pg ${n === curPage ? 'active' : ''}" data-pg="${n}">${n}</button>`;
-  });
-  p += `<button class="pg" data-pg="${curPage + 1}" ${curPage === pages ? 'disabled' : ''}>下一页</button>`;
-  p += `<select id="pg-size" class="pg-size">` +
-       `<option value="10"${pageSize === 10 ? ' selected' : ''}>10/页</option>` +
-       `<option value="20"${pageSize === 20 ? ' selected' : ''}>20/页</option>` +
-       `<option value="50"${pageSize === 50 ? ' selected' : ''}>50/页</option></select>`;
-  p += '</div>';
-  const pager = $('pager');
-  pager.innerHTML = p;
-  pager.querySelectorAll('.pg:not([disabled])').forEach(b => b.onclick = () => { curPage = parseInt(b.dataset.pg, 10); render(); });
-  const sel = $('pg-size');
-  if (sel) sel.onchange = () => { pageSize = parseInt(sel.value, 10); curPage = 1; render(); };
-}
-
-$('form').onsubmit = e => {
-  e.preventDefault();
-  const entry = {
-    date: $('f-date').value,
-    weight: parseFloat($('f-weight').value),
-    goal: $('f-goal').value ? parseFloat($('f-goal').value) : null,
-    note: $('f-note').value.trim()
-  };
-  if (!entry.date || isNaN(entry.weight)) return;
-  let data = load();
-  const i = data.findIndex(d => d.date === entry.date);
-  if (i >= 0) data[i] = entry; else data.push(entry);
-  save(data); render();
-  $('f-weight').value = ''; $('f-note').value = ''; $('f-goal').value = '';
+back.onclick = () => {
+  frameBox.style.display = 'none';
+  frame.src = '';
+  home.style.display = 'block';
+  crumb.textContent = '首页';
+  crumb.style.display = 'block';
+  back.style.display = 'none';
 };
-
-$('export-btn').onclick = () => {
-  const blob = new Blob([JSON.stringify(load(), null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'weight-backup.json'; a.click();
-};
-$('import-btn').onclick = () => $('file-input').click();
-$('file-input').onchange = e => {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { try { save(JSON.parse(reader.result)); render(); } catch { alert('文件格式不正确'); } };
-  reader.readAsText(file);
-  e.target.value = '';
-};
-$('clear-btn').onclick = () => { if (confirm('清空全部记录？此操作不可恢复')) { save([]); render(); } };
-
-// 初始化日期
-$('f-date').value = new Date().toISOString().slice(0, 10);
-
-// 实时时钟（暗红色，yyyy/m/d h:mm:ss）
-function tick() {
-  const d = new Date();
-  const p = n => String(n).padStart(2, '0');
-  const el = $('clock');
-  if (el) el.textContent = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-tick();
-setInterval(tick, 1000);
-
-render();
 </script>
 </body>
 </html>
