@@ -197,6 +197,9 @@
   @media (max-width: 520px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
+
+/* 版本角标：右下角极小字，不响应点击，用于快速分辨新旧版 */
+.ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,130,145,.45); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -907,7 +910,13 @@ $('gh-connect').onclick = async () => {
 };
 $('sync-now-btn').onclick = () => refresh();
 
+// iOS 键盘收起后视口残留修正：同位置滚动一次，触发 Safari 重算布局（不改变滚动位置）
+document.addEventListener('focusout', () => {
+  setTimeout(() => { if (!document.activeElement || !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName || '')) window.scrollTo(window.scrollX, window.scrollY); }, 250);
+});
+
 refresh();
 </script>
+<div class="ver">v17</div>
 </body>
 </html>
