@@ -2,8 +2,18 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>体重记录器</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="我的体重">
+<meta name="theme-color" content="#f4f6fb">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="assets/apple-touch-icon.png">
 <link href="fonts/lxgwwenkai-regular.css" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="fonts/lxgwwenkai-regular.css" rel="stylesheet"></noscript>
 <link href="lib/flatpickr.min.css" rel="stylesheet">
@@ -28,7 +38,10 @@
     color: var(--text);
     line-height: 1.5;
     padding: 24px 16px 60px;
+    padding-top: max(24px, env(safe-area-inset-top) + 24px);   /* 避开 iOS 刘海/状态栏 */
+    padding-bottom: max(60px, env(safe-area-inset-bottom) + 60px);
   }
+  header { padding-top: env(safe-area-inset-top); }
   .wrap { max-width: 1080px; margin: 0 auto; }
 
   header { text-align: center; margin-bottom: 24px; }
@@ -51,22 +64,26 @@
   .delta-up { color: var(--danger); }
   .delta-down { color: var(--success); }
 
-  .chart-box { position: relative; }
-  svg.chart { width: 100%; height: 220px; display: block; }
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .chart-head h2 { margin-bottom: 14px; }
+  .chart-hint { font-size: 12px; color: var(--muted); white-space: nowrap; opacity: .85; margin-bottom: 14px; }
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; overscroll-behavior-x: contain; }
+  .chart-box { position: relative; width: max-content; min-width: 100%; }
+  svg.chart { display: block; height: 220px; }
 
   form .row { display: flex; gap: 12px; flex-wrap: wrap; }
   .field { flex: 1 1 120px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .field input {
     width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-    border-radius: 10px; font-size: 15px; outline: none; background: #fbfcfe;
+    border-radius: 10px; font-size: 16px; outline: none; background: #fbfcfe;
     transition: border-color .15s;
   }
   .field input:focus { border-color: var(--primary); background: #fff; }
   .field input[readonly] { cursor: pointer; }   /* 日期选择框：点击弹日历 */
   .field select {
     width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-    border-radius: 10px; font-size: 15px; outline: none; background: #fbfcfe;
+    border-radius: 10px; font-size: 16px; outline: none; background: #fbfcfe;
     font-family: inherit; cursor: pointer; transition: border-color .15s;
   }
   .field select:focus { border-color: var(--primary); background: #fff; }
@@ -114,7 +131,7 @@
   .sync-card .row { display: flex; gap: 12px; flex-wrap: wrap; }
   .sync-card .field { flex: 1 1 160px; }
   .sync-card .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .sync-card .field input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; outline: none; background: #fbfcfe; }
+  .sync-card .field input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; outline: none; background: #fbfcfe; }
   .sync-card .field input:focus { border-color: var(--primary); background: #fff; }
   #gh-msg { margin-left: 6px; }
 
@@ -135,10 +152,46 @@
   .pg.active { background: var(--primary); color: #fff; }
   .pg:disabled { opacity: .45; cursor: not-allowed; }
   .pg-ellipsis { color: var(--muted); padding: 0 2px; }
-  .pg-size { margin-left: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe; font-size: 13px; color: var(--text); }
+  .pg-size { margin-left: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe; font-size: 16px; color: var(--text); }
+
+  /* 清空密码弹窗 */
+  .pw-mask { display:none; position: fixed; inset: 0; background: rgba(20,26,38,.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 99; align-items: center; justify-content: center; }
+  .pw-mask.show { display: flex; }
+  .pw-card { background: #fff; border-radius: 16px; padding: 22px 22px 18px; width: min(320px, calc(100vw - 48px)); box-shadow: 0 20px 50px rgba(0,0,0,.28); }
+  .pw-title { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+  .pw-tip { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 14px; line-height: 1.45; }
+  #pw-input { width: 100%; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 18px; text-align: center; letter-spacing: .35em; outline: none; background: #fbfcfe; font-variant-numeric: tabular-nums; }
+  #pw-input:focus { border-color: var(--primary); background: #fff; }
+  .pw-err { color: var(--danger); font-size: 12px; height: 16px; text-align: center; margin: 6px 0 8px; }
+  .pw-actions { display: flex; gap: 10px; }
+  .pw-actions .btn-line { flex: 1; }
+  .pw-actions .btn-primary { flex: 1; background: var(--danger); }
+
+  /* 清空：日期范围选择弹窗 */
+  .range-field { margin-bottom: 10px; }
+  .range-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .range-field input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; background: #fbfcfe; outline: none; font-variant-numeric: tabular-nums; color: var(--text); font-family: inherit; }
+  .range-field input:focus { border-color: var(--primary); background: #fff; }
+  .range-sep { display: block; text-align: center; font-size: 12px; color: var(--muted); margin: -4px 0 6px; }
+  .range-cnt { min-height: 18px; text-align: center; font-size: 13px; color: var(--primary); margin: 8px 0 10px; font-variant-numeric: tabular-nums; }
+  .range-cnt.bad { color: var(--danger); }
+  .range-all { display: block; width: 100%; margin-bottom: 12px; padding: 7px 0; border: none; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; }
+  .range-all:active { color: var(--primary); }
+
+  /* 操作结果轻提示（toast） */
+  .toast {
+    position: fixed; top: max(18px, env(safe-area-inset-top)); left: 50%;
+    transform: translateX(-50%) translateY(-120%);
+    background: rgba(35,30,21,.94); color: #fff; padding: 10px 22px; border-radius: 99px;
+    font-size: 14px; z-index: 120; box-shadow: 0 8px 24px rgba(0,0,0,.28);
+    transition: transform .28s ease, opacity .28s; opacity: 0; pointer-events: none;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+    max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
   @media (max-width: 860px) {
-    .layout { flex-direction: column; }
+    .layout { flex-direction: column; align-items: stretch; }   /* 竖排时列宽=容器宽，避免被图表内容撑开 */
     .col-right .card { margin-bottom: 18px; }
   }
   @media (max-width: 520px) {
@@ -210,15 +263,15 @@
         <button type="submit" class="btn-primary">保存记录</button>
         <button type="button" class="btn-line" id="import-btn">导入</button>
         <button type="button" class="btn-line" id="export-btn">导出</button>
-        <button type="button" class="btn-ghost" id="clear-btn" title="仅清空 24 小时内的记录">清空</button>
+        <button type="button" class="btn-ghost" id="clear-btn" title="清空全部记录（需密码）">清空</button>
       </div>
     </form>
   </section>
 
   <!-- 趋势图 -->
   <section class="card">
-    <h2>体重趋势</h2>
-    <div class="chart-box"><svg class="chart" id="chart" viewBox="0 0 700 220" preserveAspectRatio="none"></svg></div>
+    <div class="chart-head"><h2>体重趋势</h2><span class="chart-hint" id="chart-hint" style="display:none">↔ 左右滑动查看</span></div>
+    <div class="chart-scroll" id="chart-scroll"><div class="chart-box"><svg class="chart" id="chart" width="700" height="220"></svg></div></div>
   </section>
   </div><!-- /col-left -->
 
@@ -239,6 +292,43 @@
 </div>
 
 <input type="file" id="file-input" accept=".xlsx,.json,application/json" style="display:none">
+
+<!-- 清空：日期范围选择弹窗 -->
+<div class="pw-mask" id="range-mask">
+  <div class="pw-card">
+    <div class="pw-title">🧹 清空日期范围</div>
+    <div class="pw-tip">选择要清空的日期范围（含首尾两天）</div>
+    <div class="range-field">
+      <label for="range-from">开始日期</label>
+      <input type="date" id="range-from">
+    </div>
+    <span class="range-sep">—— 至 ——</span>
+    <div class="range-field">
+      <label for="range-to">结束日期</label>
+      <input type="date" id="range-to">
+    </div>
+    <div class="range-cnt" id="range-cnt"></div>
+    <button type="button" class="range-all" id="range-all">选全部范围</button>
+    <div class="pw-actions">
+      <button type="button" class="btn-line" id="range-cancel">取消</button>
+      <button type="button" class="btn-primary" id="range-ok">下一步</button>
+    </div>
+  </div>
+</div>
+
+<!-- 清空密码确认弹窗 -->
+<div class="pw-mask" id="pw-mask">
+  <div class="pw-card">
+    <div class="pw-title">🔒 清空确认</div>
+    <div class="pw-tip" id="pw-tip">将清空<b>全部</b>体重记录，此操作不可恢复。<br>请输入密码继续</div>
+    <input type="password" id="pw-input" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <div class="pw-err" id="pw-err"></div>
+    <div class="pw-actions">
+      <button type="button" class="btn-line" id="pw-cancel">取消</button>
+      <button type="button" class="btn-primary" id="pw-ok">确认清空</button>
+    </div>
+  </div>
+</div>
 <script src="lib/xlsx.full.min.js"></script>
 <script src="lib/flatpickr.min.js"></script>
 <script src="lib/zh.js"></script>
@@ -250,6 +340,17 @@ const $ = id => document.getElementById(id);
 const fmt = n => (n == null || isNaN(n)) ? '--' : Number(n).toFixed(1);
 const K2J = v => Math.round(v * 2 * 10) / 10;     // kg → 斤（显示/换算用）
 const segCls = s => s === '中' ? 'seg-n' : s === '晚' ? 'seg-e' : 'seg-m';
+
+// 操作结果轻提示：顶部滑入，2.2s 自动消失
+let toastTimer = null;
+function toast(msg) {
+  let el = document.querySelector('.toast');
+  if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
 
 // 目标体重不进 Excel（那是页面设置项），单独存本机；默认 53kg
 const goalOf = () => { const g = parseFloat(localStorage.getItem('weight_goal')); return isNaN(g) ? 53 : g; };
@@ -461,11 +562,18 @@ function render() {
 
 function drawChart(data) {
   const svg = $('chart'); svg.innerHTML = '';
+  const H = 220, pad = 36;
+  const sc = $('chart-scroll');
   if (data.length < 2) {
-    svg.innerHTML = `<text x="350" y="110" text-anchor="middle" fill="#8a94a6" font-size="14">至少记录 2 天即可显示趋势</text>`;
+    svg.setAttribute('width', Math.max(200, sc ? sc.clientWidth : 700));
+    svg.innerHTML = `<text x="50%" y="110" text-anchor="middle" fill="#8a94a6" font-size="14">至少记录 2 天即可显示趋势</text>`;
+    $('chart-hint').style.display = 'none';
     return;
   }
-  const W = 700, H = 220, pad = 36;
+  // 按数据量动态加宽：每点约 14px，最窄不低于容器宽（防止少量数据被拉伸）
+  const step = 14;
+  const W = Math.max(sc ? sc.clientWidth : 700, Math.ceil((data.length - 1) * step) + 2 * pad + 14);
+  svg.setAttribute('width', W);
   const ws = data.map(d => d.weight);
   const min = Math.min(...ws), max = Math.max(...ws);
   const range = (max - min) || 1;
@@ -483,13 +591,26 @@ function drawChart(data) {
   let path = '';
   data.forEach((d, i) => path += (i ? 'L' : 'M') + x(i) + ' ' + y(d.weight) + ' ');
   svg.insertAdjacentHTML('beforeend', `<path d="${path}" fill="none" stroke="#4f7cff" stroke-width="2.5" stroke-linecap="round"/>`);
-  // 点 + 日期
+  // 点 + 日期（标签间距自适应，约每 52px 一个，避免重叠）
+  const every = Math.max(1, Math.round(52 / ((W - 2*pad) / (data.length - 1))));
   data.forEach((d, i) => {
     svg.insertAdjacentHTML('beforeend', `<circle cx="${x(i)}" cy="${y(d.weight)}" r="3.5" fill="#4f7cff"/>`);
-    if (i % Math.ceil(data.length/6) === 0 || i === data.length-1)
+    if (i % every === 0 || i === data.length-1)
       svg.insertAdjacentHTML('beforeend', `<text x="${x(i)}" y="${H-12}" text-anchor="middle" fill="#8a94a6" font-size="9">${d.date.slice(5)}</text>`);
   });
+  // 默认滚动到最右（最新记录）；数据多到溢出时提示可滑动
+  if (sc) {
+    sc.scrollLeft = sc.scrollWidth;                        // 最新数据在右端
+    $('chart-hint').style.display = (sc.scrollWidth > sc.clientWidth + 5) ? '' : 'none';
+  }
 }
+
+// 窗口尺寸变化（如手机横竖屏切换）后重绘，保持图宽与容器协调
+let rsT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(rsT);
+  rsT = setTimeout(() => drawChart(DATA.slice().sort((a, b) => new Date(a.date) - new Date(b.date))), 200);
+});
 
 // 历史记录分页状态
 let curPage = 1;
@@ -553,7 +674,8 @@ function renderHistory(data) {
   // 删除（按 日期+时段 定位，同一天早/晚两条可分别删除）
   box.querySelectorAll('.del:not([disabled])').forEach(b => b.onclick = () => {
     if (confirm(`删除 ${b.dataset.date} ${b.dataset.seg} 的记录？`)) {
-      persist(DATA.filter(x => !(x.date === b.dataset.date && (x.seg || '早') === b.dataset.seg))).then(render);
+      persist(DATA.filter(x => !(x.date === b.dataset.date && (x.seg || '早') === b.dataset.seg)))
+        .then(() => { render(); toast(`✓ 已删除 ${b.dataset.date} ${b.dataset.seg} 的记录`); });
     }
   });
 
@@ -593,6 +715,8 @@ $('form').onsubmit = async e => {
   const i = data.findIndex(d => d.date === entry.date && (d.seg || '早') === entry.seg);
   if (i >= 0) data[i] = entry; else data.push(entry);        // 同日同时段覆盖，不同时段共存
   await persist(data); render();
+  toast(i >= 0 ? `✓ 已更新 ${entry.date} ${entry.seg} · ${fmt(K2J(entry.weight))} 斤`
+               : `✓ 录入成功 · ${entry.date} ${entry.seg} ${fmt(K2J(entry.weight))} 斤`);
   $('f-weight').value = ''; $('f-note').value = '';
 };
 
@@ -622,7 +746,7 @@ async function importXlsx(file) {
   if (!arr.length) { alert('导入失败：Excel 里没有读到有效记录（需要表头「日期/时段/体重（斤）」+ 数据行）'); return; }
   const existing = DATA.length;
   if (existing && !confirm(`将从 Excel 导入 ${arr.length} 条记录，并覆盖现有 ${existing} 条，确定继续？`)) return;
-  await persist(arr); curPage = 1; render();
+  await persist(arr); curPage = 1; render(); toast(`✓ 已从 Excel 导入 ${arr.length} 条记录`);
 }
 
 function importJson(file) {
@@ -652,17 +776,67 @@ function importJson(file) {
     if (existing && !confirm(`将导入 ${arr.length} 条记录，并覆盖现有 ${existing} 条，确定继续？`)) return;
     await persist(arr);
     curPage = 1;
-    render();
+    render(); toast(`✓ 已导入 ${arr.length} 条记录`);
   };
   reader.readAsText(file, 'utf-8');
 }
-$('clear-btn').onclick = () => {
-  const today = todayStr();
-  const removable = DATA.filter(d => d.date === today);   // 仅 24 小时内（当天）
-  if (!removable.length) { alert('没有可清空的当日（24 小时内）记录'); return; }
-  if (confirm(`仅清空当日（24 小时内）的 ${removable.length} 条记录？\n超过 24 小时的历史记录将保留，此操作不可恢复。`)) {
-    persist(DATA.filter(d => d.date !== today)).then(render);
-  }
+// 清空密码门（防误触；纯前端页面，密码硬编码在前端源码中，非安全加密）
+const CLEAR_PW = '870825';
+function askPassword(tip) {
+  return new Promise(resolve => {
+    const mask = $('pw-mask'), input = $('pw-input'), err = $('pw-err');
+    if (tip) $('pw-tip').innerHTML = tip;
+    input.value = ''; err.textContent = '';
+    mask.classList.add('show');
+    setTimeout(() => input.focus(), 60);
+    const close = v => { mask.classList.remove('show'); $('pw-ok').onclick = $('pw-cancel').onclick = mask.onclick = input.onkeydown = null; resolve(v); };
+    $('pw-cancel').onclick = () => close(false);
+    mask.onclick = e => { if (e.target === mask) close(false); };
+    $('pw-ok').onclick = () => {
+      if (input.value === CLEAR_PW) close(true);
+      else { err.textContent = '密码不对，请重试'; input.select(); }
+    };
+    input.onkeydown = e => { if (e.key === 'Enter') e.preventDefault(), $('pw-ok').click(); };
+  });
+}
+// 清空第一步：日期范围选择弹窗（返回 {from,to,n} 或 null）
+const inRange = (e, f, t) => e.date >= f && e.date <= t;
+function askRange() {
+  return new Promise(resolve => {
+    const mask = $('range-mask'), from = $('range-from'), to = $('range-to'), cnt = $('range-cnt');
+    const dates = DATA.map(e => e.date).sort();               // 最早 ~ 最晚作默认范围
+    const lo = dates[0], hi = dates[dates.length - 1];
+    from.min = to.min = lo; from.max = to.max = hi;
+    from.value = lo; to.value = hi;
+    const update = () => {
+      const n = (from.value && to.value) ? DATA.filter(e => inRange(e, from.value, to.value)).length : 0;
+      cnt.className = 'range-cnt';
+      cnt.textContent = n ? `将清空 ${from.value} 至 ${to.value} 的 ${n} 条记录` : '请选择日期范围';
+    };
+    from.oninput = to.oninput = update;
+    update();
+    mask.classList.add('show');
+    const close = v => { mask.classList.remove('show'); $('range-ok').onclick = $('range-cancel').onclick = $('range-all').onclick = mask.onclick = from.oninput = to.oninput = null; resolve(v); };
+    $('range-cancel').onclick = () => close(null);
+    mask.onclick = e => { if (e.target === mask) close(null); };
+    $('range-all').onclick = () => { from.value = lo; to.value = hi; update(); };
+    $('range-ok').onclick = () => {
+      if (!from.value || !to.value) { cnt.className = 'range-cnt bad'; cnt.textContent = '请先选择开始和结束日期'; return; }
+      if (from.value > to.value) { cnt.className = 'range-cnt bad'; cnt.textContent = '开始日期不能晚于结束日期'; return; }
+      const n = DATA.filter(e => inRange(e, from.value, to.value)).length;
+      if (!n) { cnt.className = 'range-cnt bad'; cnt.textContent = '该日期范围内没有记录'; return; }
+      close({ from: from.value, to: to.value, n });
+    };
+  });
+}
+$('clear-btn').onclick = async () => {
+  if (!DATA.length) { toast('没有记录可清空'); return; }
+  const r = await askRange();                                 // ① 选择日期范围
+  if (!r) return;
+  const ok = await askPassword(`将清空 <b>${r.from} 至 ${r.to}</b> 范围内的 <b>${r.n}</b> 条记录，<br>此操作不可恢复。请输入密码继续`);   // ② 密码门
+  if (!ok) return;
+  const rest = DATA.filter(e => !inRange(e, r.from, r.to));   // ③ 只保留范围外的记录
+  persist(rest).then(() => { render(); toast(`✓ 已清空 ${r.from} 至 ${r.to} 的体重记录 ${r.n} 条`); });
 };
 
 // 初始化日期选择器（flatpickr：点击输入框任意位置即弹出日历，周一开头）
