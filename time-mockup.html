@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时光记录器 · 布局草图 v2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #efeae3; padding: 24px 18px; color: #231e15; line-height: 1.55;
+  }
+  .page-title { text-align: center; margin-bottom: 6px; font-size: 17px; color: #5a4a38; letter-spacing: 1px; }
+  .page-sub { text-align: center; margin-bottom: 22px; font-size: 12.5px; color: #8a7a68; }
+  .stage { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+
+  .phone {
+    width: 356px; background: #fdfbf7; border-radius: 22px;
+    box-shadow: 0 14px 40px rgba(60,45,25,.18); overflow: hidden;
+    border: 1px solid rgba(191,154,125,.35);
+  }
+  .phone-head {
+    padding: 15px 18px 11px;
+    background: linear-gradient(160deg, rgba(255,250,244,.96), rgba(247,239,230,.92));
+    border-bottom: 1px solid rgba(191,154,125,.22);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .phone-head .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .phone-head h2 { font-size: 17px; letter-spacing: 1px; }
+  .phone-head .cnt { font-size: 11.5px; color: #a89880; }
+  .phone-head .sub { font-size: 11.5px; color: #8a7a68; margin-top: 2px; letter-spacing: 2px; }
+
+  .toolbar { display: flex; gap: 7px; margin-top: 11px; }
+  .tb {
+    flex: 1; text-align: center; font-size: 12px; padding: 7px 4px; border-radius: 9px;
+    background: #fff; border: 1px solid rgba(191,154,125,.4); color: #6b5740;
+  }
+  .tb.pri { background: #231e15; color: #fff; border-color: #231e15; flex: 1.25; }
+
+  .phone-body { padding: 4px 0 18px; max-height: 560px; overflow-y: auto; }
+
+  /* 年份刻度区 */
+  .axis { position: relative; padding: 14px 16px 8px 16px; }
+
+  .yr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0 8px; position: sticky; top: 0; background: #fdfbf7; z-index: 4;
+  }
+  .yr .num {
+    font-size: 20px; font-weight: 700; color: #231e15;
+    letter-spacing: 1px; font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .yr .ln { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(191,154,125,.55), rgba(191,154,125,.06)); }
+  .yr .n2 { font-size: 11px; color: #a89880; white-space: nowrap; }
+
+  /* 竖线 + 事件 */
+  .seg { position: relative; padding-left: 22px; padding-bottom: 4px; }
+  .seg::before {
+    content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px;
+    background: linear-gradient(180deg, rgba(191,154,125,.5), rgba(191,154,125,.12));
+  }
+
+  .ev { position: relative; margin-bottom: 12px; }
+  .ev::before {
+    content: ''; position: absolute; left: -21px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #fdfbf7; border: 2.5px solid #bf9a7d;
+  }
+
+  /* 时间段事件 */
+  .ev.span-ev::before {
+    width: 9px; height: 26px; border-radius: 4px; border-width: 2px;
+    top: 4px; background: rgba(191,154,125,.22);
+  }
+
+  .ev .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ev .d { font-size: 11px; color: #a89880; font-variant-numeric: tabular-nums; }
+  .ev .tag {
+    font-size: 10px; padding: 1px 7px; border-radius: 99px;
+    background: rgba(191,154,125,.16); color: #8a6b4d;
+  }
+  .ev .tag.span-tag { background: rgba(120,150,190,.16); color: #4f6d95; }
+
+  .ev .txt { font-size: 13.5px; margin-top: 3px; color: #3a3128; }
+  .ev .txt b { font-weight: 600; }
+
+  .spanbar {
+    margin-top: 5px; background: linear-gradient(90deg, rgba(191,154,125,.14), rgba(191,154,125,.05));
+    border-left: 3px solid rgba(191,154,125,.6); border-radius: 0 8px 8px 0;
+    padding: 6px 10px; font-size: 12px; color: #6b5740;
+  }
+
+  .notes { width: 400px; }
+  .notes h3 { font-size: 14px; margin-bottom: 10px; color: #5a4a38; }
+  .note-item {
+    background: #fff; border-radius: 10px; padding: 11px 13px; margin-bottom: 9px;
+    border-left: 3px solid #bf9a7d; box-shadow: 0 2px 8px rgba(60,45,25,.07);
+  }
+  .note-item .t { font-size: 12.5px; font-weight: 600; margin-bottom: 3px; }
+  .note-item .d { font-size: 12px; color: #6b5d4d; }
+  .note-item code { background: rgba(191,154,125,.15); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .feedback {
+    margin-top: 14px; background: #231e15; color: #fff;
+    border-radius: 10px; padding: 13px 15px; font-size: 12.5px;
+  }
+  .feedback .t { font-weight: 600; margin-bottom: 7px; font-size: 13px; }
+  .feedback ul { padding-left: 17px; }
+  .feedback li { margin-bottom: 5px; }
+  .legend { display: flex; gap: 14px; margin-top: 9px; font-size: 11.5px; color: #6b5d4d; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 2.5px solid #bf9a7d; background: #fdfbf7; display: inline-block; }
+  .dot.fill { background: #bf9a7d; }
+  .dot.bar { width: 7px; height: 15px; border-radius: 3px; background: rgba(191,154,125,.25); }
+</style>
+</head>
+<body>
+<div class="page-title">时光记录器 · 布局草图 v2</div>
+<div class="page-sub">个人编年史：批量导入历史事件 + 时间轴年份刻度（最新在上）</div>
+
+<div class="stage">
+  <div class="phone">
+    <div class="phone-head">
+      <div class="top">
+        <h2>⏳ 时光记录器</h2>
+        <span class="cnt">共 38 条 · 跨 15 年</span>
+      </div>
+      <div class="sub">愿无岁月可回头</div>
+      <div class="toolbar">
+        <span class="tb pri">+ 新增事件</span>
+        <span class="tb">导入</span>
+        <span class="tb">导出</span>
+      </div>
+    </div>
+
+    <div class="phone-body">
+      <div class="axis">
+
+        <div class="yr">
+          <span class="num">2015</span><span class="ln"></span><span class="n2">3 件事</span>
+        </div>
+        <div class="seg">
+          <div class="ev">
+            <div class="meta"><span class="d">05-20</span><span class="tag">观演</span></div>
+            <div class="txt"><b>人生第一场演唱会</b> · 五月天</div>
+          </div>
+          <div class="ev">
+            <div class="meta"><span class="d">03-12</span><span class="tag">生活</span></div>
+            <div class="txt">学会了骑自行车</div>
+          </div>
+        </div>
+
+        <div class="yr">
+          <span class="num">2012</span><span class="ln"></span><span class="n2">1 件事</span>
+        </div>
+        <div class="seg">
+          <div class="ev">
+            <div class="meta"><span class="d">09-01</span><span class="tag">学业</span></div>
+            <div class="txt"><b>考上大学</b> · 第一次离开家乡</div>
+          </div>
+        </div>
+
+        <div class="yr">
+          <span class="num">2010</span><span class="ln"></span><span class="n2">1 段时光</span>
+        </div>
+        <div class="seg">
+          <div class="ev span-ev">
+            <div class="meta"><span class="d">2010 → 2014</span><span class="tag span-tag">时间段</span><span class="tag">居住</span></div>
+            <div class="txt"><b>居住在北京</b></div>
+            <div class="spanbar">朝阳区 · 大学四年，宿舍 606</div>
+          </div>
+        </div>
+
+        <div class="yr">
+          <span class="num">2008</span><span class="ln"></span><span class="n2">1 件事</span>
+        </div>
+        <div class="seg">
+          <div class="ev">
+            <div class="meta"><span class="d">08-08</span><span class="tag">家庭</span></div>
+            <div class="txt">和家人一起看奥运会开幕式</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>这次改了什么</h3>
+
+    <div class="note-item">
+      <div class="t">① 年份成为主角</div>
+      <div class="d">大号年份数字 + 横线 + 「3 件事」计数。年份会吸附在顶部（sticky），滚动时始终知道自己在哪个年份。</div>
+    </div>
+
+    <div class="note-item">
+      <div class="t">② 时间段事件独立形态</div>
+      <div class="d">如「2010 → 2014 居住在北京」，圆点变成<b>竖条</b>，配一条色带容器，视觉上天然表达"持续了一段"。</div>
+    </div>
+
+    <div class="note-item">
+      <div class="t">③ 批量导入是主入口</div>
+      <div class="d">三个按钮：<b>新增</b> / <b>导入</b> / <b>导出</b>。导入支持粘贴文字（我帮你解析成结构化数据）或 Excel 文件。</div>
+    </div>
+
+    <div class="note-item">
+      <div class="t">④ 顶部统计</div>
+      <div class="d">「共 38 条 · 跨 15 年」——一眼看到自己的记录厚度。</div>
+    </div>
+
+    <div class="note-item">
+      <div class="t">视觉符号</div>
+      <div class="legend">
+        <span><i class="dot"></i>普通事件</span>
+        <span><i class="dot bar"></i>时间段</span>
+      </div>
+    </div>
+
+    <div class="feedback">
+      <div class="t">已确认</div>
+      <ul>
+        <li>✓ 年份刻度 + 编年史感</li>
+        <li>✓ 最新在上</li>
+        <li>✓ 分类：观演 / 学业 / 工作 / 居住 / 家庭 / 旅行 / 其他</li>
+        <li>✓ 不做里程碑星标</li>
+      </ul>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.18)">
+        <b>还差最后一块：</b>你手上的文字记录长什么样？<br>
+        发几条给我，我看过实际格式才能把「导入」写对。
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -2,61 +2,996 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>时光记录器</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="时光记录器">
+<meta name="theme-color" content="#f4f1ec">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link href="fonts/lxgwwenkai-regular.css" rel="stylesheet">
 <style>
   :root {
-    --text: #1f2733;
-    --muted: #8a94a6;
-    --primary: #4f7cff;
+    --text: #231e15;
+    --muted: #8a7a68;
+    --line: #e8e0d5;
+    --primary: #bf9a7d;
+    --primary-dark: #a17d5f;
+    --danger: #c0503c;
+    --card: #fff;
+    --bg: #f4f1ec;
+    --shadow: 0 2px 12px rgba(120,95,70,.09);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     font-family: 'LXGW WenKai', -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
     color: var(--text);
-    background: linear-gradient(160deg, #fdf6f0 0%, #f6f3fb 45%, #eef3fb 100%);
-    display: flex; align-items: center; justify-content: center;
-    line-height: 1.6; padding: 24px;
+    background: var(--bg);
+    background-image: url('assets/bg-sunset.jpg');
+    background-size: cover;
+    background-attachment: fixed;
+    background-position: center;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom);
   }
-  .box { text-align: center; max-width: 420px; }
-  .icon {
-    width: 84px; height: 84px; margin: 0 auto 22px;
-    border-radius: 24px; font-size: 44px; line-height: 84px;
-    background: linear-gradient(135deg, rgba(255,255,255,.8), rgba(255,255,255,.5));
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,.9);
-    box-shadow: 0 12px 30px rgba(120, 100, 180, .14);
-    animation: breathe 3s ease-in-out infinite;
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: linear-gradient(180deg, rgba(250,247,242,.90), rgba(250,247,242,.96));
+    pointer-events: none; z-index: 0;
   }
-  @keyframes breathe {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 0 14px 40px; }
+
+  header {
+    padding: calc(14px + env(safe-area-inset-top)) 18px 12px;
+    position: sticky; top: 0; z-index: 20;
+    background: linear-gradient(180deg, rgba(250,247,242,.97) 70%, rgba(250,247,242,.86));
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    margin: 0 -14px;
+    border-bottom: 1px solid rgba(191,154,125,.16);
   }
-  h1 { font-size: 26px; font-weight: 700; letter-spacing: 2px; }
-  .verse { color: #a86a8a; font-size: 15px; margin-top: 10px; letter-spacing: 3px; }
-  .divider { width: 46px; height: 2px; margin: 26px auto; background: linear-gradient(90deg, transparent, #c9b8e8, transparent); border: none; }
-  .status {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 13px; color: var(--muted);
-    background: rgba(255,255,255,.6); border: 1px solid rgba(200,195,220,.5);
-    padding: 8px 18px; border-radius: 99px;
+  .head-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  h1 { font-size: 19px; letter-spacing: 1.5px; font-weight: 700; }
+  .head-cnt { font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .yr-all {
+    font-size: 11px; color: #8a6b4d; background: none; border: none;
+    padding: 3px 5px; cursor: pointer; font-family: inherit; white-space: nowrap;
+    text-decoration: underline dotted rgba(178,143,110,.7); text-underline-offset: 3px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .yr-all:active { opacity: .7; }
+  .verse { font-size: 11.5px; color: var(--primary-dark); letter-spacing: 3px; margin-top: 1px; }
+
+  .toolbar { display: flex; gap: 7px; margin-top: 11px; }
+  .tb {
+    flex: 1; text-align: center; font-size: 13px; padding: 9px 4px; border-radius: 11px;
+    background: #fff; border: 1px solid rgba(191,154,125,.45); color: #6b5740;
+    cursor: pointer; font-family: inherit; transition: transform .12s, box-shadow .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tb:active { transform: scale(.97); }
+  .tb.pri { background: #231e15; color: #fff; border-color: #231e15; flex: 1.3; }
+
+  .cats { display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; padding-bottom: 2px;
+          scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .cats::-webkit-scrollbar { display: none; }
+  .chip {
+    font-size: 12px; padding: 5px 12px; border-radius: 99px; white-space: nowrap;
+    background: #fff; border: 1px solid rgba(191,154,125,.4); color: #7a6650;
+    cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .chip.on { background: #231e15; color: #fff; border-color: #231e15; }
+
+  .axis { padding: 6px 2px 0; }
+
+  .yr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 15px 6px 11px;
+    position: sticky; top: var(--yr-top, 148px); z-index: 10;
+    background: linear-gradient(180deg, rgba(250,247,242,.98) 60%, rgba(250,247,242,.85));
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    margin: 0 -6px;
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #f0a35e; animation: blink 1.6s infinite; }
-  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
-  .tip { margin-top: 26px; font-size: 12.5px; color: var(--muted); }
+  .yr:focus-visible { outline: 2px solid rgba(191,154,125,.55); outline-offset: 3px; border-radius: 10px; }
+  .yr:active { opacity: .72; }
+  .yr .bar {
+    flex: none; width: 4px; height: 21px; border-radius: 99px;
+    background: linear-gradient(180deg, #c9a37e, #8a6b4d);
+    transition: background .25s;
+  }
+  .yr .num {
+    font-size: 22px; font-weight: 700; letter-spacing: 1px;
+    font-variant-numeric: tabular-nums; line-height: 1; color: var(--text);
+    transition: color .25s;
+  }
+  .yr .ln { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(191,154,125,.55), rgba(191,154,125,.05)); }
+  .yr .n2 {
+    font-size: 10.5px; color: #8a6b4d; white-space: nowrap;
+    padding: 2.5px 9px; border-radius: 99px;
+    background: rgba(191,154,125,.15); font-variant-numeric: tabular-nums;
+    transition: background .25s, color .25s;
+  }
+  @media (hover: hover) {
+    .yr:hover .n2 { background: rgba(191,154,125,.26); }
+    .yr:hover .bar { background: linear-gradient(180deg, #b78f68, #6d5340); }
+  }
+  .yr .chev {
+    flex: none; width: 8px; height: 8px; margin: 2px 4px 0 0;
+    border-right: 2px solid #b08d6e; border-bottom: 2px solid #b08d6e;
+    transform: rotate(45deg);
+    transition: transform .3s cubic-bezier(.4, 0, .2, 1);
+  }
+  .yg.collapsed .yr .chev { transform: rotate(-45deg); }
+  .yg.collapsed .yr .num { color: #a5907a; }
+  .yg.collapsed .yr .bar { background: rgba(191,154,125,.38); }
+  .yg.collapsed .yr .n2 { background: transparent; color: #a5907a; }
+
+  .seg-wrap {
+    display: grid; grid-template-rows: 1fr;
+    transition: grid-template-rows .34s cubic-bezier(.4, 0, .2, 1);
+  }
+  .yg.collapsed .seg-wrap { grid-template-rows: 0fr; }
+  .seg-inner { overflow: hidden; min-height: 0; }
+
+  .seg { position: relative; padding-left: 24px; }
+  .seg::before {
+    content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px;
+    background: linear-gradient(180deg, rgba(191,154,125,.45), rgba(191,154,125,.1));
+  }
+
+  .ev { position: relative; margin-bottom: 11px; }
+  .ev::before {
+    content: ''; position: absolute; left: -23px; top: 8px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #faf7f2; border: 2.5px solid var(--primary);
+  }
+  .ev.span-ev::before {
+    background: rgba(191,154,125,.45);
+  }
+  .ev-body {
+    background: var(--card); border: 1px solid rgba(191,154,125,.28);
+    border-radius: 12px; padding: 10px 13px;
+    box-shadow: 0 1px 6px rgba(120,95,70,.07);
+  }
+  .ev.span-ev .ev-body {
+    border-left: 3px solid rgba(191,154,125,.6);
+    background: linear-gradient(90deg, rgba(191,154,125,.06), #fff 40%);
+  }
+  .ev-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+  .ev-d { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tag {
+    font-size: 10.5px; padding: 1.5px 8px; border-radius: 99px;
+    background: rgba(191,154,125,.16); color: #8a6b4d; white-space: nowrap;
+  }
+  .tag.span-tag { background: rgba(130,155,190,.18); color: #4f6d95; }
+  .ev-title { font-size: 14.5px; font-weight: 600; color: #322a20; word-break: break-word; }
+  .ev-note { font-size: 12.5px; color: #6b5d4d; margin-top: 3px; word-break: break-word; }
+  .ev-ops { display: flex; gap: 6px; margin-top: 8px; }
+  .op {
+    font-size: 11.5px; padding: 3px 10px; border-radius: 7px; cursor: pointer;
+    background: #fbf9f6; border: 1px solid var(--line); color: #7a6650;
+    font-family: inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .op.del { color: var(--danger); border-color: rgba(192,80,60,.25); background: rgba(192,80,60,.04); }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty .ico { font-size: 40px; margin-bottom: 12px; opacity: .6; }
+  .empty .t { font-size: 14px; margin-bottom: 6px; }
+  .empty .d { font-size: 12.5px; }
+
+  .mask {
+    display: none; position: fixed; inset: 0; z-index: 99;
+    background: rgba(35,30,21,.42);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .mask.show { display: flex; }
+  .card {
+    background: #fff; border-radius: 18px; padding: 20px;
+    width: min(440px, 100%); max-height: calc(100vh - 40px); overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(35,30,21,.3);
+  }
+  .card-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .card-tip { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+  .card-tip code { background: rgba(191,154,125,.15); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+
+  .fld { margin-bottom: 11px; }
+  .fld label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .fld input, .fld textarea, .fld select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 10px; font-size: 16px; outline: none; background: #fbf9f6;
+    color: var(--text); font-family: inherit; transition: border-color .15s;
+  }
+  .fld input:focus, .fld textarea:focus, .fld select:focus { border-color: var(--primary); background: #fff; }
+  .fld textarea { resize: vertical; min-height: 74px; line-height: 1.5; }
+  .fld.row2 { display: flex; gap: 10px; }
+  .fld.row2 > div { flex: 1; min-width: 0; }
+
+  .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    flex: 1; padding: 11px; border-radius: 11px; font-size: 14px;
+    font-family: inherit; cursor: pointer; border: 1px solid var(--line);
+    background: #fbf9f6; color: #5a4a38; -webkit-tap-highlight-color: transparent;
+    transition: transform .12s;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn.pri { background: #231e15; color: #fff; border-color: #231e15; }
+  .btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  #pw-input {
+    width: 100%; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 18px; text-align: center; letter-spacing: .35em; outline: none;
+    background: #fbf9f6; font-variant-numeric: tabular-nums;
+  }
+  #pw-input:focus { border-color: var(--primary); background: #fff; }
+  .pw-err { color: var(--danger); font-size: 12px; height: 16px; text-align: center; margin: 6px 0 2px; }
+
+  .pv-list { max-height: 260px; overflow-y: auto; margin: 10px 0; border-top: 1px solid #f2ede6; }
+  .pv-item {
+    display: flex; gap: 9px; padding: 8px 2px; border-bottom: 1px solid #f2ede6;
+    font-size: 12.5px; align-items: baseline;
+  }
+  .pv-item .d { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 11.5px; }
+  .pv-item .t { flex: 1; color: #3a3128; word-break: break-word; }
+  .pv-item .tg { font-size: 10px; padding: 1px 6px; border-radius: 99px; background: rgba(191,154,125,.16); color: #8a6b4d; white-space: nowrap; }
+  .pv-sum { font-size: 13px; color: var(--primary-dark); font-weight: 600; margin: 8px 0 2px; }
+  .pv-bad { font-size: 12px; color: var(--danger); margin-top: 6px; line-height: 1.5; word-break: break-all; }
+
+  .toast {
+    position: fixed; top: max(18px, env(safe-area-inset-top)); left: 50%;
+    transform: translateX(-50%) translateY(-120%);
+    background: rgba(35,30,21,.94); color: #fff; padding: 10px 22px; border-radius: 99px;
+    font-size: 14px; z-index: 120; box-shadow: 0 8px 24px rgba(0,0,0,.28);
+    transition: transform .28s ease, opacity .28s; opacity: 0; pointer-events: none;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+    max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  @media (max-width: 420px) {
+    h1 { font-size: 17.5px; }
+    .tb { font-size: 12.5px; }
+  }
 </style>
 </head>
 <body>
-  <div class="box">
-    <div class="icon">⏳</div>
-    <h1>时光记录器</h1>
+<div class="wrap">
+  <header>
+    <div class="head-top">
+      <h1>⏳ 时光记录器</h1>
+      <span style="display:flex;align-items:baseline;gap:2px">
+        <span class="head-cnt" id="head-cnt">0 条</span>
+        <button class="yr-all" id="yr-all-btn" style="display:none">收起全部</button>
+      </span>
+    </div>
     <div class="verse">愿无岁月可回头</div>
-    <hr class="divider">
-    <div class="status"><span class="dot"></span>功能建设中，敬请期待</div>
-    <p class="tip">这里以后会用来记录那些值得留住的时光</p>
+    <div class="toolbar">
+      <button class="tb pri" id="add-btn">+ 新增事件</button>
+      <button class="tb" id="import-btn">导入</button>
+      <button class="tb" id="export-btn">导出</button>
+      <button class="tb" id="sync-btn">⚙ 云端</button>
+      <button class="tb" id="clear-btn" style="color:var(--danger);border-color:rgba(192,80,60,.3)">清空</button>
+    </div>
+    <div class="cats" id="cats"></div>
+  </header>
+
+  <div class="axis" id="axis"></div>
+</div>
+
+<!-- 新增/编辑 -->
+<div class="mask" id="edit-mask">
+  <div class="card">
+    <div class="card-title" id="edit-title">新增事件</div>
+    <div class="card-tip" id="edit-tip">时间段事件适合「某年到某年住在某地」；单日事件适合「某天看了演唱会」。</div>
+    <div class="fld row2">
+      <div><label>开始日期</label><input type="date" id="e-from"></div>
+      <div><label>结束日期（留空=单日）</label><input type="date" id="e-to"></div>
+    </div>
+    <div class="fld">
+      <label>只记得大概时间？（可选，填了就优先用它）</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="e-from-txt" placeholder="如 2010 或 2010-07" style="flex:2">
+        <span style="align-self:center;color:var(--muted);font-size:13px">→</span>
+        <input type="text" id="e-to-txt" placeholder="如 2012（可留空）" style="flex:2">
+      </div>
+      <div class="hint">历史久远只记得年份时用这个。开始≠结束就自动算「时间段事件」</div>
+    </div>
+    <div class="fld"><label>事件</label><input type="text" id="e-name" placeholder="如：居住在北京清河宝盛西里"></div>
+    <div class="fld"><label>分类</label><select id="e-cat"></select></div>
+    <div class="fld"><label>备注（可选）</label><textarea id="e-note" placeholder="想补充的细节…"></textarea></div>
+    <div class="btns">
+      <button class="btn" id="edit-cancel">取消</button>
+      <button class="btn pri" id="edit-save">保存</button>
+    </div>
   </div>
+</div>
+
+<!-- 导入 -->
+<div class="mask" id="import-mask">
+  <div class="card">
+    <div class="card-title">导入事件</div>
+    <div class="card-tip">
+      每行一条，格式：<b>开始日期-结束日期 事件(备注)</b><br>
+      <code>20100720-20120201 北京清河宝盛西里(宿舍)</code><br>
+      也支持单日：<code>20150520 五月天演唱会</code>
+    </div>
+    <div class="fld">
+      <textarea id="import-text" placeholder="把文字粘贴到这里，每行一条…" style="min-height:130px"></textarea>
+    </div>
+    <div class="fld">
+      <label>或者选择 Excel 文件</label>
+      <input type="file" id="import-file" accept=".xlsx,.xls" style="font-size:14px;padding:8px">
+    </div>
+    <div id="import-preview"></div>
+    <div class="btns">
+      <button class="btn" id="import-cancel">取消</button>
+      <button class="btn pri" id="import-confirm" disabled>确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 云端同步设置 -->
+<div class="mask" id="sync-mask">
+  <div class="card">
+    <div class="card-title">☁ 云端同步</div>
+    <div class="card-tip">把数据存到你 GitHub 仓库的 <code id="sync-path-show">data/time.xlsx</code>，多设备共享。Token 只存本机浏览器。与体重记录器的 Token 互相独立。</div>
+    <div class="fld"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="github_pat_… 或 ghp_…" style="letter-spacing:.02em"></div>
+    <div class="fld row2">
+      <div><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
+      <div><label>仓库名</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
+    </div>
+    <div class="fld row2">
+      <div><label>分支</label><input type="text" id="gh-branch" placeholder="main"></div>
+      <div><label>文件路径</label><input type="text" id="gh-path" placeholder="data/time.xlsx"></div>
+    </div>
+    <div class="btns" style="margin-top:10px">
+      <button class="btn" id="sync-close">关闭</button>
+      <button class="btn pri" id="sync-save">保存并连接</button>
+    </div>
+    <div class="card-tip" id="sync-msg" style="margin:10px 0 0;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- 密码 -->
+<div class="mask" id="pw-mask">
+  <div class="card" style="width:min(330px,100%)">
+    <div class="card-title" style="text-align:center">🔒 危险操作确认</div>
+    <div class="card-tip" id="pw-tip" style="text-align:center">此操作不可恢复，请输入密码继续</div>
+    <input type="password" id="pw-input" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <div class="pw-err" id="pw-err"></div>
+    <div class="btns">
+      <button class="btn" id="pw-cancel">取消</button>
+      <button class="btn danger" id="pw-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
+<script src="lib/xlsx.full.min.js"></script>
+<script>
+/* ============================================================
+   时光记录器 · 个人编年史
+   存储：localStorage（本机）+ GitHub Excel（云端同步）
+   数据字段：{ id, from, to, sortKey, span, title, note, cat }
+   ============================================================ */
+const KEY = 'time_events_v1';
+const SHEET_NAME = 'events';
+const CLEAR_PW = '870825';
+const $ = id => document.getElementById(id);
+const CATS = ['观演', '学业', '工作', '居住', '家庭', '旅行', '其他'];
+let DATA = [];
+let curCat = 'ALL';
+
+/* ---------- 解析器 ---------- */
+const CAT_RULES = [
+  { key: '居住', words: ['宿舍', '里', '号楼', '小区', '公寓', '路', '街', '庄', '村', '苑', '园', '府', '湾', '城', '住'] },
+  { key: '工作', words: ['商厦', '公司', '大厦', '写字楼', '工厂', '园区', '办公室', '科技', '集团', '入职', '上班'] },
+  { key: '学业', words: ['大学', '学院', '学校', '中学', '小学', '高中', '初中', '毕业', '入学', '考研', '考试'] },
+  { key: '观演', words: ['演唱会', 'live', 'livehouse', '音乐节', '话剧', '剧场', '电影', '演出', '展'] },
+  { key: '旅行', words: ['旅行', '旅游', '去了', '游玩', '出差', '机场', '车站', '景区'] },
+  { key: '家庭', words: ['家', '父母', '爸', '妈', '结婚', '孩子', '出生', '亲'] },
+];
+function parseDate(s) {
+  s = String(s).trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{4})\s*年\s*(?:(\d{1,2})\s*月\s*(?:(\d{1,2})\s*日?)?)?$/);
+  if (m) return { y: +m[1], mo: m[2] ? +m[2] : null, d: m[3] ? +m[3] : null };
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return { y: +m[1], mo: +m[2], d: +m[3] };
+  m = s.match(/^(\d{4})(\d{2})$/);
+  if (m) return { y: +m[1], mo: +m[2], d: null };
+  m = s.match(/^(\d{4})\s*[-./]\s*(\d{1,2})\s*(?:[-./]\s*(\d{1,2}))?$/);
+  if (m) return { y: +m[1], mo: +m[2], d: m[3] ? +m[3] : null };
+  m = s.match(/^(\d{4})$/);
+  if (m) return { y: +m[1], mo: null, d: null };
+  return null;
+}
+function fmtDate(o) {
+  if (!o) return '';
+  const p = n => String(n).padStart(2, '0');
+  if (o.mo == null) return `${o.y}`;
+  if (o.d == null) return `${o.y}-${p(o.mo)}`;
+  return `${o.y}-${p(o.mo)}-${p(o.d)}`;
+}
+function padSort(o) {
+  return `${o.y}-${String(o.mo || 0).padStart(2, '0')}-${String(o.d || 0).padStart(2, '0')}`;
+}
+function guessCat(text) {
+  const low = text.toLowerCase();
+  for (const r of CAT_RULES) if (r.words.some(w => low.includes(w.toLowerCase()))) return r.key;
+  return '其他';
+}
+const DATE_PART = '(\\d{4}[-./]?\\d{0,2}[-./]?\\d{0,2}|\\d{4}年(?:\\d{1,2}月(?:\\d{1,2}日?)?)?)';
+function parseLine(line) {
+  const raw = String(line).trim();
+  if (!raw) return null;
+  if (/^(日期|时间|开始|事件|标题|编号|#)/.test(raw)) return null;
+  const reSpan = new RegExp(`^${DATE_PART}\\s*[-~至到→—]+\\s*${DATE_PART}\\s+(.+)$`);
+  const reOne  = new RegExp(`^${DATE_PART}\\s+(.+)$`);
+  let from = null, to = null, rest = '';
+  let m = raw.match(reSpan);
+  if (m) { from = parseDate(m[1]); to = parseDate(m[2]); rest = m[3]; }
+  else {
+    m = raw.match(reOne);
+    if (m) { from = parseDate(m[1]); rest = m[2]; }
+  }
+  if (!from) return null;
+  if (!to) to = from;
+  let title = rest.trim(), note = '';
+  const bm = title.match(/^(.*?)[（(]([^）)]*)[）)]\s*$/);
+  if (bm) { title = bm[1].trim(); note = bm[2].trim(); }
+  const span = !(from.y === to.y && from.mo === to.mo && from.d === to.d);
+  const cat = guessCat(title + ' ' + note);
+  return {
+    id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    from: fmtDate(from), to: fmtDate(to), sortKey: padSort(from),
+    span, title: title || '(未命名)', note, cat,
+  };
+}
+function parseText(text) {
+  const out = [], bad = [];
+  String(text).split(/\r?\n/).forEach((ln, i) => {
+    if (!ln.trim()) return;
+    const r = parseLine(ln);
+    if (r) out.push(r); else bad.push({ line: i + 1, text: ln.trim() });
+  });
+  return { items: out, bad };
+}
+
+/* ---------- 存储 ---------- */
+function loadLocal() {
+  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+}
+let syncTimer = null;
+function persist(arr, silent) {
+  DATA = arr;
+  try { localStorage.setItem(KEY, JSON.stringify(arr)); } catch (e) {}
+  if (ghReady()) {                             // 有 Token：自动写回云端 Excel
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(async () => {
+      const ok = await ghPush(DATA);
+      if (ok) toast('☁ 已同步到云端');
+    }, 600);
+  }
+}
+function save(arr, msg) {
+  persist(arr);
+  render();
+  if (msg) toast(msg);
+}
+
+/* ---------- 工具 ---------- */
+let toastTimer = null;
+function toast(msg) {
+  let el = document.querySelector('.toast');
+  if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
+  el.textContent = msg; el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+function sortDesc(arr) {
+  return arr.slice().sort((a, b) => (b.sortKey || '').localeCompare(a.sortKey || ''));
+}
+function yearOf(s) { return (s || '').slice(0, 4) || '未知'; }
+function fmtMD(s) {
+  const p = (s || '').split('-');
+  if (p.length < 3) return s || '';
+  return `${p[1]}-${p[2]}`;
+}
+function catCounts(arr) {
+  const m = {};
+  arr.forEach(e => { m[e.cat] = (m[e.cat] || 0) + 1; });
+  return m;
+}
+
+/* ---------- 渲染 ---------- */
+function renderCats() {
+  const counts = catCounts(DATA);
+  const box = $('cats');
+  box.innerHTML = '';
+  const mk = (key, label, n) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (curCat === key ? ' on' : '');
+    b.textContent = n != null ? `${label} ${n}` : label;
+    b.onclick = () => { curCat = key; render(); };
+    return b;
+  };
+  box.appendChild(mk('ALL', '全部', DATA.length));
+  CATS.forEach(c => { if (counts[c]) box.appendChild(mk(c, c, counts[c])); });
+}
+
+function render() {
+  const cnt = $('head-cnt');
+  if (!DATA.length) {
+    cnt.textContent = '0 条';
+    $('cats').innerHTML = '';
+    $('axis').innerHTML = `<div class="empty">
+      <div class="ico">⏳</div>
+      <div class="t">还没有记录</div>
+      <div class="d">点「+ 新增事件」记一笔，或点「导入」批量粘贴历史事件</div>
+    </div>`;
+    return;
+  }
+  const list = sortDesc(curCat === 'ALL' ? DATA : DATA.filter(e => e.cat === curCat));
+  const years = [...new Set(list.map(e => yearOf(e.sortKey)))].sort((a, b) => b.localeCompare(a));
+  cnt.textContent = curCat === 'ALL'
+    ? `${DATA.length} 条 · 跨 ${years.length} 年`
+    : `${list.length} 条`;
+
+  renderCats();
+
+  const axis = $('axis');
+  axis.innerHTML = '';
+
+  years.forEach(y => {
+    const items = list.filter(e => yearOf(e.sortKey) === y);
+    const isC = collapsedYears.has(y);
+    const g = document.createElement('div');
+    g.className = 'yg' + (isC ? ' collapsed' : '');
+    g.dataset.year = y;
+    g.innerHTML = `
+      <div class="yr" role="button" tabindex="0" aria-expanded="${!isC}" aria-label="${y} 年，${items.length} 件事">
+        <span class="bar"></span>
+        <span class="num">${y}</span>
+        <span class="ln"></span>
+        <span class="n2">${items.length} 件事</span>
+        <span class="chev"></span>
+      </div>
+      <div class="seg-wrap"><div class="seg-inner"><div class="seg"></div></div></div>`;
+    const seg = g.querySelector('.seg');
+    items.forEach(ev => {
+      const d = document.createElement('div');
+      d.className = 'ev' + (ev.span ? ' span-ev' : '');
+      const dateTxt = ev.span ? `${ev.from} → ${ev.to}` : ev.from;
+      d.innerHTML = `
+        <div class="ev-body">
+          <div class="ev-meta">
+            <span class="ev-d">${dateTxt}</span>
+            ${ev.span ? '<span class="tag span-tag">时间段</span>' : ''}
+            <span class="tag">${ev.cat}</span>
+          </div>
+          <div class="ev-title">${esc(ev.title)}</div>
+          ${ev.note ? `<div class="ev-note">${esc(ev.note)}</div>` : ''}
+          <div class="ev-ops">
+            <button class="op" data-act="edit" data-id="${ev.id}">编辑</button>
+            <button class="op del" data-act="del" data-id="${ev.id}">删除</button>
+          </div>
+        </div>`;
+      seg.appendChild(d);
+    });
+    axis.appendChild(g);
+  });
+
+  updateYrAllBtn();
+
+  axis.onclick = e => {
+    const op = e.target.closest('.op');
+    if (op) {
+      if (op.dataset.act === 'edit') openEdit(DATA.find(x => x.id === op.dataset.id));
+      else delEvent(op.dataset.id);
+      return;
+    }
+    const yr = e.target.closest('.yr');
+    if (yr) toggleYear(yr.closest('.yg'));
+  };
+  axis.onkeydown = e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('yr')) {
+      e.preventDefault();
+      toggleYear(e.target.closest('.yg'));
+    }
+  };
+}
+
+/* ---------- 年份折叠（本机记忆） ---------- */
+const YR_COLLAPSE_KEY = 'time_yr_collapsed_v1';
+let collapsedYears = new Set((() => {
+  try { return JSON.parse(localStorage.getItem(YR_COLLAPSE_KEY)) || []; } catch (e) { return []; }
+})());
+function persistCollapsed() {
+  try { localStorage.setItem(YR_COLLAPSE_KEY, JSON.stringify([...collapsedYears])); } catch (e) {}
+}
+function applyYearEl(g, c) {
+  g.classList.toggle('collapsed', c);
+  g.querySelector('.yr').setAttribute('aria-expanded', String(!c));
+}
+function toggleYear(g) {
+  const y = g.dataset.year;
+  const c = !collapsedYears.has(y);
+  if (c) collapsedYears.add(y); else collapsedYears.delete(y);
+  applyYearEl(g, c);
+  persistCollapsed();
+  updateYrAllBtn();
+}
+function updateYrAllBtn() {
+  const btn = $('yr-all-btn');
+  const gs = [...document.querySelectorAll('#axis .yg')];
+  btn.style.display = gs.length > 1 ? '' : 'none';
+  btn.textContent = gs.every(g => g.classList.contains('collapsed')) ? '展开全部' : '收起全部';
+}
+$('yr-all-btn').onclick = () => {
+  const gs = [...document.querySelectorAll('#axis .yg')];
+  if (!gs.length) return;
+  const collapseTo = !gs.every(g => g.classList.contains('collapsed'));
+  gs.forEach(g => {
+    const y = g.dataset.year;
+    if (collapseTo) collapsedYears.add(y); else collapsedYears.delete(y);
+    applyYearEl(g, collapseTo);
+  });
+  persistCollapsed();
+  updateYrAllBtn();
+};
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/* ---------- 新增 / 编辑 ---------- */
+let editingId = null;
+function openEdit(ev) {
+  editingId = ev ? ev.id : null;
+  $('edit-title').textContent = ev ? '编辑事件' : '新增事件';
+  const today = new Date().toISOString().slice(0, 10);
+  // 已有记录：能识别为完整日期就回填日期框，否则回填文本框
+  const isFull = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+  $('e-from').value = ev ? (isFull(ev.from) ? ev.from : '') : today;
+  $('e-to').value = ev && ev.span && isFull(ev.to) ? ev.to : '';
+  $('e-from-txt').value = ev && !isFull(ev.from) ? ev.from : '';
+  $('e-to-txt').value = ev && ev.span && !isFull(ev.to) ? ev.to : '';
+  $('e-name').value = ev ? ev.title : '';
+  $('e-note').value = ev ? ev.note : '';
+  const sel = $('e-cat');
+  sel.innerHTML = CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = ev ? ev.cat : '其他';
+  $('edit-mask').classList.add('show');
+}
+function closeEdit() { $('edit-mask').classList.remove('show'); editingId = null; }
+
+/* 归一化日期文本：2010-7-2 → 2010-07-02；2010-7 → 2010-07；2010 → 2010 */
+function normDateStr(s) {
+  s = String(s || '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{4})\s*[-./年]?\s*(\d{1,2})?\s*[-./月]?\s*(\d{1,2})?\s*日?$/);
+  if (!m) return '';
+  const y = m[1], mo = m[2] ? String(+m[2]).padStart(2, '0') : '', d = m[3] ? String(+m[3]).padStart(2, '0') : '';
+  if (d && mo) return `${y}-${mo}-${d}`;
+  if (mo) return `${y}-${mo}`;
+  return y;
+}
+
+function saveEdit() {
+  // 优先取文本框（支持只填年份），否则取日期控件；结束留空 = 单日
+  const from = normDateStr($('e-from-txt').value) || $('e-from').value.trim();
+  let to = normDateStr($('e-to-txt').value) || $('e-to').value.trim();
+  if (!from) { toast('请填写开始日期'); return; }
+  const span = !!(to && to !== from);          // 结束≠开始 → 自动时间段
+  if (!to) to = from;
+  if (span) {
+    const fa = from.length, ta = to.length;
+    if (fa === ta && from > to) { toast('开始日期不能晚于结束日期'); return; }
+    if (fa !== ta && to.startsWith(from.slice(0, Math.min(fa, ta))) && fa > ta) {
+      toast('开始日期不能晚于结束日期'); return;   // 如 2010-05 开始到 2010 结束
+    }
+  }
+  const title = $('e-name').value.trim();
+  if (!title) { toast('请填写事件'); return; }
+  const cat = $('e-cat').value;
+  const note = $('e-note').value.trim();
+  const sortKey = from.length === 4 ? from + '-00-00'
+                : from.length === 7 ? from + '-00' : from;
+
+  const isEdit = !!editingId;                   // 先固化编辑态（closeEdit 会清空它）
+  const obj = { id: editingId || ('e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+                from, to, sortKey, span, title, note, cat };
+  const next = isEdit ? DATA.map(x => x.id === obj.id ? obj : x)
+                      : DATA.concat([obj]);
+  const msg = isEdit ? `✓ 已更新「${title}」` : `✓ 已记录「${title}」`;
+  closeEdit();
+  save(next, msg);
+}
+
+/* ---------- 删除 ---------- */
+async function delEvent(id) {
+  const ev = DATA.find(x => x.id === id);
+  if (!ev) return;
+  if (!confirm(`确定删除「${ev.title}」？`)) return;
+  save(DATA.filter(x => x.id !== id), `✓ 已删除「${ev.title}」`);
+}
+
+/* ---------- 导入 ---------- */
+let pendingImport = null;
+function openImport() {
+  $('import-text').value = '';
+  $('import-file').value = '';
+  $('import-preview').innerHTML = '';
+  $('import-confirm').disabled = true;
+  pendingImport = null;
+  $('import-mask').classList.add('show');
+}
+function closeImport() { $('import-mask').classList.remove('show'); pendingImport = null; }
+function previewImport() {
+  const text = $('import-text').value;
+  const box = $('import-preview');
+  if (!text.trim()) { box.innerHTML = ''; $('import-confirm').disabled = true; return; }
+  const { items, bad } = parseText(text);
+  pendingImport = items;
+  if (!items.length) {
+    box.innerHTML = `<div class="pv-bad">没有解析出任何有效记录，请检查格式</div>`;
+    $('import-confirm').disabled = true;
+    return;
+  }
+  const years = [...new Set(items.map(e => yearOf(e.sortKey)))];
+  box.innerHTML = `
+    <div class="pv-sum">解析出 ${items.length} 条 · 跨 ${years.length} 年${bad.length ? ` · ${bad.length} 行无法识别` : ''}</div>
+    <div class="pv-list">${items.map(e => `
+      <div class="pv-item">
+        <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
+        <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(e.note) : ''}</span>
+        <span class="tg">${e.cat}</span>
+      </div>`).join('')}</div>
+    ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
+  $('import-confirm').disabled = false;
+}
+function confirmImport() {
+  if (!pendingImport || !pendingImport.length) return;
+  const existKeys = new Set(DATA.map(e => e.from + '|' + e.title));
+  const fresh = pendingImport.filter(e => !existKeys.has(e.from + '|' + e.title));
+  const dup = pendingImport.length - fresh.length;
+  const next = DATA.concat(fresh);
+  closeImport();
+  save(next, `✓ 已导入 ${fresh.length} 条记录${dup ? `（跳过重复 ${dup} 条）` : ''}`);
+}
+$('import-file').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      const lines = rows.map(r => r.filter(c => c !== '' && c != null).join(' ')).filter(x => x.trim());
+      $('import-text').value = lines.join('\n');
+      previewImport();
+      toast('✓ 已读取 Excel，请确认预览');
+    } catch (err) { toast('读取失败：' + err.message); }
+  };
+  rd.readAsArrayBuffer(f);
+};
+
+/* ---------- 导出 ---------- */
+function exportXlsx() {
+  if (!DATA.length) { toast('没有记录可导出'); return; }
+  const rows = [['开始日期', '结束日期', '事件', '分类', '备注']];
+  sortDesc(DATA).forEach(e => rows.push([e.from, e.to, e.title, e.cat, e.note]));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 13 }, { wch: 13 }, { wch: 34 }, { wch: 8 }, { wch: 24 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'events');
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `时光记录_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast(`✓ 已导出 ${DATA.length} 条记录`);
+}
+
+/* ---------- 密码 ---------- */
+function askPassword(tip) {
+  return new Promise(resolve => {
+    const mask = $('pw-mask'), input = $('pw-input'), err = $('pw-err');
+    if (tip) $('pw-tip').innerHTML = tip;
+    input.value = ''; err.textContent = '';
+    mask.classList.add('show');
+    setTimeout(() => input.focus(), 60);
+    const close = v => {
+      mask.classList.remove('show');
+      $('pw-ok').onclick = $('pw-cancel').onclick = mask.onclick = input.onkeydown = null;
+      resolve(v);
+    };
+    $('pw-cancel').onclick = () => close(false);
+    mask.onclick = e => { if (e.target === mask) close(false); };
+    $('pw-ok').onclick = () => {
+      if (input.value === CLEAR_PW) close(true);
+      else { err.textContent = '密码不对，请重试'; input.select(); }
+    };
+    input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('pw-ok').click(); } };
+  });
+}
+
+/* ---------- 云端同步（GitHub Excel） ---------- */
+const GH_KEY = 'time_gh_cfg_v1';
+let GH = { token: '', owner: '', repo: '', branch: 'main', path: 'data/time.xlsx', sha: null };
+function loadGh() {
+  try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {}
+}
+function ghReady() { return !!(GH.token && GH.owner && GH.repo); }
+function ghApi() { return `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`; }
+function ghHeaders() {
+  return { 'Authorization': `Bearer ${GH.token}`, 'Accept': 'application/vnd.github+json' };
+}
+function bufToB64(buf) {
+  const bytes = new Uint8Array(buf); let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64ToBuf(b64) {
+  const bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+/* 数据 <-> xlsx 行 */
+function rowsToEvents(rows) {
+  const out = [];
+  rows.forEach((r, i) => {
+    if (i === 0) return;                       // 表头
+    const [from, to, title, cat, note] = r;
+    if (!from && !title) return;
+    const f = String(from || '').trim(), t = String(to || f || '').trim();
+    out.push({
+      id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + i,
+      from: f, to: t, sortKey: f.length === 7 ? f + '-00' : f,
+      span: f !== t, title: String(title || '(未命名)'),
+      cat: CATS.includes(cat) ? cat : '其他',
+      note: String(note || ''),
+    });
+  });
+  return out;
+}
+function eventsToRows(arr) {
+  const rows = [['开始日期', '结束日期', '事件', '分类', '备注']];
+  sortDesc(arr).forEach(e => rows.push([e.from, e.to, e.title, e.cat, e.note]));
+  return rows;
+}
+function buildXlsx(arr) {
+  const ws = XLSX.utils.aoa_to_sheet(eventsToRows(arr));
+  ws['!cols'] = [{ wch: 13 }, { wch: 13 }, { wch: 34 }, { wch: 8 }, { wch: 24 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+async function ghPull() {
+  const r = await fetch(ghApi() + `?t=${Date.now()}`, { headers: ghHeaders() });
+  if (r.status === 404) return null;           // 云端还没有 → 保留本地
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const j = await r.json();
+  GH.sha = j.sha;
+  return rowsToEvents(XLSX.utils.sheet_to_json(
+    XLSX.read(b64ToBuf(j.content), { type: 'array' }).Sheets[SHEET_NAME],
+    { header: 1, defval: '' }));
+}
+async function ghPush(arr) {
+  const body = {
+    message: `时光记录器同步 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+    content: bufToB64(buildXlsx(arr)), branch: GH.branch,
+  };
+  if (GH.sha) body.sha = GH.sha;
+  const r = await fetch(ghApi(), {
+    method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (r.status === 409) {                      // sha 过期 → 重拉再推
+    await ghPull();
+    return ghPush(arr);
+  }
+  if (!r.ok) { toast(`☁ 同步失败：HTTP ${r.status}`); return false; }
+  const j = await r.json();
+  GH.sha = j.content && j.content.sha;
+  saveGh();
+  return true;
+}
+function saveGh() {
+  try { localStorage.setItem(GH_KEY, JSON.stringify({ ...GH })); } catch (e) {}
+}
+async function doPull(silent) {
+  if (!ghReady()) return;
+  try {
+    const remote = await ghPull();
+    if (remote == null) {
+      if (!silent) $('sync-msg').textContent = '云端还没有 data/time.xlsx，导入数据后将自动创建';
+      if (DATA.length && !silent) $('sync-msg').textContent = '云端还没有该文件，保存任意记录后将自动创建';
+      return;
+    }
+    if (remote.length) {
+      const localKeys = new Set(DATA.map(e => e.from + '|' + e.title + '|' + e.to));
+      const fresh = remote.filter(e => !localKeys.has(e.from + '|' + e.title + '|' + e.to));
+      if (fresh.length) {
+        DATA = DATA.concat(fresh);
+        persist(DATA);
+        render();
+      }
+      if (!silent) $('sync-msg').textContent = `✓ 已拉取云端数据（本次新增 ${fresh.length} 条）`;
+    } else if (!silent) {
+      $('sync-msg').textContent = '云端文件是空的';
+    }
+  } catch (e) {
+    if (!silent) $('sync-msg').textContent = '连接失败：' + e.message;
+    else console.warn('ghPull 失败:', e.message);
+  }
+}
+function openSync() {
+  $('gh-token').value = GH.token; $('gh-owner').value = GH.owner;
+  $('gh-repo').value = GH.repo; $('gh-branch').value = GH.branch || 'main';
+  $('gh-path').value = GH.path || 'data/time.xlsx';
+  $('sync-msg').textContent = ghReady() ? '当前已连接' : '';
+  $('sync-mask').classList.add('show');
+}
+$('sync-btn').onclick = openSync;
+$('sync-close').onclick = () => $('sync-mask').classList.remove('show');
+$('sync-mask').onclick = e => { if (e.target === $('sync-mask')) $('sync-mask').classList.remove('show'); };
+$('sync-save').onclick = async () => {
+  const tk = $('gh-token').value.trim();
+  if (!tk) { $('sync-msg').textContent = '请填写 Token'; return; }
+  GH.token = tk;
+  GH.owner = $('gh-owner').value.trim();
+  GH.repo = $('gh-repo').value.trim();
+  GH.branch = $('gh-branch').value.trim() || 'main';
+  GH.path = $('gh-path').value.trim() || 'data/time.xlsx';
+  GH.sha = null;
+  $('sync-msg').textContent = '连接中…';
+  const before = DATA.length;
+  await doPull(false);
+  saveGh();
+  const after = DATA.length;
+  if ($('sync-msg').textContent.startsWith('✓') || $('sync-msg').textContent.includes('还没有')) {
+    $('sync-msg').textContent = `✓ 连接成功${after > before ? `，拉到 ${after - before} 条云端记录` : ''}`;
+    render();
+  }
+};
+
+/* ---------- 初始化 ---------- */
+$('add-btn').onclick = () => openEdit(null);
+$('edit-cancel').onclick = closeEdit;
+$('edit-save').onclick = saveEdit;
+$('edit-mask').onclick = e => { if (e.target === $('edit-mask')) closeEdit(); };
+$('import-btn').onclick = openImport;
+$('import-cancel').onclick = closeImport;
+$('import-text').oninput = previewImport;
+$('import-confirm').onclick = confirmImport;
+$('import-mask').onclick = e => { if (e.target === $('import-mask')) closeImport(); };
+$('export-btn').onclick = exportXlsx;
+
+/* ---------- 清空全部（密码门） ---------- */
+$('clear-btn').onclick = async () => {
+  if (!DATA.length) { toast('没有记录可清空'); return; }
+  const n = DATA.length;
+  const ok = await askPassword(`将清空<b>全部 ${n} 条</b>时光记录，<br>此操作不可恢复。请输入密码继续`);
+  if (!ok) return;
+  save([], `✓ 已清空 ${n} 条时光记录`);
+};
+
+DATA = loadLocal();
+loadGh();
+render();
+if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
+</script>
 </body>
 </html>
