@@ -346,6 +346,7 @@
     <div class="card-title">☁ 云端同步</div>
     <div class="card-tip">把数据存到你 GitHub 仓库的 <code id="sync-path-show">data/time.xlsx</code>，多设备共享。Token 只存本机浏览器。与体重记录器的 Token 互相独立。</div>
     <div class="fld"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="github_pat_… 或 ghp_…" style="letter-spacing:.02em"></div>
+    <div class="card-tip" style="margin-top:6px">💡 每个浏览器 / iOS 主屏幕图标都有<b>独立存储</b>：换环境需重新配置一次 Token；保存后数据自动从 GitHub 云端拉回，不会丢。</div>
     <div class="fld row2">
       <div><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
       <div><label>仓库名</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
@@ -943,7 +944,8 @@ function openSync() {
   $('gh-token').value = GH.token; $('gh-owner').value = GH.owner;
   $('gh-repo').value = GH.repo; $('gh-branch').value = GH.branch || 'main';
   $('gh-path').value = GH.path || 'data/time.xlsx';
-  $('sync-msg').textContent = ghReady() ? '当前已连接' : '';
+  $('sync-msg').textContent = ghReady() ? '当前已连接'
+    : (window.navigator.standalone ? '⚠️ 主屏幕模式使用独立存储：请在此重新配置 Token，保存后数据自动从云端拉回' : '');
   $('sync-mask').classList.add('show');
 }
 $('sync-btn').onclick = openSync;
@@ -995,11 +997,16 @@ document.addEventListener('focusout', () => {
   setTimeout(() => { if (!document.activeElement || !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName || '')) window.scrollTo(window.scrollX, window.scrollY); }, 250);
 });
 
+// Service Worker：主屏幕/离线场景下联网时永远加载最新版（file:// 与 http 环境自动跳过）
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
 DATA = loadLocal();
 loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v7</div>
+<div class="ver">v8</div>
 </body>
 </html>

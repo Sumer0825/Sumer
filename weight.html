@@ -219,6 +219,7 @@
     <p class="tip">把数据写入你仓库里的 <code>data/weight.xlsx</code>（Excel 文件，列：日期 / 时段 / 体重（斤） / 备注），多设备自动共享（每次保存 = 一次 commit）。Token 仅存于本机浏览器，不会上传到任何服务器。</p>
     <div class="row">
       <div class="field"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="ghp_xxx，需 contents 读写权限"></div>
+      <p class="tip" style="margin-top:8px">💡 每个浏览器 / iOS 主屏幕图标都有<b>独立存储</b>：换环境需重新配置一次 Token；保存后数据自动从 GitHub 云端拉回，不会丢。</p>
       <div class="field"><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
       <div class="field"><label>仓库名</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
       <div class="field"><label>分支</label><input type="text" id="gh-branch" placeholder="main"></div>
@@ -882,6 +883,7 @@ function ghPrefill() {
 }
 ghCfgLoad(); ghPrefill();
 if (GH.token) $('store-mode').textContent = 'GitHub Excel（' + GH.owner + '/' + GH.repo + '）';
+else if (window.navigator.standalone) $('store-mode').textContent = '主屏幕模式：独立存储，请配置 Token（数据会自动从云端拉回）';
 $('f-goal').value = K2J(goalOf());   // 目标输入框预填当前目标（单位：斤）
 
 $('sync-settings-btn').onclick = () => {
@@ -915,8 +917,13 @@ document.addEventListener('focusout', () => {
   setTimeout(() => { if (!document.activeElement || !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName || '')) window.scrollTo(window.scrollX, window.scrollY); }, 250);
 });
 
+// Service Worker：主屏幕/离线场景下联网时永远加载最新版（file:// 与 http 环境自动跳过）
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
 refresh();
 </script>
-<div class="ver">v17</div>
+<div class="ver">v18</div>
 </body>
 </html>

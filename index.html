@@ -143,7 +143,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 7, 'weight.html': 17 };
+const TOOLS_VER = { 'time.html': 8, 'weight.html': 18 };
 
 TOOLS.forEach((t, i) => {
   const c = document.createElement('div');
@@ -198,6 +198,11 @@ back.onclick = () => {
   crumb.style.display = 'block';
   back.style.display = 'none';
 };
+
+// Service Worker：iOS 主屏幕模式下联网时永远加载最新版（file:// 环境自动跳过）
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
