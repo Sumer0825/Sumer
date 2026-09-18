@@ -184,6 +184,13 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     font-family: inherit; -webkit-tap-highlight-color: transparent;
   }
   .op.del { color: var(--danger); border-color: rgba(192,80,60,.25); background: rgba(192,80,60,.04); }
+  .op.del.locked {
+    color: #a89484; border-color: rgba(150,135,120,.28); background: rgba(150,135,120,.06);
+  }
+  @media (hover: hover) {
+    .op.del.locked:hover { color: #8c7c6c; border-color: rgba(150,135,120,.45); background: rgba(150,135,120,.11); }
+  }
+  .tag.lock-tag { background: rgba(150,135,120,.16); color: #7d6e60; }
 
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
   .empty .ico { font-size: 40px; margin-bottom: 12px; opacity: .6; }
@@ -246,6 +253,12 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .pv-item .d { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 11.5px; }
   .pv-item .t { flex: 1; color: #3a3128; word-break: break-word; }
   .pv-item .tg { font-size: 10px; padding: 1px 6px; border-radius: 99px; background: rgba(191,154,125,.16); color: #8a6b4d; white-space: nowrap; }
+  .pv-item .pv-cat {
+    flex: none; font-size: 16px; font-family: inherit; padding: 5px 8px;
+    border: 1px solid rgba(191,154,125,.5); border-radius: 8px;
+    background: #fdfbf8; color: #6b5740; -webkit-tap-highlight-color: transparent;
+  }
+  .pv-hint { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
   .pv-sum { font-size: 13px; color: var(--primary-dark); font-weight: 600; margin: 8px 0 2px; }
   .pv-bad { font-size: 12px; color: var(--danger); margin-top: 6px; line-height: 1.5; word-break: break-all; }
 
@@ -458,11 +471,11 @@ function parseLine(line) {
   const bm = title.match(/^(.*?)[（(]([^）)]*)[）)]\s*$/);
   if (bm) { title = bm[1].trim(); note = bm[2].trim(); }
   const span = !(from.y === to.y && from.mo === to.mo && from.d === to.d);
-  const cat = guessCat(title + ' ' + note);
+  // 分类不自动猜：导入时由用户在预览里逐条选择，默认「其他」
   return {
     id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     from: fmtDate(from), to: fmtDate(to), sortKey: padSort(from),
-    span, title: title || '(未命名)', note, cat,
+    span, title: title || '(未命名)', note, cat: '其他',
   };
 }
 function parseText(text) {
@@ -580,18 +593,21 @@ function render() {
       const d = document.createElement('div');
       d.className = 'ev' + (ev.span ? ' span-ev' : '');
       const dateTxt = ev.span ? `${ev.from} → ${ev.to}` : ev.from;
+      const lk = isLocked(ev);
       d.innerHTML = `
         <div class="ev-body">
           <div class="ev-meta">
             <span class="ev-d">${dateTxt}</span>
             ${ev.span ? '<span class="tag span-tag">时间段</span>' : ''}
             <span class="tag">${ev.cat}</span>
+            ${lk ? '<span class="tag lock-tag" title="超过一年的记录不可删除，编辑不受限">🔒 已保护</span>' : ''}
           </div>
           <div class="ev-title">${esc(ev.title)}</div>
           ${ev.note ? `<div class="ev-note">${esc(ev.note)}</div>` : ''}
           <div class="ev-ops">
             <button class="op" data-act="edit" data-id="${ev.id}">编辑</button>
-            <button class="op del" data-act="del" data-id="${ev.id}">删除</button>
+            <button class="op del${lk ? ' locked' : ''}" data-act="del" data-id="${ev.id}"
+              title="${lk ? '超过一年的记录不可删除（可以编辑）' : '删除这条记录'}">删除${lk ? ' 🔒' : ''}</button>
           </div>
         </div>`;
       seg.appendChild(d);
@@ -725,10 +741,29 @@ function saveEdit() {
   save(next, msg);
 }
 
+/* ---------- 删除保护：结束日期距今超过 1 个整年的记录禁止删除（可编辑） ---------- */
+// 事件「结束日期」归一化（单日=当天；2010 → 2010-01-01；2010-07 → 2010-07-01）
+function endDateOf(ev) {
+  const s = String((ev.span ? ev.to : ev.from) || ev.from || '');
+  const m = s.match(/^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?/);
+  if (!m) return null;
+  return new Date(+m[1], m[2] ? +m[2] - 1 : 0, m[3] ? +m[3] : 1);
+}
+// 结束日期所属年份 + 1 年 ≤ 今年 → 锁定（按整年计算）
+function isLocked(ev) {
+  const end = endDateOf(ev);
+  if (!end) return false;
+  return end.getFullYear() + 1 <= new Date().getFullYear();
+}
+
 /* ---------- 删除 ---------- */
-async function delEvent(id) {
+function delEvent(id) {
   const ev = DATA.find(x => x.id === id);
   if (!ev) return;
+  if (isLocked(ev)) {                          // 锁定的记录：直接禁止，不弹任何窗口
+    toast('🔒 超过一年的记录不可删除（可以编辑）');
+    return;
+  }
   if (!confirm(`确定删除「${ev.title}」？`)) return;
   save(DATA.filter(x => x.id !== id), `✓ 已删除「${ev.title}」`);
 }
@@ -758,17 +793,23 @@ function previewImport() {
   const years = [...new Set(items.map(e => yearOf(e.sortKey)))];
   box.innerHTML = `
     <div class="pv-sum">解析出 ${items.length} 条 · 跨 ${years.length} 年${bad.length ? ` · ${bad.length} 行无法识别` : ''}</div>
-    <div class="pv-list">${items.map(e => `
+    <div class="pv-hint">请为每条选择分类（默认「其他」）</div>
+    <div class="pv-list">${items.map((e, i) => `
       <div class="pv-item">
         <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
         <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(e.note) : ''}</span>
-        <span class="tg">${e.cat}</span>
+        <select class="pv-cat" data-i="${i}">${CATS.map(c => `<option value="${c}"${c === e.cat ? ' selected' : ''}>${c}</option>`).join('')}</select>
       </div>`).join('')}</div>
     ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
   $('import-confirm').disabled = false;
 }
 function confirmImport() {
   if (!pendingImport || !pendingImport.length) return;
+  // 收集预览里用户选的分类
+  document.querySelectorAll('#import-preview .pv-cat').forEach(sel => {
+    const it = pendingImport[+sel.dataset.i];
+    if (it) it.cat = sel.value;
+  });
   const existKeys = new Set(DATA.map(e => e.from + '|' + e.title));
   const fresh = pendingImport.filter(e => !existKeys.has(e.from + '|' + e.title));
   const dup = pendingImport.length - fresh.length;
@@ -1019,6 +1060,6 @@ loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v10</div>
+<div class="ver">v12</div>
 </body>
 </html>
