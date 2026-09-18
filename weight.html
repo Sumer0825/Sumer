@@ -14,9 +14,12 @@
 <meta name="theme-color" content="#f4f6fb">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="assets/apple-touch-icon.png">
-<link href="fonts/lxgwwenkai-regular.css" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="fonts/lxgwwenkai-regular.css" rel="stylesheet"></noscript>
 <link href="lib/flatpickr.min.css" rel="stylesheet">
+<script>
+/* 被门户 iframe 嵌入时打标记：顶部安全区改由门户顶栏负责，避免重复避让（须尽早执行防布局闪烁） */
+try { if (window.self !== window.top) document.documentElement.classList.add('in-frame'); }
+catch (e) { document.documentElement.classList.add('in-frame'); }
+</script>
 <style>
   :root {
     --bg: #f4f6fb;
@@ -33,7 +36,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'LXGW WenKai', -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, sans-serif;
+    font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -200,6 +203,9 @@
 
 /* 版本角标：右下角极小字，不响应点击，用于快速分辨新旧版 */
 .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,130,145,.45); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
+/* 被门户 iframe 嵌入时：顶部安全区由门户顶栏负责，本页不再重复避让（防止标题上方出现大段空白） */
+html.in-frame body { padding-top: 24px; }
+html.in-frame header { padding-top: 0; }
 </style>
 </head>
 <body>
@@ -913,8 +919,14 @@ $('gh-connect').onclick = async () => {
 $('sync-now-btn').onclick = () => refresh();
 
 // iOS 键盘收起后视口残留修正：同位置滚动一次，触发 Safari 重算布局（不改变滚动位置）
+// 同时修正外层门户窗口（standalone 模式下键盘会把外层视口顶错位，导致底部按钮被遮挡）
 document.addEventListener('focusout', () => {
-  setTimeout(() => { if (!document.activeElement || !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName || '')) window.scrollTo(window.scrollX, window.scrollY); }, 250);
+  setTimeout(() => {
+    if (!document.activeElement || !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName || '')) {
+      window.scrollTo(window.scrollX, window.scrollY);
+      try { if (window.parent && window.parent !== window) window.parent.scrollTo(window.parent.scrollX, window.parent.scrollY); } catch (e) {}
+    }
+  }, 250);
 });
 
 // Service Worker：主屏幕/离线场景下联网时永远加载最新版（file:// 与 http 环境自动跳过）
@@ -924,6 +936,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v18</div>
+<div class="ver">v20</div>
 </body>
 </html>

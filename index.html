@@ -14,7 +14,6 @@
 <meta name="theme-color" content="#1a1230">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="assets/apple-touch-icon.png">
-<link href="fonts/lxgwwenkai-regular.css" rel="stylesheet">
 <style>
   :root {
     --bg: #f4f6fb;
@@ -31,7 +30,7 @@
     background: linear-gradient(rgba(255,255,255,.14), rgba(255,255,255,.30)), url('assets/bg.jpg?v=2') center / cover no-repeat #f4f6fb;
   }
   body {
-    font-family: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
     color: var(--text);
   }
   .topbar {
@@ -87,8 +86,8 @@
   }
   @keyframes ripple { to { transform: scale(2.4); opacity: 0; } }
 
-  /* iframe 容器 */
-  .frame-box { position: fixed; inset: 60px 0 0 0; background: #fff; display: none; }
+  /* iframe 容器：top 与顶栏等高（顶栏含状态栏安全区），避免顶栏遮挡工具页顶部 */
+  .frame-box { position: fixed; inset: calc(60px + env(safe-area-inset-top)) 0 0 0; background: #fff; display: none; }
   iframe.frame { width: 100%; height: 100%; border: none; display: block; }
   .loading {
     position: absolute; inset: 0; z-index: 1; background: #fff;
@@ -143,7 +142,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 8, 'weight.html': 18 };
+const TOOLS_VER = { 'time.html': 10, 'weight.html': 20 };
 
 TOOLS.forEach((t, i) => {
   const c = document.createElement('div');
