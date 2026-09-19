@@ -129,8 +129,9 @@
    对应页面文件放在与本 index.html 同目录即可（同属一个静态站点）。
    ========================================================= */
 const TOOLS = [
-  { name: '时光记录器', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
-  { name: '体重记录器', file: 'weight.html', icon: '🎯', desc: '记录与查看体重趋势' },
+  { name: '时光自撰集', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
+  { name: '轻身时光簿', file: 'weight.html', icon: '🎯', desc: '记录与查看体重趋势' },
+  { name: '收支规划局', file: 'budget.html', icon: '💰', desc: '每天的开支预算与实际' },
 ];
 
 const tools = document.getElementById('tools');
@@ -142,7 +143,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 12, 'weight.html': 20 };
+const TOOLS_VER = { 'time.html': 13, 'weight.html': 21, 'budget.html': 3 };
 
 TOOLS.forEach((t, i) => {
   const c = document.createElement('div');

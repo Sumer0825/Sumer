@@ -6,11 +6,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>时光记录器</title>
+<title>时光自撰集</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="时光记录器">
+<meta name="apple-mobile-web-app-title" content="时光自撰集">
 <meta name="theme-color" content="#f4f1ec">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <script>
@@ -287,7 +287,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 <div class="wrap">
   <header>
     <div class="head-top">
-      <h1>⏳ 时光记录器</h1>
+      <h1>⏳ 时光自撰集</h1>
       <span style="display:flex;align-items:baseline;gap:2px">
         <span class="head-cnt" id="head-cnt">0 条</span>
         <button class="yr-all" id="yr-all-btn" style="display:none">收起全部</button>
@@ -400,7 +400,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 <script src="lib/xlsx.full.min.js"></script>
 <script>
 /* ============================================================
-   时光记录器 · 个人编年史
+   时光自撰集 · 个人编年史
    存储：localStorage（本机）+ GitHub Excel（云端同步）
    数据字段：{ id, from, to, sortKey, span, title, note, cat }
    ============================================================ */
@@ -940,7 +940,7 @@ async function ghPull() {
 }
 async function ghPush(arr) {
   const body = {
-    message: `时光记录器同步 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+    message: `时光自撰集同步 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
     content: bufToB64(buildXlsx(arr)), branch: GH.branch,
   };
   if (GH.sha) body.sha = GH.sha;
@@ -1060,6 +1060,6 @@ loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v12</div>
+<div class="ver">v13</div>
 </body>
 </html>
