@@ -233,6 +233,7 @@ html.in-frame header { padding-top: 0; }
     <div class="field" style="margin-top:10px"><label>数据文件路径</label><input type="text" id="gh-path" placeholder="data/weight.xlsx"></div>
     <div class="actions">
       <button type="button" class="btn-primary" id="gh-connect">保存并连接</button>
+      <button type="button" class="btn-line" id="gh-disconnect" style="display:none;color:var(--danger);border-color:rgba(255,93,108,.3)">断开链接并清空 Token</button>
       <button type="button" class="btn-line" id="gh-close">关闭</button>
       <span id="gh-msg" class="tip"></span>
     </div>
@@ -265,7 +266,7 @@ html.in-frame header { padding-top: 0; }
         <div class="field" style="flex:0.6 1 88px"><label>时段</label>
           <select id="f-seg"><option value="早" selected>早</option><option value="中">中</option><option value="晚">晚</option></select>
         </div>
-        <div class="field" style="flex:1 1 110px"><label>体重 (斤)</label><input type="number" id="f-weight" step="0.1" min="0" placeholder="如 140.5" required></div>
+        <div class="field" style="flex:1 1 110px"><label>体重 (斤)</label><input type="number" id="f-weight" step="0.1" min="0" placeholder="如120" required></div>
         <div class="field" style="flex:1 1 110px"><label>目标 (斤)</label><input type="number" id="f-goal" step="0.1" min="0" placeholder="可选"></div>
         <div class="field" style="flex:2 1 160px"><label>备注</label><input type="text" id="f-note" placeholder="可选，如 晨起空腹"></div>
       </div>
@@ -344,7 +345,7 @@ html.in-frame header { padding-top: 0; }
 <script src="lib/zh.js"></script>
 <script>
 const KEY = 'weight_records_v1';
-const SEED = 'data/weight.xlsx';                 // 同站种子 Excel（无缓存、无 token 时读取）
+// 注：本工具不再内置种子 Excel，无 Token 时本机为空，全部依赖链接后从仓库拉取
 const SHEET_NAME = 'Sheet1 (2)';                 // 与你的 Excel 保持一致
 const $ = id => document.getElementById(id);
 const fmt = n => (n == null || isNaN(n)) ? '--' : Number(n).toFixed(1);
@@ -362,8 +363,9 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-// 目标体重不进 Excel（那是页面设置项），单独存本机；默认 53kg
-const goalOf = () => { const g = parseFloat(localStorage.getItem('weight_goal')); return isNaN(g) ? 53 : g; };
+// 目标体重不进 Excel（那是页面设置项），单独存本机；默认 106 斤（53kg）
+const GOAL_DEFAULT = 53;   // kg，等价 106 斤
+const goalOf = () => { const g = parseFloat(localStorage.getItem('weight_goal')); return isNaN(g) ? GOAL_DEFAULT : g; };
 
 // 旧数据迁移：早期版本把时段（早/中/晚）存在 note 里，挪到 seg 字段
 const load = () => {
@@ -376,6 +378,7 @@ const load = () => {
       if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; }
       else r.seg = '早';
     }
+    r.goal = r.goal || GOAL_DEFAULT;     // 旧数据没填目标 → 统一补默认 106 斤
   });
   return d;
 };
@@ -459,11 +462,26 @@ async function ghPull() {
   GH.sha = j.sha;
   return parseXlsxBuf(b64ToBuf(j.content));
 }
+async function ghFetchSha() {
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}?ref=${GH.branch}`;
+  const r = await fetch(url, { headers: ghHeaders() });
+  if (r.status === 404) return null;               // 云端还没有 Excel → 首次保存时创建
+  if (!r.ok) return null;
+  GH.sha = (await r.json()).sha;
+  return GH.sha;
+}
 async function ghPush(data) {
   const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`;
+  // 云端已有文件但本地没拿到 sha → 先补拉，避免 422 "sha wasn't supplied"
+  if (!GH.sha) await ghFetchSha();
   const body = { message: '更新体重数据 ' + new Date().toISOString().slice(0, 10), content: bufToB64(buildXlsx(data)), branch: GH.branch };
   if (GH.sha) body.sha = GH.sha;                   // 带 sha = 更新；不带 = 创建（云端还没有文件时）
-  const r = await fetch(url, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let r = await fetch(url, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  // sha 缺失/过期（422/409）→ 重拉指纹再试一次
+  if ((r.status === 422 || r.status === 409) && (await ghFetchSha()) !== null) {
+    body.sha = GH.sha;
+    r = await fetch(url, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e.message || '') + ' (' + r.status + ')'); }
   GH.sha = (await r.json()).content.sha;
 }
@@ -473,6 +491,7 @@ function setSync(text, type) {
   el.textContent = text;
   el.className = 'sync-status' + (type === 'ok' ? ' ok' : type === 'err' ? ' err' : '');
   $('sync-now-btn').style.display = GH.token ? '' : 'none';
+  const dc = $('gh-disconnect'); if (dc) dc.style.display = GH.token ? '' : 'none';
 }
 // 持久化：先写本地缓存，有 token 再写 GitHub
 async function persist(data) {
@@ -486,16 +505,7 @@ async function persist(data) {
 // 启动加载策略：先用本地缓存立即渲染（秒开），再后台拉 GitHub/种子，到货后静默更新
 async function refresh() {
   render();                                   // ① 本地缓存先上屏，不等网络
-  if (!DATA.length) {                         // ② 无缓存：读同站种子 Excel
-    try {
-      const r = await fetch(SEED, { cache: 'no-store' });
-      if (r.ok) {
-        const d = parseXlsxBuf(await r.arrayBuffer());
-        if (d.length) { DATA = d; save(d); render(); }
-      }
-    } catch (e) { /* file:// 或文件不存在时忽略 */ }
-  }
-  if (GH.token) {                             // ③ 有 token：后台同步 GitHub，不阻塞界面
+  if (GH.token) {                             // ② 有 token：后台同步 GitHub，不阻塞界面（无 token 时本机为空，全部依赖链接后从仓库拉取）
     try {
       const d = await ghPull();
       if (d === null) {
@@ -542,7 +552,8 @@ function render() {
   else { dEl.textContent = '0.0'; dEl.className = 'value'; }
 
   // 距目标差值（最新体重 - 目标体重；正=还需减，负=已低于目标）
-  const goal = len ? (data[len-1].goal || null) : null;
+  // 目标取「最近一条填了目标的记录」，本机设置的目标兜底（默认 106 斤）
+  const goal = len ? (data.slice().reverse().find(d => d.goal != null)?.goal ?? goalOf()) : null;
   const gEl = $('s-goal');
   if (goal == null) { gEl.innerHTML = '--'; gEl.className = 'value'; }
   else {
@@ -670,7 +681,7 @@ function renderHistory(data) {
     items.forEach(d => {
       const canDel = d.date === today;   // 仅当前自然日（24 小时内）可删
       const isMax = weekMaxSet.has(d);   // 本周最大体重
-      html += `<tr><td>${d.date}</td><td><span class="seg-tag ${segCls(d.seg)}">${d.seg || '早'}</span></td><td class="${isMax ? 'week-max' : ''}"><b>${fmt(K2J(d.weight))}</b> 斤</td><td>${d.goal ? fmt(K2J(d.goal))+' 斤' : '-'}</td>`;
+      html += `<tr><td>${d.date}</td><td><span class="seg-tag ${segCls(d.seg)}">${d.seg || '早'}</span></td><td class="${isMax ? 'week-max' : ''}"><b>${fmt(K2J(d.weight))}</b> 斤</td><td>${fmt(K2J(d.goal || GOAL_DEFAULT))} 斤</td>`;
       html += `<td class="note">${d.note || ''}</td>`;
       if (canDel)
         html += `<td style="text-align:right"><button class="del" data-date="${d.date}" data-seg="${d.seg || '早'}">删除</button></td>`;
@@ -720,14 +731,14 @@ $('form').onsubmit = async e => {
     note: $('f-note').value.trim()
   };
   if (!entry.date || isNaN(entry.weight) || isNaN(jin)) return;
-  localStorage.setItem('weight_goal', String(entry.goal));   // 目标持久化（不进 Excel）
+  localStorage.setItem('weight_goal', String(entry.goal));           // 目标持久化（不进 Excel）
   let data = DATA.slice();
   const i = data.findIndex(d => d.date === entry.date && (d.seg || '早') === entry.seg);
   if (i >= 0) data[i] = entry; else data.push(entry);        // 同日同时段覆盖，不同时段共存
   await persist(data); render();
   toast(i >= 0 ? `✓ 已更新 ${entry.date} ${entry.seg} · ${fmt(K2J(entry.weight))} 斤`
                : `✓ 录入成功 · ${entry.date} ${entry.seg} ${fmt(K2J(entry.weight))} 斤`);
-  $('f-weight').value = ''; $('f-note').value = '';
+  $('f-weight').value = ''; $('f-note').value = '';      // 保存后清空体重与备注，等待下次输入
 };
 
 // 导出：生成与云端同格式的 Excel（日期 | 时段 | 体重（斤） | 备注）
@@ -781,7 +792,10 @@ function importJson(file) {
       alert('导入失败，有 ' + bad.length + ' 条格式不对：\n' + bad.slice(0, 5).join('\n') + (bad.length > 5 ? '\n…' : ''));
       return;
     }
-    arr.forEach(r => { if (!r.seg) { if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; } else r.seg = '早'; } r.goal = r.goal || goalOf(); });
+    arr.forEach(r => {
+      if (!r.seg) { if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; } else r.seg = '早'; }
+      r.goal = r.goal || GOAL_DEFAULT;     // 导入数据未填目标 → 统一按默认 106 斤
+    });
     const existing = DATA.length;
     if (existing && !confirm(`将导入 ${arr.length} 条记录，并覆盖现有 ${existing} 条，确定继续？`)) return;
     await persist(arr);
@@ -890,7 +904,7 @@ function ghPrefill() {
 ghCfgLoad(); ghPrefill();
 if (GH.token) $('store-mode').textContent = 'GitHub Excel（' + GH.owner + '/' + GH.repo + '）';
 else if (window.navigator.standalone) $('store-mode').textContent = '主屏幕模式：独立存储，请配置 Token（数据会自动从云端拉回）';
-$('f-goal').value = K2J(goalOf());   // 目标输入框预填当前目标（单位：斤）
+$('f-goal').value = K2J(goalOf());   // 目标输入框预填当前目标（单位：斤），默认 106
 
 $('sync-settings-btn').onclick = () => {
   ghPrefill();
@@ -898,6 +912,8 @@ $('sync-settings-btn').onclick = () => {
 };
 $('gh-close').onclick = () => { $('sync-card').style.display = 'none'; };
 $('gh-connect').onclick = async () => {
+  const tk = $('gh-token').value.trim();
+  if (!tk) { $('gh-msg').textContent = '请填写 Token'; return; }
   ghCfgSave();
   $('gh-msg').textContent = '连接中…';
   try {
@@ -917,6 +933,24 @@ $('gh-connect').onclick = async () => {
   }
 };
 $('sync-now-btn').onclick = () => refresh();
+$('gh-disconnect').onclick = async () => {
+  if (!confirm('确定断开 GitHub 链接？\n\n将清空：本机 Token、本机浏览器缓存的体重数据\n不会动：仓库里 Excel 表格已写入的数据\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
+  localStorage.removeItem('gh_token');
+  localStorage.removeItem('gh_cfg');
+  localStorage.removeItem('weight_records_v1');   // 清空本机缓存数据
+  localStorage.removeItem('weight_goal');         // 清空本机缓存的目标
+  DATA = [];
+  GH.owner = 'sumer0825'; GH.repo = 'Sumer'; GH.path = 'data/weight.xlsx';
+  GH.token = ''; GH.sha = null;
+  if (window.navigator.standalone) $('store-mode').textContent = '主屏幕模式：独立存储，请配置 Token（数据会自动从云端拉回）';
+  else $('store-mode').textContent = '本机浏览器（localStorage）';
+  setSync('未连接 GitHub（仅本机）');
+  const dc = $('gh-disconnect'); if (dc) dc.style.display = 'none';
+  ghPrefill();
+  render();
+  $('gh-msg').textContent = '已断开链接并清空 Token，本机缓存数据已清空，仓库表格未改动';
+  toast('已断开链接并清空本机数据（仓库表格未改动）');
+};
 
 // iOS 键盘收起后视口残留修正：同位置滚动一次，触发 Safari 重算布局（不改变滚动位置）
 // 同时修正外层门户窗口（standalone 模式下键盘会把外层视口顶错位，导致底部按钮被遮挡）
@@ -936,6 +970,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v21</div>
+<div class="ver">v29</div>
 </body>
 </html>

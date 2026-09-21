@@ -378,6 +378,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
       <button class="btn" id="sync-close">关闭</button>
       <button class="btn pri" id="sync-save">保存并连接</button>
     </div>
+    <button class="btn danger" id="gh-disconnect" style="display:none;width:100%;margin-top:10px">断开链接并清空 Token</button>
     <div class="card-tip" id="sync-msg" style="margin:10px 0 0;min-height:18px"></div>
   </div>
 </div>
@@ -493,9 +494,10 @@ function loadLocal() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
 }
 let syncTimer = null;
-function persist(arr, silent) {
+function persist(arr, silent, noPush) {
   DATA = arr;
   try { localStorage.setItem(KEY, JSON.stringify(arr)); } catch (e) {}
+  if (noPush) return;                          // 静默拉取场景：只更新本地，不回写云端
   if (ghReady()) {                             // 有 Token：自动写回云端 Excel
     if (syncTimer) clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
@@ -847,7 +849,7 @@ function exportXlsx() {
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `时光记录_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.href = url; a.download = `编年记事_${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   toast(`✓ 已导出 ${DATA.length} 条记录`);
@@ -878,7 +880,7 @@ function askPassword(tip) {
 
 /* ---------- 云端同步（GitHub Excel） ---------- */
 const GH_KEY = 'time_gh_cfg_v1';
-let GH = { token: '', owner: '', repo: '', branch: 'main', path: 'data/time.xlsx', sha: null };
+let GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/time.xlsx', sha: null };
 function loadGh() {
   try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {}
 }
@@ -939,18 +941,24 @@ async function ghPull() {
     { header: 1, defval: '' }));
 }
 async function ghPush(arr) {
+  // 云端已有文件但本地没拿到 sha → 先补拉，避免 422 "sha wasn't supplied"
+  if (!GH.sha) { try { await ghPull(); } catch (e) { /* 404 等忽略，按新文件创建 */ } }
   const body = {
     message: `时光自撰集同步 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
     content: bufToB64(buildXlsx(arr)), branch: GH.branch,
   };
   if (GH.sha) body.sha = GH.sha;
-  const r = await fetch(ghApi(), {
+  let r = await fetch(ghApi(), {
     method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (r.status === 409) {                      // sha 过期 → 重拉再推
-    await ghPull();
-    return ghPush(arr);
+  if ((r.status === 409 || r.status === 422) && GH.token) {  // sha 缺失/过期 → 重拉再推（仅一次）
+    try { await ghPull(); } catch (e) { /* ignore */ }
+    if (GH.sha) body.sha = GH.sha;
+    r = await fetch(ghApi(), {
+      method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   }
   if (!r.ok) { toast(`☁ 同步失败：HTTP ${r.status}`); return false; }
   const j = await r.json();
@@ -966,7 +974,7 @@ async function doPull(silent) {
   try {
     const remote = await ghPull();
     if (remote == null) {
-      if (!silent) $('sync-msg').textContent = '云端还没有 data/time.xlsx，导入数据后将自动创建';
+      if (!silent) $('sync-msg').textContent = '云端还没有该文件，导入数据后将自动创建';
       if (DATA.length && !silent) $('sync-msg').textContent = '云端还没有该文件，保存任意记录后将自动创建';
       return;
     }
@@ -975,7 +983,7 @@ async function doPull(silent) {
       const fresh = remote.filter(e => !localKeys.has(e.from + '|' + e.title + '|' + e.to));
       if (fresh.length) {
         DATA = DATA.concat(fresh);
-        persist(DATA);
+        persist(DATA, silent, silent);        // 静默启动拉取时只写本地，不自动回写云端
         render();
       }
       if (!silent) $('sync-msg').textContent = `✓ 已拉取云端数据（本次新增 ${fresh.length} 条）`;
@@ -988,22 +996,36 @@ async function doPull(silent) {
   }
 }
 function openSync() {
-  $('gh-token').value = GH.token; $('gh-owner').value = GH.owner;
-  $('gh-repo').value = GH.repo; $('gh-branch').value = GH.branch || 'main';
+  $('gh-token').value = GH.token; $('gh-owner').value = GH.owner || 'sumer0825';
+  $('gh-repo').value = GH.repo || 'Sumer'; $('gh-branch').value = GH.branch || 'main';
   $('gh-path').value = GH.path || 'data/time.xlsx';
   $('sync-msg').textContent = ghReady() ? '当前已连接'
     : (window.navigator.standalone ? '⚠️ 主屏幕模式使用独立存储：请在此重新配置 Token，保存后数据自动从云端拉回' : '');
+  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
   $('sync-mask').classList.add('show');
 }
 $('sync-btn').onclick = openSync;
 $('sync-close').onclick = () => $('sync-mask').classList.remove('show');
 $('sync-mask').onclick = e => { if (e.target === $('sync-mask')) $('sync-mask').classList.remove('show'); };
+$('gh-disconnect').onclick = async () => {
+  if (!confirm('确定断开 GitHub 链接？\n\n将清空：本机 Token、本机浏览器缓存的记事数据\n不会动：仓库里 Excel 表格已写入的数据\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
+  localStorage.removeItem(GH_KEY);
+  localStorage.removeItem(KEY);                    // 清空本机缓存数据
+  DATA = [];
+  GH.token = ''; GH.owner = 'sumer0825'; GH.repo = 'Sumer'; GH.path = 'data/time.xlsx'; GH.sha = null;
+  $('gh-token').value = ''; $('gh-owner').value = 'sumer0825'; $('gh-repo').value = 'Sumer';
+  $('gh-path').value = 'data/time.xlsx';
+  $('sync-msg').textContent = '已断开链接并清空 Token，本机缓存数据已清空，仓库表格未改动';
+  $('gh-disconnect').style.display = 'none';
+  render();
+  toast('已断开链接并清空本机数据（仓库表格未改动）');
+};
 $('sync-save').onclick = async () => {
   const tk = $('gh-token').value.trim();
   if (!tk) { $('sync-msg').textContent = '请填写 Token'; return; }
   GH.token = tk;
-  GH.owner = $('gh-owner').value.trim();
-  GH.repo = $('gh-repo').value.trim();
+  GH.owner = $('gh-owner').value.trim() || 'sumer0825';
+  GH.repo = $('gh-repo').value.trim() || 'Sumer';
   GH.branch = $('gh-branch').value.trim() || 'main';
   GH.path = $('gh-path').value.trim() || 'data/time.xlsx';
   GH.sha = null;
@@ -1015,6 +1037,7 @@ $('sync-save').onclick = async () => {
   if ($('sync-msg').textContent.startsWith('✓') || $('sync-msg').textContent.includes('还没有')) {
     $('sync-msg').textContent = `✓ 连接成功${after > before ? `，拉到 ${after - before} 条云端记录` : ''}`;
     render();
+    $('gh-disconnect').style.display = ghReady() ? '' : 'none';   // 连接成功后显示断开按钮
   }
 };
 
@@ -1060,6 +1083,6 @@ loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v13</div>
+<div class="ver">v17</div>
 </body>
 </html>
