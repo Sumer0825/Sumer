@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>清居置物箱</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="清居置物箱">
+<meta name="theme-color" content="#faf7f2">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="assets/apple-touch-icon.png">
+<script>
+/* 被门户 iframe 嵌入时打标记：顶部安全区改由门户顶栏负责，避免重复避让（须尽早执行防布局闪烁） */
+try { if (window.self !== window.top) document.documentElement.classList.add('in-frame'); }
+catch (e) { document.documentElement.classList.add('in-frame'); }
+</script>
+<style>
+  :root {
+    --bg: #f5f1ea;
+    --panel: #ffffff;
+    --ink: #3a352f;
+    --muted: #8c8377;
+    --line: #e7e0d5;
+    --brand: #c97b5a;
+    --brand-soft: #f3e3da;
+    --accent: #6f9c76;
+    --shadow: 0 10px 30px rgba(80, 60, 40, 0.10);
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: linear-gradient(180deg, #faf7f2 0%, var(--bg) 100%);
+    color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+  header { padding: 26px 24px 8px; max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: 1px; }
+  h1 .tag { font-size: 13px; color: var(--brand); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-left: 10px; vertical-align: middle; }
+  .subtitle { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+
+  .toolbar { max-width: 1120px; margin: 16px auto 0; padding: 0 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1 1 auto; padding-bottom: 4px; }
+  .tab {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 9px 16px; border-radius: 999px; font-size: 14px; cursor: pointer; white-space: nowrap; transition: all .15s;
+  }
+  .tab:hover { border-color: var(--brand); }
+  .tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .tab .n { opacity: .7; font-size: 12px; margin-left: 6px; }
+  button.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 10px 16px; border-radius: 999px; font-size: 14px; cursor: pointer; transition: all .2s; outline: none; white-space: nowrap; }
+  button.btn:hover { border-color: var(--brand); }
+  button.btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+  button.btn.primary:hover { background: #b86a4b; }
+  button.btn.ghost { background: transparent; }
+  button.btn.sm { padding: 7px 12px; font-size: 13px; }
+
+  main { max-width: 1120px; margin: 18px auto 70px; padding: 0 24px; }
+
+  .loc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 18px; flex-wrap: wrap; }
+  .loc-title { font-size: 19px; font-weight: 600; }
+  .loc-title small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .loc-actions { display: flex; gap: 8px; }
+
+  /* 层区块 */
+  .level { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 18px; overflow: hidden; }
+  .level-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: linear-gradient(90deg, #fbf6f0, #fff); border-bottom: 1px solid var(--line); }
+  .level-name { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .level-name .badge { font-size: 12px; color: var(--muted); background: #f1ece3; padding: 2px 9px; border-radius: 999px; font-weight: 400; }
+  .level-tools { display: flex; gap: 6px; }
+  .level-body { padding: 16px 18px; }
+  .level-name { cursor: pointer; user-select: none; }
+  .level-name .arrow { display: inline-block; width: 16px; color: var(--muted); font-size: 12px; }
+  .level.collapsed .level-body { display: none; }
+  .level.collapsed { box-shadow: none; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
+  .item { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; transition: transform .15s; cursor: pointer; }
+  .item:hover { transform: translateY(-3px); border-color: var(--brand); }
+  .item .thumb { width: 100%; height: 96px; object-fit: cover; background: #f3efe8; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #b3a89a; overflow: hidden; }
+  .item .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .item .thumb .ph-icon { font-size: 22px; opacity: .6; }
+  .item .thumb .ph-txt { font-size: 11px; margin-top: 4px; opacity: .7; }
+  .item .im { padding: 10px 11px 12px; }
+  .item .nm { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .qty { font-size: 12px; color: var(--brand); margin-top: 3px; }
+  .item .meta-note { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; max-height: 2.6em; overflow: hidden; }
+  .item-empty { color: var(--muted); font-size: 13px; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; text-align: center; }
+
+  /* 侧边栏树状布局 */
+  .app { max-width: 1120px; margin: 18px auto 70px; padding: 0 24px; display: flex; gap: 18px; align-items: flex-start; }
+  .sidebar { width: 220px; flex: 0 0 220px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; position: sticky; top: 16px; max-height: calc(100vh - 40px); overflow: hidden auto; transition: width .22s ease, flex-basis .22s ease, padding .22s ease; }
+  .sidebar .sb-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; min-height: 30px; margin-bottom: 10px;
+    background: transparent; border: 1px solid var(--line); border-radius: 8px;
+    cursor: pointer; color: var(--muted); font-size: 13px; line-height: 1; padding: 0;
+    transition: background .15s, color .15s;
+  }
+  .sidebar .sb-toggle:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-soft); }
+  .sidebar .sb-toggle .lbl { font-size: 12px; margin-left: 4px; }
+  .sidebar .sb-toggle .ic { font-size: 14px; line-height: 1; }
+  .sidebar .sb-title { font-size: 12px; color: var(--muted); margin: 0 6px 8px; white-space: nowrap; }
+  .sidebar .loc { margin-bottom: 2px; }
+  .sidebar .loc-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; gap: 6px; }
+  .sidebar .loc-row:hover { background: #faf6f0; }
+  .sidebar .loc-row.active { background: var(--brand-soft); color: var(--brand); }
+  .sidebar .loc-row .arr { color: var(--muted); font-size: 11px; width: 14px; display: inline-block; flex: 0 0 14px; }
+  .sidebar .loc-row .cnt { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .sidebar .loc-row .ico-circle { display: none; width: 34px; height: 34px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin: 0 auto; }
+  .sidebar .loc-row .ico-circle.active { background: var(--brand); color: #fff; }
+  .sidebar .loc-row .lbl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .sidebar .lvls { margin-left: 14px; margin-top: 2px; }
+  .sidebar .lvl-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--ink); }
+  .sidebar .lvl-row:hover { background: #faf6f0; }
+  .sidebar .lvl-row.active { background: var(--brand); color: #fff; }
+  .sidebar .lvl-row .cnt { font-size: 11px; opacity: .8; }
+  .sidebar .sb-new { margin-top: 10px; width: 100%; text-align: left; }
+  .sidebar .sb-new-collapsed {
+    display: none; width: 36px; height: 36px; margin: 10px auto 0;
+    border-radius: 50%; border: 1px dashed var(--line); background: transparent;
+    color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 0;
+  }
+  .sidebar .sb-new-collapsed:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+  .content { flex: 1 1 auto; min-width: 0; }
+
+  /* 侧边栏收起状态：仅图标 + 折叠按钮 */
+  .sidebar.collapsed { width: 56px; flex: 0 0 56px; padding: 10px 6px; }
+  .sidebar.collapsed .sb-toggle { margin-bottom: 12px; }
+  .sidebar.collapsed .sb-toggle .lbl { display: none; }
+  .sidebar.collapsed .sb-title { display: none; }
+  .sidebar.collapsed .sb-new { display: none; }
+  .sidebar.collapsed .sb-new-collapsed { display: block; }
+  .sidebar.collapsed .sb-empty { display: none; }
+  .sidebar.collapsed .loc-row { padding: 4px 0; justify-content: center; }
+  .sidebar.collapsed .loc-row .arr { display: none; }
+  .sidebar.collapsed .loc-row .cnt { display: none; }
+  .sidebar.collapsed .loc-row .lbl-name { display: none; }
+  .sidebar.collapsed .loc-row .ico-circle { display: flex; }
+  .sidebar.collapsed .lvls { display: none; }
+
+  /* 移动端：小屏时主区不再被挤压，sidebar 默认展开但更窄 */
+  @media (max-width: 760px) {
+    .app { padding: 0 12px; gap: 10px; }
+    .sidebar { width: 168px; flex: 0 0 168px; padding: 10px; }
+    .sidebar .loc-row { padding: 7px 8px; font-size: 13px; }
+    .sidebar .lvl-row { padding: 5px 8px; font-size: 12px; }
+    .sidebar.collapsed { width: 48px; flex: 0 0 48px; padding: 10px 4px; }
+    .sidebar.collapsed .loc-row .ico-circle { width: 30px; height: 30px; font-size: 13px; }
+    .sidebar .sb-new-collapsed { width: 32px; height: 32px; font-size: 16px; }
+  }
+  @media (max-width: 480px) {
+    .app { padding: 0 10px; gap: 8px; }
+    /* 极窄屏自动收起，留出空间给物品；用户手动展开后尊重选择 */
+    body.sidebar-auto .sidebar:not(.user-toggled) { width: 48px; flex: 0 0 48px; padding: 10px 4px; }
+    body.sidebar-auto .sidebar:not(.user-toggled) .sb-title,
+    body.sidebar-auto .sidebar:not(.user-toggled) .sb-new,
+    body.sidebar-auto .sidebar:not(.user-toggled) .lbl-name,
+    body.sidebar-auto .sidebar:not(.user-toggled) .arr,
+    body.sidebar-auto .sidebar:not(.user-toggled) .cnt,
+    body.sidebar-auto .sidebar:not(.user-toggled) .lvls { display: none; }
+    body.sidebar-auto .sidebar:not(.user-toggled) .loc-row { justify-content: center; padding: 4px 0; }
+    body.sidebar-auto .sidebar:not(.user-toggled) .loc-row .ico-circle { display: flex; }
+    body.sidebar-auto .sidebar:not(.user-toggled) .sb-toggle .lbl { display: none; }
+    body.sidebar-auto .sidebar:not(.user-toggled) .sb-new-collapsed { display: block; width: 32px; height: 32px; font-size: 16px; }
+  }
+  .loc-sub { font-size: 15px; font-weight: 600; margin: 2px 0 14px; display: flex; align-items: center; justify-content: space-between; }
+  .ilist { display: flex; flex-direction: column; gap: 8px; }
+  .irow { display: flex; gap: 10px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; transition: border-color .15s; }
+  .irow:hover { border-color: var(--brand); }
+  .irow .ithumb { width: 46px; height: 46px; border-radius: 8px; background: #f3efe8; display: flex; align-items: center; justify-content: center; color: #b3a89a; font-size: 18px; overflow: hidden; flex: 0 0 46px; }
+  .irow .ithumb img { width: 100%; height: 100%; object-fit: cover; }
+  .irow .info { flex: 1; min-width: 0; }
+  .irow .info .nm { font-size: 14px; font-weight: 600; }
+  .irow .info .qty { font-size: 12px; color: var(--brand); margin-top: 2px; }
+  .irow .info .note { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .empty-hero { text-align: center; color: var(--muted); padding: 70px 20px; }
+  .empty-hero .big { font-size: 46px; margin-bottom: 10px; }
+  .empty-hero .btn { margin-top: 16px; }
+
+  .del-x { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; padding: 5px 8px; border-radius: 8px; }
+  .del-x:hover { background: #fbe9e3; color: #d9534f; }
+  .edit-x { border: none; background: transparent; color: var(--brand); cursor: pointer; font-size: 13px; padding: 5px 8px; border-radius: 8px; margin-right: 2px; }
+  .edit-x:hover { background: var(--brand-soft); }
+
+  /* 模态框 */
+  .overlay { position: fixed; inset: 0; background: rgba(40,30,20,.55); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--panel); border-radius: 20px; width: 100%; max-width: 460px; padding: 22px; box-shadow: var(--shadow); max-height: 92vh; overflow: auto; }
+  .modal h3 { margin: 0 0 16px; font-size: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--ink); outline: none; font-family: inherit; background: #fff; }
+  .field input:focus, .field textarea:focus { border-color: var(--brand); }
+  .field textarea { resize: vertical; min-height: 56px; }
+  .field .row2 { display: flex; gap: 12px; }
+  .field .row2 > div { flex: 1; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+  /* 物品上传区 */
+  .upzone { border: 2px dashed var(--line); border-radius: 12px; background: #faf7f2; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; transition: all .2s; margin-bottom: 14px; }
+  .upzone:hover, .upzone.drag { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+  .upzone img { max-width: 100%; max-height: 200px; border-radius: 8px; display: none; }
+  .upzone .ph { font-size: 13px; }
+  .upzone .ph-replace { display: none; font-size: 11px; color: var(--brand); margin-top: 6px; }
+  .upzone.hasimg .ph { display: none; }
+  .upzone.hasimg .ph-replace { display: block; }
+  .upzone.hasimg { border-style: solid; padding: 8px; }
+
+  /* 查看大图 */
+  .lightbox .modal { max-width: 640px; text-align: center; }
+  .lightbox img { max-width: 100%; border-radius: 12px; }
+  .lightbox .info { text-align: left; margin-top: 12px; font-size: 14px; }
+  .lightbox .info .c { color: var(--brand); }
+  .counter { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+
+  /* 物品明细日期 */
+  .irow .info .created { font-size: 11px; color: var(--muted); margin-top: 2px; opacity: .75; }
+
+  /* 密码弹窗（删除/危险操作用） */
+  .pw-mask { position: fixed; inset: 0; background: rgba(40,30,20,.55); z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .pw-mask.show { display: flex; }
+  .pw-card { background: var(--panel); border-radius: 16px; padding: 22px; max-width: 380px; width: 100%; box-shadow: var(--shadow); }
+  .pw-card h3 { margin: 0 0 6px; font-size: 16px; }
+  .pw-card .pw-msg { color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.5; white-space: pre-line; }
+  .pw-card .pw-input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; outline: none; font-family: inherit; background: #fbfcfe; letter-spacing: 4px; }
+  .pw-card .pw-input:focus { border-color: var(--brand); background: #fff; }
+  .pw-card .pw-err { color: var(--danger); font-size: 12px; min-height: 16px; margin-top: 6px; }
+  .pw-card .pw-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+  .pw-card .pw-actions .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .pw-card .pw-actions .btn.primary:hover { background: #b86a4b; }
+
+  /* ---------- 工具箱统一部件 ---------- */
+  .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,110,95,.45); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .in-frame .ver { display: none; }   /* 嵌入门户后由门户显示版本号 */
+  /* 顶页眉（standalone 模式），与现有工具风格一致 */
+  header { padding: 26px 24px 4px; max-width: 1120px; margin: 0 auto; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: .5px; }
+  header h1 .tag { font-size: 12px; color: var(--brand); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-left: 10px; vertical-align: middle; font-weight: 500; }
+  header .subtitle { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .in-frame header { padding: 12px 22px 4px; }   /* iframe 模式压扁顶页眉 */
+  .in-frame header h1 { display: none; }            /* 标题在 iframe 里与 portal 顶栏重复，藏掉；保留副标题说明 */
+  .in-frame .app { margin-top: 0; }                 /* 顶部间距收紧，让描述贴近主区 */
+
+  /* ---------- GitHub 同步面板 ---------- */
+  .sync-fab { position: fixed; right: 12px; bottom: calc(28px + env(safe-area-inset-bottom)); width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: var(--shadow); cursor: pointer; font-size: 18px; z-index: 30; }
+  .sync-fab:hover { background: #b86a4b; }
+  .in-frame .sync-fab { bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .sync-mask { position: fixed; inset: 0; background: rgba(40,30,20,.45); z-index: 40; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .sync-mask.show { display: flex; }
+  .sync-card { background: var(--panel); border-radius: 16px; padding: 18px; max-width: 480px; width: 100%; max-height: 92vh; overflow: auto; box-shadow: var(--shadow); }
+  .sync-card h3 { margin: 0 0 6px; font-size: 16px; }
+  .sync-card .desc { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .sync-card .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sync-card .field { flex: 1 1 150px; }
+  .sync-card .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .sync-card .field input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; font-size: 14px; outline: none; background: #fbfcfe; font-family: inherit; }
+  .sync-card .field input:focus { border-color: var(--brand); background: #fff; }
+  .sync-card .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .sync-card .actions .btn-pri { background: var(--brand); color: #fff; border: 1px solid var(--brand); }
+  .sync-card .actions .btn-pri:hover { background: #b86a4b; }
+  .sync-card .actions .btn-danger { color: var(--danger); border-color: var(--danger); }
+  .sync-card .actions .btn-danger:hover { background: var(--danger); color: #fff; }
+  .sync-card .msg { font-size: 12px; color: var(--muted); margin-top: 10px; min-height: 16px; }
+  .sync-card .msg.ok { color: var(--success); }
+  .sync-card .msg.err { color: var(--danger); }
+  .sync-card .mode { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .sync-card .mode b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>清居置物箱<span class="tag">室内物品整理归纳</span></h1>
+    <p class="subtitle">按「衣柜 / 储物柜 → 第几层 → 放了什么」逐层记录，例如哪层放夏季衣物、哪层放冬季被褥。</p>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main id="main"></main>
+  </div>
+
+  <!-- GitHub 同步（浮动按钮 + 面板） -->
+  <button class="sync-fab" id="sync-fab" title="GitHub 同步设置">⚙</button>
+  <div class="sync-mask" id="sync-mask">
+    <div class="sync-card" id="sync-card">
+      <h3>GitHub 同步</h3>
+      <p class="desc">把数据存到 GitHub 仓库，换设备也能用。Token 需 <code>contents</code> 读写权限（Fine-grained PAT 最稳）。</p>
+      <div class="mode" id="store-mode">存储：<b>本机浏览器（IndexedDB）</b></div>
+      <div class="row">
+        <div class="field" style="flex:1 1 100%"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="ghp_xxx" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
+        <div class="field"><label>仓库 repo</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
+        <div class="field"><label>分支</label><input type="text" id="gh-branch" placeholder="main" maxlength="999" inputmode="text"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1 1 100%"><label>数据文件路径</label><input type="text" id="gh-path" placeholder="data/storage.json"></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="sync-save">保存配置</button>
+        <button class="btn" id="sync-pull">从仓库拉取</button>
+        <button class="btn" id="sync-push">推到仓库</button>
+        <button class="btn" id="sync-export">导出 JSON</button>
+        <label class="btn" for="sync-import" style="cursor:pointer">导入 JSON</label>
+        <input type="file" id="sync-import" accept="application/json" hidden>
+        <button class="btn btn-danger" id="gh-disconnect" style="display:none;margin-left:auto">断开链接并清空</button>
+      </div>
+      <div class="msg" id="sync-msg"></div>
+    </div>
+  </div>
+
+  <!-- 密码弹窗（删除 / 危险操作用） -->
+  <div class="pw-mask" id="pw-mask">
+    <div class="pw-card">
+      <h3 id="pw-title">请输入密码确认</h3>
+      <p class="pw-msg" id="pw-msg">该操作不可撤销。</p>
+      <input type="password" class="pw-input" id="pw-input" placeholder="••••••" autocomplete="off" inputmode="numeric">
+      <div class="pw-err" id="pw-err"></div>
+      <div class="pw-actions">
+        <button class="btn" id="pw-cancel">取消</button>
+        <button class="btn primary" id="pw-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建/改名位置 -->
+  <div class="overlay" id="locOverlay">
+    <div class="modal">
+      <h3 id="locTitle">新建位置</h3>
+      <div class="field">
+        <label>位置名称</label>
+        <input id="locName" type="text" placeholder="如：主卧衣柜 / 阳台储物柜 / 玄关鞋柜" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn" data-close="locOverlay">取消</button>
+        <button class="btn primary" id="locSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建层 -->
+  <div class="overlay" id="lvlOverlay">
+    <div class="modal">
+      <h3>新增一层</h3>
+      <div class="field">
+        <label>层名称</label>
+        <input id="lvlName" type="text" placeholder="如：上层 / 中层 / 下层 / 最底层抽屉" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn" data-close="lvlOverlay">取消</button>
+        <button class="btn primary" id="lvlSave">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加物品 -->
+  <div class="overlay" id="itemOverlay">
+    <div class="modal">
+      <h3 id="itemTitle">添加物品</h3>
+      <div class="upzone" id="upzone">
+        <img id="itemPreview" alt="预览" />
+        <div class="ph"><strong>点击或拖拽</strong> 上传物品图片<br><span style="font-size:12px">可选；配置仓库后将存入 images/ 文件夹</span></div>
+        <div class="ph-replace">↻ 点击预览可更换图片（编辑模式）</div>
+      </div>
+      <input id="itemFile" type="file" accept="image/*" hidden />
+      <div class="field">
+        <label>物品名称</label>
+        <input id="itemName" type="text" placeholder="如：夏季T恤 / 冬季羽绒服 / 换季被褥" />
+      </div>
+      <div class="field">
+        <label>数量（可选）</label>
+        <input id="itemQty" type="text" inputmode="numeric" placeholder="如：2 / 一盒 / 若干" maxlength="999" />
+      </div>
+      <div class="field">
+        <label>备注（可选）</label>
+        <textarea id="itemNote" placeholder="补充信息，比如品牌、型号、存放注意事项…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" data-close="itemOverlay">取消</button>
+        <button class="btn primary" id="itemSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 查看大图 -->
+  <div class="overlay lightbox" id="viewOverlay">
+    <div class="modal">
+      <div class="counter" id="viewCounter"></div>
+      <img id="viewImg" alt="大图" />
+      <div class="info">
+        <div><strong id="viewName"></strong></div>
+        <div class="c" id="viewCat"></div>
+        <div id="viewQty" style="margin-top:4px"></div>
+        <div style="color:var(--muted);font-size:13px;margin-top:4px" id="viewNote"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="viewClose">关闭</button>
+        <button class="btn" id="viewPrev">← 上一张</button>
+        <button class="btn" id="viewNext">下一张 →</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+/* ---------- IndexedDB（三个层级 store） ---------- */
+const DB_NAME = "home-storage", VER = 1;
+let db = null;
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, VER);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains("locations")) d.createObjectStore("locations", { keyPath: "id" });
+      if (!d.objectStoreNames.contains("levels")) d.createObjectStore("levels", { keyPath: "id" });
+      if (!d.objectStoreNames.contains("items")) d.createObjectStore("items", { keyPath: "id" });
+    };
+    req.onsuccess = () => { db = req.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+const st = (name, mode) => db.transaction(name, mode).objectStore(name);
+const getAll = (name) => new Promise((res, rej) => { const r = st(name, "readonly").getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const put = (name, v) => new Promise((res, rej) => { const r = st(name, "readwrite").put(v); r.onsuccess = res; r.onerror = () => rej(r.error); });
+const del = (name, id) => new Promise((res, rej) => { const r = st(name, "readwrite").delete(id); r.onsuccess = res; r.onerror = () => rej(r.error); });
+const uid = () => Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[m]));
+
+/* ---------- GitHub 图片上传 ----------
+   说明：上传物品图片会写入仓库 images/ 文件夹（需已配置 Token）。
+   Token 与仓库信息由页面右下角 ⚙ 同步面板填入并存在 localStorage，本代码不写默认值。 */
+async function uploadImageToGitHub(dataUrl, filename) {
+  if (!ghReady()) return null;   // 未配置 Token 或 token 还是占位符
+  const b64 = dataUrl.split(",")[1];
+  if (!b64) return null;
+  const imgPath = (GH.imagesPath || 'images');
+  const path = `${imgPath}/${filename}`;
+  const api = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(path)}`;
+  const res = await fetch(api, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${GH.token}`,
+      "Content-Type": "application/json",
+      "Accept": "application/vnd.github+json"
+    },
+    body: JSON.stringify({ message: `chore: add image ${filename}`, content: b64, branch: GH.branch })
+  });
+  if (!res.ok) {
+    let msg = `GitHub API ${res.status}`;
+    try { const e = await res.json(); msg = e.message || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  return data.content?.download_url || null;
+}
+
+// 从仓库 images/ 文件夹删除图片（按公开地址反推路径）
+async function deleteImageFromGitHub(url) {
+  if (!ghReady()) return;
+  if (!url || !url.includes(`/${GH.owner}/${GH.repo}/`)) return;
+  const m = url.match(/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\/(.+)$/);
+  if (!m) return;
+  const path = decodeURIComponent(m[1]);
+  const api = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(path)}`;
+  try {
+    const head = await fetch(api, { headers: { "Authorization": `Bearer ${GH.token}`, "Accept": "application/vnd.github+json" } });
+    if (!head.ok) return;
+    const j = await head.json();
+    await fetch(api, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${GH.token}`, "Content-Type": "application/json", "Accept": "application/vnd.github+json" },
+      body: JSON.stringify({ message: `chore: remove image ${path}`, sha: j.sha, branch: GH.branch })
+    });
+  } catch (_) {}
+}
+
+function makeImageFileName(dataUrl) {
+  const m = dataUrl.match(/^data:(image\/\w+);/);
+  const ext = m ? m[1].split("/")[1] : "jpg";
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+}
+
+/* ---------- 状态 ---------- */
+let locations = [], levels = [], items = [];
+let currentLoc = null;
+let currentLevel = null;
+let collapsedLocs = new Set();
+let viewList = [], viewIndex = 0;
+let sbCollapsed = (localStorage.getItem("storage_sb_collapsed") === "1");
+
+/* ---------- 数据加载 ---------- */
+async function load() {
+  [locations, levels, items] = await Promise.all([getAll("locations"), getAll("levels"), getAll("items")]);
+  locations.sort((a, b) => a.order - b.order);
+  if (!currentLoc && locations.length) currentLoc = locations[0].id;
+  render();
+}
+
+/* ---------- 渲染 ---------- */
+function render() {
+  renderSidebar();
+  renderContent();
+}
+
+function renderSidebar() {
+  const sb = $("sidebar");
+  const collapsedCls = sbCollapsed ? " collapsed" : "";
+  sb.classList.toggle("collapsed", sbCollapsed);
+  const ico = sbCollapsed ? "›" : "‹";
+  const icoLbl = sbCollapsed ? "展开" : "收起";
+  let html = `<button class="sb-toggle" id="sbToggle" title="${sbCollapsed ? '展开侧边栏' : '收起侧边栏'}"><span class="ic">${ico}</span><span class="lbl">${icoLbl}</span></button>`;
+  html += `<div class="sb-title">位置</div>`;
+  if (!locations.length) {
+    html += `<div class="sb-empty" style="font-size:13px;color:var(--muted);padding:6px 10px;">还没有位置</div>`;
+  }
+  locations.forEach(l => {
+    const myLevels = levels.filter(x => x.locId === l.id).sort((a, b) => a.order - b.order);
+    const collapsed = collapsedLocs.has(l.id);
+    const active = l.id === currentLoc ? " active" : "";
+    const icoActive = l.id === currentLoc ? " active" : "";
+    const firstChar = (l.name || "?").trim().charAt(0) || "?";
+    html += `<div class="loc">
+      <div class="loc-row${active}" data-loc="${l.id}" title="${esc(l.name)}"><span class="ico-circle${icoActive}">${esc(firstChar)}</span><span class="lbl-name"><span class="arr">${collapsed ? "▸" : "▾"}</span> ${esc(l.name)}</span><span class="cnt">${myLevels.length}层</span></div>
+      <div class="lvls" style="${collapsed ? "display:none" : ""}">
+        ${myLevels.map(L => {
+          const cnt = items.filter(i => i.levelId === L.id).length;
+          const a = L.id === currentLevel ? " active" : "";
+          return `<div class="lvl-row${a}" data-lvl="${L.id}"><span>${esc(L.name)}</span><span class="cnt">${cnt}</span></div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  });
+  html += `<button class="btn sm ghost sb-new" id="sbNewLoc">＋ 新建位置</button>`;
+  html += `<button class="sb-new-collapsed" id="sbNewLocMini" title="新建位置">＋</button>`;
+  sb.innerHTML = html;
+  $("sbToggle").onclick = () => toggleSidebar();
+  $("sbNewLoc").onclick = () => openLocModal();
+  const mini = $("sbNewLocMini");
+  if (mini) mini.onclick = () => openLocModal();
+  sb.querySelectorAll("[data-loc]").forEach(r => r.onclick = () => {
+    const id = r.dataset.loc;
+    // 收起状态下：单击图标 = 选中位置 + 展开侧边栏；展开状态下：单击行为同原（折叠/展开 位置树）
+    if (sbCollapsed) {
+      currentLoc = id;
+      const ml = levels.filter(x => x.locId === id).sort((a, b) => a.order - b.order);
+      currentLevel = ml.length ? ml[0].id : null;
+      toggleSidebar(true);   // 强制展开
+      return;
+    }
+    if (collapsedLocs.has(id)) collapsedLocs.delete(id); else collapsedLocs.add(id);
+    currentLoc = id;
+    const ml = levels.filter(x => x.locId === id).sort((a, b) => a.order - b.order);
+    currentLevel = ml.length ? ml[0].id : null;
+    render();
+  });
+  sb.querySelectorAll("[data-lvl]").forEach(r => r.onclick = () => {
+    currentLoc = locations.find(l => levels.some(x => x.id === r.dataset.lvl && x.locId === l.id))?.id || currentLoc;
+    currentLevel = r.dataset.lvl;
+    render();
+  });
+}
+
+function toggleSidebar(force) {
+  sbCollapsed = (force === true) ? false : (force === false ? true : !sbCollapsed);
+  localStorage.setItem("storage_sb_collapsed", sbCollapsed ? "1" : "0");
+  localStorage.setItem("storage_sb_user", "1");
+  $("sidebar").classList.add("user-toggled");
+  render();
+}
+
+function renderContent() {
+  const main = $("main");
+  if (!locations.length) {
+    main.innerHTML = `<div class="empty-hero"><div class="big">🚪</div><div>还没有任何位置，先建一个衣柜或储物柜吧</div><button class="btn primary empty-hero-btn" id="firstLoc">＋ 新建第一个位置</button><br><button class="btn empty-hero-btn" id="loadDemo" style="margin-top:12px">✨ 载入示例衣柜（看看效果）</button></div>`;
+    $("firstLoc").onclick = () => openLocModal();
+    $("loadDemo").onclick = loadDemo;
+    return;
+  }
+  const loc = locations.find(l => l.id === currentLoc) || locations[0];
+  currentLoc = loc.id;
+  const myLevels = levels.filter(x => x.locId === loc.id).sort((a, b) => a.order - b.order);
+  if (!currentLevel || !myLevels.some(L => L.id === currentLevel)) currentLevel = myLevels.length ? myLevels[0].id : null;
+  const totalItems = items.filter(i => myLevels.some(L => L.id === i.levelId)).length;
+
+  if (!myLevels.length) {
+    main.innerHTML = `<div class="loc-head">
+        <div class="loc-title">${esc(loc.name)}<small>0 层</small></div>
+        <div class="loc-actions">
+          <button class="btn sm ghost" id="renameLoc">改名</button>
+          <button class="btn sm ghost" id="delLoc">删除位置</button>
+          <button class="btn sm primary" id="addLevel">＋ 添加层</button>
+        </div>
+      </div><div class="item-empty">这个位置还没有分层，点「＋ 添加层」开始记录每一层放了什么。</div>`;
+    $("addLevel").onclick = openLevelModal;
+    $("renameLoc").onclick = () => openLocModal(loc);
+    $("delLoc").onclick = () => delLocation(loc);
+    return;
+  }
+
+  const L = levels.find(x => x.id === currentLevel);
+  const myItems = items.filter(i => i.levelId === currentLevel);
+  let html = `<div class="loc-head">
+      <div class="loc-title">${esc(loc.name)}<small>${myLevels.length} 层 · ${totalItems} 件物品</small></div>
+      <div class="loc-actions">
+        <button class="btn sm ghost" id="renameLoc">改名</button>
+        <button class="btn sm ghost" id="delLoc">删除位置</button>
+        <button class="btn sm primary" id="addLevel">＋ 添加层</button>
+      </div>
+    </div>
+    <div class="loc-sub"><span>${esc(L.name)} · ${myItems.length} 件物品</span><button class="btn sm ghost" id="delLevel">删除层</button></div>`;
+  html += myItems.length
+    ? `<div class="ilist">${myItems.map(i => itemRow(i)).join("")}</div>`
+    : `<div class="item-empty">这一层还空着，点「＋ 添加物品」记一笔。</div>`;
+  html += `<div style="margin-top:14px"><button class="btn primary sm" id="addItem">＋ 添加物品到「${esc(L.name)}」</button></div>`;
+  main.innerHTML = html;
+
+  $("addLevel").onclick = openLevelModal;
+  $("addItem").onclick = () => openItemModal(currentLevel);
+  $("renameLoc").onclick = () => openLocModal(loc);
+  $("delLoc").onclick = () => delLocation(loc);
+  $("delLevel").onclick = () => delLevel(currentLevel);
+  main.querySelectorAll(".irow").forEach(el => el.onclick = () => openView(el.dataset.id));
+  main.querySelectorAll(".irow .del-x").forEach(b => b.onclick = (e) => { e.stopPropagation(); removeItem(b.dataset.del); });
+  main.querySelectorAll(".irow .edit-x").forEach(b => b.onclick = (e) => { e.stopPropagation(); openItemModal(currentLevel, b.dataset.edit); });
+}
+
+function itemRow(i) {
+  const thumb = i.url ? `<div class="ithumb"><img src="${i.url}" alt="" /></div>` : `<div class="ithumb">📷</div>`;
+  const dateStr = i.createdAt ? new Date(i.createdAt).toISOString().slice(0, 10) : '';
+  return `<div class="irow" data-id="${i.id}">
+      ${thumb}
+      <div class="info">
+        <div class="nm">${esc(i.name || "未命名")}</div>
+        ${i.qty ? `<div class="qty">× ${esc(i.qty)}</div>` : ""}
+        ${dateStr ? `<div class="created">📅 ${dateStr}</div>` : ""}
+        ${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}
+      </div>
+      <button class="edit-x" data-edit="${i.id}">编辑</button>
+      <button class="del-x" data-del="${i.id}">删除</button>
+    </div>`;
+}
+
+function itemCard(i) {
+  const thumb = i.url
+    ? `<img class="thumb" src="${i.url}" alt="" />`
+    : `<div class="thumb"><span class="ph-icon">📷</span><span class="ph-txt">暂无图片</span></div>`;
+  return `<div class="item" data-id="${i.id}">
+      ${thumb}
+      <div class="im">
+        <div class="nm">${esc(i.name || "未命名")}</div>
+        ${i.qty ? `<div class="qty">× ${esc(i.qty)}</div>` : ""}
+        ${i.note ? `<div class="meta-note">${esc(i.note)}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+/* ---------- 位置 ---------- */
+function openLocModal(loc) {
+  $("locTitle").textContent = loc ? "重命名位置" : "新建位置";
+  $("locName").value = loc ? loc.name : "";
+  $("locOverlay").classList.add("show");
+  $("locName").focus();
+  $("locSave").onclick = async () => {
+    const name = $("locName").value.trim();
+    if (!name) return alert("请填写位置名称");
+    if (loc) { loc.name = name; await put("locations", loc); }
+    else { const order = locations.length ? Math.max(...locations.map(l => l.order)) + 1 : 0; await put("locations", { id: uid(), name, order }); }
+    $("locOverlay").classList.remove("show");
+    await load();
+    scheduleAutoPush();
+  };
+}
+async function delLocation(loc) {
+  const lvlCount = levels.filter(x => x.locId === loc.id).length;
+  const itmCount = items.filter(i => levels.some(x => x.locId === loc.id && x.id === i.levelId)).length;
+  const ok = await askPassword(`确定删除「${loc.name}」及其下所有层和物品？\n\n将一并删除：${lvlCount} 层 / ${itmCount} 件物品\n该操作不可撤销，请输入密码确认`);
+  if (!ok) return;
+  const myLevels = levels.filter(x => x.locId === loc.id);
+  for (const L of myLevels) {
+    for (const it of items.filter(i => i.levelId === L.id)) await del("items", it.id);
+    await del("levels", L.id);
+  }
+  await del("locations", loc.id);
+  if (currentLoc === loc.id) currentLoc = null;
+  await load();
+  scheduleAutoPush();
+}
+
+/* ---------- 示例数据 ---------- */
+async function loadDemo() {
+  if (locations.length && !confirm("将示例衣柜添加到现有数据之前（不影响已有内容）？")) return;
+  const locId = uid();
+  await put("locations", { id: locId, name: "主卧衣柜", order: locations.length });
+  const layers = [
+    { name: "上层（夏季区）", items: [["夏季T恤", "一摞", "纯棉，当季常穿"], ["短裤", "5条", ""], ["凉席", "1张", "换季收起"]] },
+    { name: "中层（春秋区）", items: [["薄卫衣", "3件", ""], ["长裤", "若干", ""], ["衬衫", "几件", "上班穿"]] },
+    { name: "下层（冬季区）", items: [["羽绒服", "2件", "厚款，过冬"], ["厚毛衣", "一箱", ""], ["换季被褥", "1床", "真空袋收纳"]] }
+  ];
+  for (let i = 0; i < layers.length; i++) {
+    const L = { id: uid(), locId, name: layers[i].name, order: i };
+    await put("levels", L);
+    for (const [name, qty, note] of layers[i].items) {
+      await put("items", { id: uid(), levelId: L.id, name, qty, note, url: "", createdAt: Date.now() });
+    }
+  }
+  await load();
+  scheduleAutoPush();
+}
+
+/* ---------- 层 ---------- */
+function openLevelModal() {
+  $("lvlName").value = "";
+  $("lvlOverlay").classList.add("show");
+  $("lvlName").focus();
+  $("lvlSave").onclick = async () => {
+    const name = $("lvlName").value.trim() || "未命名层";
+    const myLevels = levels.filter(x => x.locId === currentLoc);
+    const order = myLevels.length ? Math.max(...myLevels.map(l => l.order)) + 1 : 0;
+    await put("levels", { id: uid(), locId: currentLoc, name, order });
+    $("lvlOverlay").classList.remove("show");
+    await load();
+    scheduleAutoPush();
+  };
+}
+async function delLevel(id) {
+  const L = levels.find(x => x.id === id);
+  const itmCount = items.filter(i => i.levelId === id).length;
+  const ok = await askPassword(`删除「${L?.name}」这一层及其中的 ${itmCount} 件物品？\n该操作不可撤销，请输入密码确认`);
+  if (!ok) return;
+  for (const it of items.filter(i => i.levelId === id)) await del("items", it.id);
+  await del("levels", id);
+  await load();
+  scheduleAutoPush();
+}
+
+/* ---------- 删除单个物品 ---------- */
+async function removeItem(id) {
+  const it = items.find(x => x.id === id);
+  const ok = await askPassword(`删除物品「${it?.name || "未命名"}」？\n请输入密码确认`);
+  if (!ok) return;
+  if (it && it.src === "github") await deleteImageFromGitHub(it.url);
+  await del("items", id);
+  await load();
+  scheduleAutoPush();
+}
+
+/* ---------- 物品 ---------- */
+let itemLevelId = null, itemFileData = null, itemEditId = null;
+function openItemModal(levelId, editId) {
+  itemLevelId = levelId;
+  itemFileData = null;
+  itemEditId = editId || null;
+  $("itemName").value = ""; $("itemQty").value = ""; $("itemNote").value = "";
+  const uz = $("upzone"); uz.classList.remove("hasimg"); $("itemPreview").style.display = "none"; $("itemPreview").src = "";
+  const L = levels.find(l => l.id === levelId);
+  if (editId) {
+    // 编辑模式：回填表单，隐藏图片上传区（图片保持原样）
+    const it = items.find(i => i.id === editId);
+    if (it) {
+      $("itemName").value = it.name || "";
+      $("itemQty").value = it.qty || "";
+      $("itemNote").value = it.note || "";
+      if (it.url) { $("itemPreview").src = it.url; $("itemPreview").style.display = "block"; uz.classList.add("hasimg"); }
+    }
+    $("itemTitle").textContent = `编辑物品 · ${L ? L.name : ""}`;
+  } else {
+    $("itemTitle").textContent = `添加物品 · ${L ? L.name : ""}`;
+  }
+  $("itemOverlay").classList.add("show");
+  $("itemName").focus();
+  $("itemSave").onclick = saveItem;
+}
+async function saveItem() {
+  const name = $("itemName").value.trim();
+  if (!name) return alert("请填写物品名称");
+  if (itemEditId) {
+    // 编辑模式：保留 id/createdAt；图片可选替换（上传新图则走 GitHub images/ 流程，旧 GitHub 图会被删）
+    const old = items.find(i => i.id === itemEditId);
+    if (!old) { itemEditId = null; return; }
+    let url = old.url || "", src = old.src || "";
+    if (itemFileData) {
+      // 先尝试删旧 GitHub 图（best-effort，失败不阻塞）
+      if (old.src === "github" && old.url) {
+        try { await deleteImageFromGitHub(old.url); } catch (_) {}
+      }
+      const fname = makeImageFileName(itemFileData);
+      try {
+        const gh = await uploadImageToGitHub(itemFileData, fname);
+        if (gh) { url = gh; src = "github"; }
+        else { url = itemFileData; src = "local"; }
+      } catch (e) {
+        console.warn("图片上传仓库失败，已回退为本地存储：", e);
+        url = itemFileData; src = "local";
+      }
+    }
+    Object.assign(old, {
+      name, qty: $("itemQty").value.trim(), note: $("itemNote").value.trim(),
+      url, src
+    });
+    await put("items", old);
+    itemEditId = null;
+    itemFileData = null;
+    $("itemOverlay").classList.remove("show");
+    await load();
+    scheduleAutoPush();
+    return;
+  }
+  let url = "", src = "";
+  if (itemFileData) {
+    const fname = makeImageFileName(itemFileData);
+    try {
+      const gh = await uploadImageToGitHub(itemFileData, fname);
+      if (gh) { url = gh; src = "github"; }
+      else { url = itemFileData; src = "local"; }
+    } catch (e) {
+      console.warn("图片上传仓库失败，已回退为本地存储：", e);
+      url = itemFileData; src = "local";
+    }
+  }
+  await put("items", {
+    id: uid(), levelId: itemLevelId,
+    name, qty: $("itemQty").value.trim(), note: $("itemNote").value.trim(),
+    url, src, createdAt: Date.now()
+  });
+  $("itemOverlay").classList.remove("show");
+  await load();
+  scheduleAutoPush();
+  if (itemFileData && !src) { /* 无图，跳过 */ }
+  if (itemFileData && src === "local" && !ghReady()) {
+    console.log('未配置 GitHub Token，图片仅保存在本机 IndexedDB');
+  }
+}
+
+/* 上传图片到物品 */
+$("upzone").onclick = () => $("itemFile").click();
+$("itemFile").onchange = (e) => { if (e.target.files[0]) readItemFile(e.target.files[0]); e.target.value = ""; };
+["dragenter","dragover"].forEach(ev => $("upzone").addEventListener(ev, e => { e.preventDefault(); $("upzone").classList.add("drag"); }));
+["dragleave","drop"].forEach(ev => $("upzone").addEventListener(ev, e => { e.preventDefault(); $("upzone").classList.remove("drag"); }));
+$("upzone").addEventListener("drop", e => { if (e.dataTransfer.files[0]) readItemFile(e.dataTransfer.files[0]); });
+function readItemFile(file) {
+  if (!file.type.startsWith("image/")) return alert("请选择图片");
+  const r = new FileReader();
+  r.onload = () => { itemFileData = r.result; const p = $("itemPreview"); p.src = r.result; p.style.display = "block"; $("upzone").classList.add("hasimg"); };
+  r.readAsDataURL(file);
+}
+
+/* ---------- 查看大图 ---------- */
+function openView(id) {
+  // 当前位置下所有物品，按层顺序铺平，便于翻页
+  const loc = locations.find(l => l.id === currentLoc);
+  const myLevels = levels.filter(x => x.locId === loc.id).sort((a, b) => a.order - b.order);
+  viewList = [];
+  myLevels.forEach(L => items.filter(i => i.levelId === L.id).forEach(i => viewList.push({ ...i, _loc: loc.name, _lvl: L.name })));
+  viewIndex = viewList.findIndex(i => i.id === id);
+  showView();
+  $("viewOverlay").classList.add("show");
+}
+function showView() {
+  const it = viewList[viewIndex];
+  if (!it) return;
+  $("viewImg").src = it.url || "";
+  $("viewImg").style.display = it.url ? "block" : "none";
+  $("viewName").textContent = it.name || "未命名";
+  $("viewCat").textContent = `${esc(it._loc)} · ${esc(it._lvl)}`;
+  $("viewQty").innerHTML = it.qty ? `<span style="color:var(--brand)">数量：${esc(it.qty)}</span>` : "";
+  $("viewNote").textContent = it.note || "";
+  $("viewCounter").textContent = `${viewIndex + 1} / ${viewList.length}`;
+}
+$("viewPrev").onclick = () => { viewIndex = (viewIndex - 1 + viewList.length) % viewList.length; showView(); };
+$("viewNext").onclick = () => { viewIndex = (viewIndex + 1) % viewList.length; showView(); };
+$("viewClose").onclick = () => $("viewOverlay").classList.remove("show");
+document.addEventListener("keydown", e => {
+  if ($("viewOverlay").classList.contains("show")) {
+    if (e.key === "ArrowLeft") $("viewPrev").click();
+    if (e.key === "ArrowRight") $("viewNext").click();
+    if (e.key === "Escape") $("viewClose").click();
+  }
+});
+
+/* ---------- 通用关闭 ---------- */
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => $(b.dataset.close).classList.remove("show"));
+["locOverlay","lvlOverlay","itemOverlay"].forEach(id => $(id).onclick = (e) => { if (e.target === $(id)) $(id).classList.remove("show"); });
+
+/* ====================== GitHub 同步（与 weight/budget/time 一致机制） ====================== */
+const GH_KEY = 'storage_gh_cfg_v1';
+let GH = (() => { try { return JSON.parse(localStorage.getItem(GH_KEY) || 'null') || {}; } catch (_) { return {}; } })();
+GH = Object.assign({ token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/storage.json', sha: null }, GH);
+const ghReady = () => !!(GH.token && !/^YOUR|^ghp_xxxx/i.test(GH.token));
+
+/* ---------- 危险操作密码门 ---------- */
+const CLEAR_PW = '870825';
+function askPassword(msg) {
+  return new Promise((resolve) => {
+    $('pw-msg').textContent = msg || '该操作不可撤销，请输入密码确认';
+    $('pw-err').textContent = '';
+    $('pw-input').value = '';
+    $('pw-mask').classList.add('show');
+    setTimeout(() => { $('pw-input').focus(); }, 60);
+    const cleanup = () => {
+      $('pw-mask').classList.remove('show');
+      $('pw-ok').removeEventListener('click', onOk);
+      $('pw-cancel').removeEventListener('click', onCancel);
+      $('pw-input').removeEventListener('keydown', onKey);
+      $('pw-mask').removeEventListener('click', onMask);
+    };
+    const onOk = () => {
+      const pw = $('pw-input').value;
+      if (pw !== CLEAR_PW) {
+        $('pw-err').textContent = '密码错误，请重新输入';
+        $('pw-input').focus();
+        $('pw-input').select();
+        return;
+      }
+      cleanup();
+      resolve(true);
+    };
+    const onCancel = () => { cleanup(); resolve(false); };
+    const onKey = (e) => { if (e.key === 'Enter') onOk(); else if (e.key === 'Escape') onCancel(); };
+    const onMask = (e) => { if (e.target === $('pw-mask')) onCancel(); };
+    $('pw-ok').addEventListener('click', onOk);
+    $('pw-cancel').addEventListener('click', onCancel);
+    $('pw-input').addEventListener('keydown', onKey);
+    $('pw-mask').addEventListener('click', onMask);
+  });
+}
+
+function ghPrefill() {
+  $('gh-token').value = GH.token || '';
+  $('gh-owner').value = GH.owner || '';
+  $('gh-repo').value = GH.repo || '';
+  $('gh-branch').value = GH.branch || 'main';
+  $('gh-path').value = GH.path || '';
+}
+function setSyncMsg(txt, cls) {
+  const el = $('sync-msg'); el.textContent = txt; el.className = 'msg' + (cls ? ' ' + cls : '');
+  if (cls === 'ok' || cls === 'err') setTimeout(() => { el.textContent = ''; el.className = 'msg'; }, 4000);
+}
+function refreshSyncUI() {
+  $('store-mode').innerHTML = ghReady()
+    ? '存储：<b>本机浏览器（IndexedDB）</b> · 已配置 GitHub 同步（拉到本地后断网也可用）'
+    : '存储：<b>本机浏览器（IndexedDB）</b>';
+  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
+}
+/* ---------- 自动同步（每次改动后自动推到仓库） ---------- */
+let autoPushTimer = null;
+function scheduleAutoPush() {
+  if (!ghReady()) return;
+  // 防抖：连续编辑只推一次
+  if (autoPushTimer) clearTimeout(autoPushTimer);
+  autoPushTimer = setTimeout(async () => {
+    autoPushTimer = null;
+    try {
+      if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
+      const snapshot = await exportSnapshot();
+      const msg = `更新清居置物箱 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+      await ghPutFile(JSON.stringify(snapshot, null, 2), msg);
+      localStorage.setItem(GH_KEY, JSON.stringify(GH));
+      setSyncMsg(`✓ 已自动同步到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
+    } catch (e) {
+      setSyncMsg('自动同步失败：' + e.message, 'err');
+    }
+  }, 600);   // 600ms 防抖，连续编辑不会反复推
+}
+async function ghGetSha() {
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
+  const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('GitHub API ' + res.status);
+  const j = await res.json(); return j.sha || null;
+}
+async function ghGetFile() {
+  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
+  const res = await fetch(apiUrl, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('GitHub API ' + res.status);
+  const j = await res.json();
+  let txt = '';
+  try { txt = decodeURIComponent(escape(atob((j.content || '').replace(/\n/g, '')))); } catch (_) { txt = ''; }
+  return { sha: j.sha, text: txt };
+}
+async function ghPutFile(content, msg) {
+  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
+  const body = { message: msg || ('更新清居置物箱 ' + new Date().toISOString().slice(0, 10)), content: btoa(unescape(encodeURIComponent(content))), branch: GH.branch };
+  if (GH.sha) body.sha = GH.sha;
+  const res = await fetch(apiUrl, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + GH.token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' }, body: JSON.stringify(body) });
+  if (res.status === 422) { GH.sha = null; return ghPutFile(content, msg); }   // sha 冲突 → 重试
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || ('GitHub API ' + res.status)); }
+  const j = await res.json(); GH.sha = j.content.sha; return j;
+}
+
+/* 同步面板交互 */
+$('sync-fab').onclick = () => { ghPrefill(); refreshSyncUI(); $('sync-mask').classList.add('show'); };
+$('sync-mask').onclick = (e) => { if (e.target === $('sync-mask')) $('sync-mask').classList.remove('show'); };
+
+$('sync-save').onclick = async () => {
+  const tk = $('gh-token').value.trim();
+  if (!tk) { setSyncMsg('请填写 Token', 'err'); $('gh-token').focus(); return; }
+  GH = {
+    token: tk,
+    owner: $('gh-owner').value.trim() || 'sumer0825',
+    repo: $('gh-repo').value.trim() || 'Sumer',
+    branch: $('gh-branch').value.trim() || 'main',
+    path: $('gh-path').value.trim() || 'data/storage.json',
+    sha: null
+  };
+  localStorage.setItem(GH_KEY, JSON.stringify(GH));
+  refreshSyncUI();
+  $('sync-msg').textContent = '连接中…';
+  try {
+    const f = await ghGetFile();
+    if (!f) {
+      GH.sha = null;
+      setSyncMsg(`✓ 已保存配置。仓库里还没有 ${GH.path}，首次保存数据时自动创建。`, 'ok');
+    } else {
+      GH.sha = f.sha;
+      const data = JSON.parse(f.text || '{}');
+      const ok = confirm(`已连接到 GitHub。\n\n仓库现有数据：${data.locations?.length || 0} 个位置 / ${data.items?.length || 0} 件物品。\n\n是否将仓库数据导入本机？（选「取消」则保留本机数据，下次改动时会自动推到仓库）`);
+      if (ok) {
+        await clearAll();
+        if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
+        if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
+        if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+        await load();
+        setSyncMsg(`✓ 已保存配置 + 从仓库拉取：${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品`, 'ok');
+      } else {
+        setSyncMsg(`✓ 已保存配置，保留本机数据。下次改动时会自动推到仓库。`, 'ok');
+      }
+    }
+  } catch (e) {
+    setSyncMsg('已保存配置，但连接检查失败：' + e.message, 'err');
+  }
+};
+
+$('sync-pull').onclick = async () => {
+  if (!ghReady()) { setSyncMsg('请先填写并保存 Token', 'err'); return; }
+  try {
+    setSyncMsg('正在从仓库拉取…');
+    const f = await ghGetFile();
+    if (!f) { setSyncMsg('仓库里还没有这个文件，可点「推到仓库」创建', 'err'); return; }
+    const data = JSON.parse(f.text || '{}');
+    if (!confirm(`将仓库数据导入到本机？\n\n将覆盖本机 IndexedDB 中的全部收纳数据：${data.locations?.length || 0} 个位置 / ${data.items?.length || 0} 件物品。\n仓库里的文件不动。`)) return;
+    GH.sha = f.sha;
+    // 清空 → 写入
+    await clearAll();
+    if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
+    if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
+    if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+    await load();
+    setSyncMsg(`✓ 已拉取：${data.locations?.length || 0} 位置 / ${data.levels?.length || 0} 层 / ${data.items?.length || 0} 物品`, 'ok');
+  } catch (e) { setSyncMsg('拉取失败：' + e.message, 'err'); }
+};
+
+$('sync-push').onclick = async () => {
+  if (!ghReady()) { setSyncMsg('请先填写并保存 Token', 'err'); return; }
+  try {
+    setSyncMsg('正在推到仓库…');
+    if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
+    const snapshot = await exportSnapshot();
+    await ghPutFile(JSON.stringify(snapshot, null, 2), '更新清居置物箱 ' + new Date().toISOString().slice(0, 10));
+    localStorage.setItem(GH_KEY, JSON.stringify(GH));
+    setSyncMsg(`✓ 已推到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品`, 'ok');
+  } catch (e) { setSyncMsg('推送失败：' + e.message, 'err'); }
+};
+
+$('sync-export').onclick = async () => {
+  const snapshot = await exportSnapshot();
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `清居置物箱-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setSyncMsg('✓ 已导出 JSON 文件', 'ok');
+};
+
+$('sync-import').onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const txt = await file.text();
+    const data = JSON.parse(txt);
+    if (!confirm(`将导入文件覆盖本机 IndexedDB？\n\n${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品。\n（不影响 GitHub 仓库）`)) { e.target.value = ''; return; }
+    await clearAll();
+    if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
+    if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
+    if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+    await load();
+    setSyncMsg(`✓ 已导入：${data.locations?.length || 0} 位置 / ${data.levels?.length || 0} 层 / ${data.items?.length || 0} 物品`, 'ok');
+  } catch (err) { setSyncMsg('导入失败：' + err.message, 'err'); }
+  e.target.value = '';
+};
+
+$('gh-disconnect').onclick = async () => {
+  if (!confirm('确定断开 GitHub 链接？\n\n将清空：本机 Token、本机 IndexedDB 缓存的全部收纳数据\n不会动：仓库里已写入的 data/storage.json 与 images/ 文件夹\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
+  localStorage.removeItem(GH_KEY);
+  GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/storage.json', sha: null };
+  await clearAll();
+  $('sync-mask').classList.remove('show');
+  setTimeout(() => alert('已断开链接并清空本机数据\n仓库里的 data/storage.json 与图片未被改动'), 100);
+  refreshSyncUI();
+};
+
+/* ---------- 数量字段统一约束：长度 ≤ 999、不允许负号字符 ---------- */
+function bindNumGuard(id) {
+  const el = $(id); if (!el) return;
+  el.addEventListener('input', () => {
+    const before = el.value;
+    // 过滤负号字符（其它非数字字符保留自由文本语义：itemQty 支持「一盒」「若干」）
+    const after = before.replace(/-/g, '');
+    if (after !== before) el.value = after;
+  });
+  el.addEventListener('blur', () => {
+    if (el.value.length > 999) el.value = el.value.slice(0, 999);
+  });
+}
+bindNumGuard('itemQty');
+bindNumGuard('gh-branch');
+
+async function clearAll() {
+  for (const name of ['locations', 'levels', 'items']) {
+    const all = await getAll(name);
+    for (const x of all) await del(name, x.id);
+  }
+  currentLoc = null; currentLevel = null;
+}
+
+async function exportSnapshot() {
+  const [locs, lvls, itms] = await Promise.all([getAll('locations'), getAll('levels'), getAll('items')]);
+  return { version: 1, exportedAt: new Date().toISOString(), locations: locs, levels: lvls, items: itms };
+}
+
+/* ---------- 启动 ---------- */
+// 极窄屏（≤480px）首次访问时自动收起侧栏；用户手动切换后尊重用户选择
+function applyAutoSidebar() {
+  const userSet = localStorage.getItem("storage_sb_user") === "1";
+  if (!userSet && window.innerWidth <= 480) {
+    sbCollapsed = true;
+  }
+  if (window.innerWidth <= 480) document.body.classList.add("sidebar-auto");
+}
+applyAutoSidebar();
+window.addEventListener("resize", () => {
+  document.body.classList.toggle("sidebar-auto", window.innerWidth <= 480);
+});
+openDB().then(async () => {
+  await load();
+  // 已配置 Token：启动时静默从仓库拉取一次
+  if (ghReady()) {
+    try {
+      const f = await ghGetFile();
+      if (f) {
+        GH.sha = f.sha;
+        const data = JSON.parse(f.text || '{}');
+        const cloudCount = (data.locations?.length || 0) + (data.items?.length || 0);
+        const localCount = locations.length + items.length;
+        // 仅当云端数据明显多于本地时（避免误覆盖本机最近改动），自动合并
+        if (cloudCount > localCount) {
+          await clearAll();
+          if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
+          if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
+          if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+          await load();
+          setSyncMsg(`✓ 启动时从仓库拉取：${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品`, 'ok');
+        } else {
+          setSyncMsg(`已连接 GitHub（云端 ${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品，本机 ${localCount} 条）`, '');
+        }
+      }
+    } catch (e) { /* 静默失败，不打扰 */ }
+  }
+}).catch(e => alert("数据库初始化失败：" + e.message));
+</script>
+<div class="ver">v3</div>
+</body>
+</html>

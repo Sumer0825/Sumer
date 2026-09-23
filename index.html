@@ -132,6 +132,7 @@ const TOOLS = [
   { name: '轻身时光簿', file: 'weight.html', icon: '🎯', desc: '记录与查看体重趋势' },
   { name: '收支规划局', file: 'budget.html', icon: '💰', desc: '每天的开支预算与实际' },
   { name: '时光自撰集', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
+  { name: '清居置物箱', file: 'storage.html', icon: '🧺', desc: '室内物品整理归纳' },
 ];
 
 const tools = document.getElementById('tools');
@@ -143,7 +144,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 17, 'weight.html': 29, 'budget.html': 8 };
+const TOOLS_VER = { 'time.html': 17, 'weight.html': 29, 'budget.html': 10, 'storage.html': 3 };
 
 TOOLS.forEach((t, i) => {
   const c = document.createElement('div');
@@ -186,8 +187,8 @@ function openTool(i) {
   frame.src = t.file + (v ? '?v=' + v : '');   // 带版本号，绕过 CDN/浏览器缓存
   frame.title = t.name;
   crumb.innerHTML = `当前：<b>${t.name}</b>`;
-  crumb.style.display = 'none';
-  back.style.display = 'block';
+  crumb.style.display = 'block';     // 显示当前工具名（顶部右侧指示器）
+  back.style.display = 'block';      // 同时显示返回按钮
 }
 
 back.onclick = () => {

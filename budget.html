@@ -351,6 +351,7 @@ html.in-frame .month-picker { top: 4px; }
     <div class="set-row">
       <div class="field" style="flex:1 1 160px"><label>每天预算金额（元）</label><input type="number" id="b-input" step="0.01" min="0" inputmode="decimal" placeholder="如 120"></div>
       <button type="button" class="btn-primary" id="b-save">保存</button>
+      <button type="button" class="btn-ghost" id="b-unlock" style="display:none" title="本月已过 8 号锁定时，输入密码可临时解锁修改">🔓 输密码解锁</button>
     </div>
     <div class="set-hint" id="b-hint"></div>
   </section>
@@ -696,6 +697,7 @@ async function refresh() {
    渲染
    ========================================================= */
 let VIEW = curMonth();      // 当前查看的月份 'YYYY-MM'
+let budgetUnlocked = false; // 会话级：本月已过 8 号锁定时，输密码可临时解锁修改（切月/刷新后复位）
 
 const WEEKDAY = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
@@ -758,6 +760,7 @@ function shiftMonth(n) {
   const [y, m] = VIEW.split('-').map(Number);
   const d = new Date(y, m - 1 + n, 1);
   VIEW = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  budgetUnlocked = false;   // 切月后恢复锁定状态
   render();
 }
 
@@ -882,10 +885,11 @@ function renderSummary() {
 function renderBudgetSetting() {
   const monthEditable = canEditMonth(VIEW);
   const frozenThisMonth = budgetLockedThisMonth();   // 当月 8 号后冻结
-  const editable = monthEditable && !frozenThisMonth;
-  const inp = $('b-input'), btn = $('b-save');
+  const editable = monthEditable && (!frozenThisMonth || budgetUnlocked);
+  const inp = $('b-input'), btn = $('b-save'), ubtn = $('b-unlock');
   inp.disabled = !editable;
   btn.disabled = !editable;
+  ubtn.style.display = (frozenThisMonth && !budgetUnlocked) ? '' : 'none';
   // 显示当月「当前生效」的日预算（取最后一段）
   const segs = DATA.budgets.filter(b => b.month === VIEW).sort((a, b) => a.effective_from < b.effective_from ? -1 : 1);
   const val = segs.length ? segs[segs.length - 1].daily : '';
@@ -894,8 +898,10 @@ function renderBudgetSetting() {
   const hint = $('b-hint');
   if (!monthEditable) {
     hint.innerHTML = `🔒 ${monthLabel(VIEW)}已结清，预算与记录均不可修改。`;
-  } else if (frozenThisMonth) {
-    hint.innerHTML = `🔒 本月已过 8 号，日预算已锁定（每月仅 1~7 号可改预算，次月 1 号自动解锁）。<br>当前：¥${money(val)}/天，已生效。`;
+  } else if (frozenThisMonth && !budgetUnlocked) {
+    hint.innerHTML = `🔒 本月已过 8 号，日预算已锁定（每月仅 1~7 号可改，或点「🔓 输密码解锁」临时修改）。<br>当前：¥${money(val)}/天，已生效。`;
+  } else if (frozenThisMonth && budgetUnlocked) {
+    hint.innerHTML = `🔓 已输密码解锁，可临时修改本月预算（仅本次会话有效，刷新或切月后恢复锁定）。<br>当前：¥${money(val)}/天。`;
   } else if (segs.length > 1) {
     hint.innerHTML = `本月预算调整过 ${segs.length - 1} 次：` +
       segs.map((s, i) => {
@@ -1056,16 +1062,33 @@ $('t-save').onclick = async () => {
 };
 $('t-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('t-save').click(); } });
 
+// 当月已过 8 号时，输入密码可临时解锁预算修改（仅本次会话有效）
+$('b-unlock').onclick = async () => {
+  if (!budgetLockedThisMonth()) return;
+  const ok = await askPassword(`本月已过 8 号，日预算已锁定。<br>如需修改，请输入密码解锁（仅本次会话有效，刷新或切月后恢复锁定）`);
+  if (!ok) return;
+  budgetUnlocked = true;
+  render();
+  toast('🔓 已解锁，可修改本月日预算');
+};
+
 $('b-save').onclick = async () => {
   if (!canEditMonth(VIEW)) { toast('该月已结清，不可修改'); return; }
-  if (budgetLockedThisMonth()) { toast('本月已过 8 号，日预算已锁定（次月 1 号解锁）'); return; }
+  if (budgetLockedThisMonth() && !budgetUnlocked) { toast('本月已过 8 号，日预算已锁定（点「🔓 输密码解锁」后可改，次月 1 号自动解锁）'); return; }
   const raw = $('b-input').value.trim();
   if (raw === '') { toast('请填写每天预算金额'); $('b-input').focus(); return; }
   const v = parseFloat(raw);
   if (isNaN(v) || v <= 0) { toast('请输入大于 0 的金额'); return; }
   setBudget(VIEW, Math.round(v * 100) / 100);
   await persist(DATA);
-  toast(`✓ 日预算已更新为 ¥${money(v)}`);
+  if (budgetLockedThisMonth()) {
+    // 冻结月：输密码解锁后保存即重新锁定，下次修改需再次输密码
+    budgetUnlocked = false;
+    render();
+    toast(`✓ 日预算已更新为 ¥${money(v)}（已重新锁定，再次修改需输密码）`);
+  } else {
+    toast(`✓ 日预算已更新为 ¥${money(v)}`);
+  }
 };
 
 $('clear-btn').onclick = async () => {
@@ -1245,6 +1268,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v8</div>
+<div class="ver">v10</div>
 </body>
 </html>
