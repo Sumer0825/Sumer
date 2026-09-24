@@ -1,7 +1,13 @@
 {
   "version": 1,
-  "exportedAt": "2026-09-24T05:52:49.086Z",
-  "locations": [],
+  "exportedAt": "2026-09-24T05:53:26.189Z",
+  "locations": [
+    {
+      "id": "1790229205580-hsk7u",
+      "name": "卧室大货架",
+      "order": 0
+    }
+  ],
   "levels": [],
   "items": []
 }
