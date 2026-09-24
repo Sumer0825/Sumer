@@ -469,12 +469,20 @@ const load = () => { try { return normData(JSON.parse(localStorage.getItem(KEY))
 const save = d => { d.meta.lastModified = new Date().toISOString(); localStorage.setItem(KEY, JSON.stringify(d)); };
 let DATA = load();
 
-// 某天的日预算：取 effective_from <= date 中最晚的一条
+// 某天的日预算：
+// 1) 常规：取 effective_from <= date 中最晚的一段；
+// 2) 补录回溯：date 早于本月首段生效日（如月中途才首次设预算、之后补录月初的账）
+//    → 只要本月设过预算，就视为「整月都有预算」，回溯用本月首段金额；
+// 3) 本月没设过 → 沿用上月最后一段标准（原行为），从未设过任何预算则 null。
 function dailyAt(date, budgets) {
-  let cur = null;
-  for (const b of budgets || DATA.budgets) {
-    if (b.effective_from <= date) cur = b; else break;   // 字符串比较等价于日期比较
+  const list = budgets || DATA.budgets;                 // 已按 effective_from 升序
+  const month = date.slice(0, 7);
+  let cur = null, firstOfMonth = null;
+  for (const b of list) {
+    if (!firstOfMonth && b.month === month) firstOfMonth = b;
+    if (b.effective_from <= date) cur = b;              // 字符串比较等价于日期比较
   }
+  if (firstOfMonth) return (cur && cur.month === month) ? cur.daily : firstOfMonth.daily;
   return cur ? cur.daily : null;
 }
 // 该月总预算（按分段天数累加）
@@ -485,8 +493,9 @@ function monthBudgetTotal(month, budgets) {
   const last = lastDayOfMonth(month);
   let total = 0;
   segs.forEach((s, i) => {
+    const start = i === 0 ? month + '-01' : s.effective_from;  // 首段回溯到月初：补录日期也计入总预算
     const end = i + 1 < segs.length ? addDays(segs[i + 1].effective_from, -1) : last;
-    const days = dayDiff(s.effective_from, end) + 1;
+    const days = dayDiff(start, end) + 1;
     if (days > 0) total += days * s.daily;
   });
   return total;
@@ -903,12 +912,15 @@ function renderBudgetSetting() {
   if (document.activeElement !== inp) inp.value = val === '' ? '' : val;
 
   const hint = $('b-hint');
+  // 首段生效日晚于月初时，说明月初~生效日之间的补录日期是回溯按首段金额算的，各提示分支都说明这一点
+  const retroNote = (segs.length && segs[0].effective_from > VIEW + '-01')
+    ? `本月 ${VIEW}-01 ~ ${addDays(segs[0].effective_from, -1).slice(5)} 补录的日期按首段 ¥${money(segs[0].daily)}/天 计。` : '';
   if (!monthEditable) {
     hint.innerHTML = `🔒 ${monthLabel(VIEW)}已结清，预算与记录均不可修改。`;
   } else if (frozenThisMonth && !budgetUnlocked) {
-    hint.innerHTML = `🔒 本月已过 8 号，日预算已锁定（每月仅 1~7 号可改，或点「🔓 输密码解锁」临时修改）。<br>当前：¥${money(val)}/天，已生效。`;
+    hint.innerHTML = `🔒 本月已过 8 号，日预算已锁定（每月仅 1~7 号可改，或点「🔓 输密码解锁」临时修改）。<br>当前：¥${money(val)}/天，已生效。${retroNote ? '<br>' + retroNote : ''}`;
   } else if (frozenThisMonth && budgetUnlocked) {
-    hint.innerHTML = `🔓 已输密码解锁，可临时修改本月预算（仅本次会话有效，刷新或切月后恢复锁定）。<br>当前：¥${money(val)}/天。`;
+    hint.innerHTML = `🔓 已输密码解锁，可临时修改本月预算（仅本次会话有效，刷新或切月后恢复锁定）。<br>当前：¥${money(val)}/天。${retroNote ? '<br>' + retroNote : ''}`;
   } else if (segs.length > 1) {
     hint.innerHTML = `本月预算调整过 ${segs.length - 1} 次：` +
       segs.map((s, i) => {
@@ -918,7 +930,9 @@ function renderBudgetSetting() {
       `<br>统计按各段实际天数分别累加（这不是记账明细，Excel 里可看到完整轨迹）。`;
   } else if (segs.length === 1) {
     hint.textContent = `当前：¥${money(segs[0].daily)}/天，从 ${segs[0].effective_from} 起生效。` +
-      (segs[0].effective_from > VIEW + '-01' ? '本月此前日期无预算（总预算只算生效日起）。' : '再次改动会从今天开始按新金额算。');
+      (segs[0].effective_from > VIEW + '-01'
+        ? `${VIEW}-01 ~ ${addDays(segs[0].effective_from, -1).slice(5)} 的补录日期按首段 ¥${money(segs[0].daily)}/天 计。`
+        : '再次改动会从今天开始按新金额算。');
   } else {
     hint.textContent = '还没有设置预算。填一个金额保存即可开始。';
   }
@@ -1276,6 +1290,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v13</div>
+<div class="ver">v14</div>
 </body>
 </html>
