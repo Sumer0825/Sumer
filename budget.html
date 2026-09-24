@@ -143,13 +143,15 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .prog-bar.under > span { background: linear-gradient(90deg, #2bbf7a, #5fd39b); }
 
   /* ===== 概览统计 ===== */
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
   .stat { text-align: center; padding: 8px 4px; }
   .stat .label { font-size: 12px; color: var(--muted); white-space: nowrap; }
   .stat .value { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
   .stat .value small { font-size: 11px; font-weight: 500; color: var(--muted); }
   .stat .value.over  { color: var(--danger); }
   .stat .value.under { color: var(--success); }
+  .stat .value.plus  { color: var(--danger); }   /* 结余为正：有富余，红 */
+  .stat .value.minus { color: var(--success); }  /* 结余为负：超支，绿（数值自带负号） */
   .stat-note { font-size: 11.5px; color: var(--muted); margin-top: 12px; text-align: center; opacity: .9; }
 
   /* ===== 周柱图 ===== */
@@ -323,6 +325,7 @@ html.in-frame .month-picker { top: 4px; }
       <div class="stat"><div class="label">总预算<small id="sum-budget-note"></small></div><div class="value" id="s-budget">--</div></div>
       <div class="stat"><div class="label">累计实际</div><div class="value" id="s-actual">--</div></div>
       <div class="stat"><div class="label">已用</div><div class="value" id="s-pct">--</div></div>
+      <div class="stat"><div class="label">结余</div><div class="value" id="s-bal">--</div></div>
       <div class="stat"><div class="label">剩余天数</div><div class="value" id="s-days">--</div></div>
     </div>
     <div class="stat-note" id="sum-note"></div>
@@ -500,7 +503,8 @@ function monthBudgetTotal(month, budgets) {
   });
   return total;
 }
-// 该月到「今天」为止的累计实际：未填的过去日按花满算；今天未填也按花满算（另有横幅提醒）
+// 该月到「今天」为止的真实累计：只统计已填的记录。
+// （旧版会把未填的过去日按预算额计入，导致「累计实际」紧贴总预算、看起来像目标；v16 起未填不计入）
 function monthActualSoFar(month, d) {
   const today = todayStr();
   let sum = 0, filled = 0, past = 0;
@@ -509,7 +513,6 @@ function monthActualSoFar(month, d) {
     past++;
     const rec = (d || DATA).actuals.find(a => a.date === day);
     if (rec) { sum += rec.amount; filled++; }
-    else { const dl = dailyAt(day, (d || DATA).budgets); if (dl != null) sum += dl; }
   }
   return { sum, filled, past };
 }
@@ -822,6 +825,9 @@ function renderAlerts() {
   ).join('');
 }
 
+// 会话内记住最近一次操作的日期：批量补录时保存后不跳回今天（刷新页面后回到今天，防止跨天误记）
+let lastPick = null;
+
 function renderToday() {
   const today = todayStr();
   const t = parseYmd(today);
@@ -830,15 +836,17 @@ function renderToday() {
   $('t-budget').textContent = daily == null ? '--' : money(daily);
   const rec = DATA.actuals.find(a => a.date === today);
 
-  // 日期选择：默认今天；约束在 [本月1号, 今天]
+  // 日期选择：默认今天；约束在 [本月1号, 今天]；保存后保持在上一次操作的日期
   const dp = $('t-datepick');
   dp.min = curMonth() + '-01';
   dp.max = today;
-  if (document.activeElement !== dp) dp.value = today;
+  if (document.activeElement !== dp) dp.value = (lastPick && lastPick <= today) ? lastPick : today;
+  const picked = dp.value;
   // 当用户改日期时，输入框里同步显示该日的实际（如有），方便修改历史日
   dp.onchange = () => {
     const d = dp.value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    lastPick = d;
     const r = DATA.actuals.find(a => a.date === d);
     $('t-input').value = r ? r.amount : '';
     $('t-input').focus();
@@ -847,8 +855,9 @@ function renderToday() {
   // 今日输入始终可用（今天天然属于本月，与当前浏览的历史月无关）
   $('t-input').disabled = false;
   $('t-save').disabled = false;
-  const curVal = rec ? rec.amount : '';
-  if (document.activeElement !== $('t-input')) $('t-input').value = curVal === '' ? '' : curVal;
+  // 输入框同步「当前所选日期」的已有记录（保存后日期不跳，金额也停留在刚记的那天）
+  const recPicked = DATA.actuals.find(a => a.date === picked);
+  if (document.activeElement !== $('t-input')) $('t-input').value = recPicked ? recPicked.amount : '';
 
   // 今日实际（未填时按花满展示，但用斜体弱化区分）
   const shown = rec ? rec.amount : daily;
@@ -882,6 +891,17 @@ function renderSummary() {
   el.textContent = pct == null ? '--' : pct.toFixed(1) + '%';
   el.className = 'value' + (pct == null ? '' : pct > 100 ? ' over' : '');
 
+  // 结余 = 总预算 - 累计实际：正值红色（有富余），负值绿色带负号（超支），与概览其他项同字号字重
+  const balEl = $('s-bal');
+  if (hasB && past) {
+    const bal = total - sum;
+    balEl.textContent = money(bal);
+    balEl.className = 'value' + (bal > 0 ? ' plus' : bal < 0 ? ' minus' : '');
+  } else {
+    balEl.textContent = '--';
+    balEl.className = 'value';
+  }
+
   // 剩余天数
   const days = daysInMonth(VIEW);
   const left = isCur ? days.filter(d => d >= today).length : (VIEW > curMonth() ? days.length : 0);
@@ -889,7 +909,8 @@ function renderSummary() {
 
   const parts = [];
   if (hasB) parts.push('总预算 = 每日预算 × 当月天数');
-  if (filled) parts.push(`已填 ${filled}/${past} 天，未填日期按预算额计`);
+  if (filled) parts.push(`已填 ${filled}/${past} 天，未填日期不计入实际`);
+  else if (past) parts.push(`已填 0/${past} 天，未填日期不计入实际`);
   if (isCur) parts.push('跨月后该月自动冻结，不可再改');
   $('sum-note').textContent = parts.join(' · ');
 
@@ -1290,6 +1311,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v14</div>
+<div class="ver">v16</div>
 </body>
 </html>
