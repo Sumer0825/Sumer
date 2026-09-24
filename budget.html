@@ -512,7 +512,11 @@ function budgetLockedThisMonth() {
 
 // 写入一条预算（当月）：同一天已有记录则覆盖，否则追加
 function setBudget(month, daily, fromDate) {
-  const from = fromDate || (month === curMonth() ? todayStr() : month + '-01');
+  // 该月首次设定预算 → 生效日取当月 1 号，覆盖全月：
+  // 总预算 = 每日预算 × 当月天数，且补录的过去日期也能带出预算列。
+  // 若该月已有预算段（月中途调整）→ 沿用原逻辑从今天起生效，不影响已过去的段。
+  const hasSeg = DATA.budgets.some(b => b.month === month);
+  const from = fromDate || ((hasSeg && month === curMonth()) ? todayStr() : month + '-01');
   const i = DATA.budgets.findIndex(b => b.effective_from === from);
   if (i >= 0) DATA.budgets[i].daily = daily;
   else DATA.budgets.push({ id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), month, effective_from: from, daily, note: '' });
@@ -913,7 +917,8 @@ function renderBudgetSetting() {
       }).join(' → ') +
       `<br>统计按各段实际天数分别累加（这不是记账明细，Excel 里可看到完整轨迹）。`;
   } else if (segs.length === 1) {
-    hint.textContent = `当前：¥${money(segs[0].daily)}/天，从 ${segs[0].effective_from} 起生效。改动会从今天开始按新金额算。`;
+    hint.textContent = `当前：¥${money(segs[0].daily)}/天，从 ${segs[0].effective_from} 起生效。` +
+      (segs[0].effective_from > VIEW + '-01' ? '本月此前日期无预算（总预算只算生效日起）。' : '再次改动会从今天开始按新金额算。');
   } else {
     hint.textContent = '还没有设置预算。填一个金额保存即可开始。';
   }
@@ -1271,6 +1276,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v12</div>
+<div class="ver">v13</div>
 </body>
 </html>
