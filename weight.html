@@ -37,8 +37,11 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
-    background: var(--bg);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.66) 100%),
+      url('assets/bg-weight.png') center / cover no-repeat;
     color: var(--text);
+    min-height: 100vh;
     line-height: 1.5;
     padding: 24px 16px 60px;
     padding-top: max(24px, env(safe-area-inset-top) + 24px);   /* 避开 iOS 刘海/状态栏 */
@@ -970,6 +973,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v29</div>
+<div class="ver">v31</div>
 </body>
 </html>

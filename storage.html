@@ -29,6 +29,8 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     --brand: #c97b5a;
     --brand-soft: #f3e3da;
     --accent: #6f9c76;
+    --danger: #d9534f;
+    --success: #2c8e60;
     --shadow: 0 10px 30px rgba(80, 60, 40, 0.10);
     --radius: 16px;
   }
@@ -36,7 +38,9 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-    background: linear-gradient(180deg, #faf7f2 0%, var(--bg) 100%);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.66) 100%),
+      url('assets/bg-storage.png') center / cover no-repeat;
     color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
   }
   header { padding: 26px 24px 8px; max-width: 1120px; margin: 0 auto; }
@@ -126,7 +130,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 0;
   }
   .sidebar .sb-new-collapsed:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
-  .content { flex: 1 1 auto; min-width: 0; }
+  .content, #main { flex: 1 1 auto; min-width: 0; }
 
   /* 侧边栏收起状态：仅图标 + 折叠按钮 */
   .sidebar.collapsed { width: 56px; flex: 0 0 56px; padding: 10px 6px; }
@@ -183,16 +187,23 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .empty-hero .big { font-size: 46px; margin-bottom: 10px; }
   .empty-hero .btn { margin-top: 16px; }
 
+  /* 极窄屏（≤480）：空状态按钮默认 nowrap 会被 CJK 文案撑宽偶发溢出，
+     允许换行 + 限宽，保证任何字体度量下都不超出主区 */
+  @media (max-width: 480px) {
+    .empty-hero { padding: 56px 12px; }
+    .empty-hero .btn { max-width: 100%; white-space: normal; }
+  }
+
   .del-x { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; padding: 5px 8px; border-radius: 8px; }
   .del-x:hover { background: #fbe9e3; color: #d9534f; }
   .edit-x { border: none; background: transparent; color: var(--brand); cursor: pointer; font-size: 13px; padding: 5px 8px; border-radius: 8px; margin-right: 2px; }
   .edit-x:hover { background: var(--brand-soft); }
 
   /* 模态框 */
-  .overlay { position: fixed; inset: 0; background: rgba(40,30,20,.55); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; box-sizing: border-box; background: rgba(20,26,38,.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 20px 24px; z-index: 99; }
   .overlay.show { display: flex; }
-  .modal { background: var(--panel); border-radius: 20px; width: 100%; max-width: 460px; padding: 22px; box-shadow: var(--shadow); max-height: 92vh; overflow: auto; }
-  .modal h3 { margin: 0 0 16px; font-size: 18px; }
+  .modal { background: #fff; border-radius: 16px; width: min(420px, 100%); padding: 22px 22px 18px; box-shadow: 0 20px 50px rgba(0,0,0,.28); max-height: 90%; overflow: auto; }
+  .modal h3 { margin: 0 0 16px; font-size: 17px; font-weight: 700; text-align: center; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   .field input, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--ink); outline: none; font-family: inherit; background: #fff; }
@@ -223,17 +234,19 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .irow .info .created { font-size: 11px; color: var(--muted); margin-top: 2px; opacity: .75; }
 
   /* 密码弹窗（删除/危险操作用） */
-  .pw-mask { position: fixed; inset: 0; background: rgba(40,30,20,.55); z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; }
+  /* ===== 密码弹窗（与「收支规划局」budget.html 同款） ===== */
+  .pw-mask { display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; box-sizing: border-box; background: rgba(20,26,38,.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 99; align-items: center; justify-content: center; padding: 0 24px; }
   .pw-mask.show { display: flex; }
-  .pw-card { background: var(--panel); border-radius: 16px; padding: 22px; max-width: 380px; width: 100%; box-shadow: var(--shadow); }
-  .pw-card h3 { margin: 0 0 6px; font-size: 16px; }
-  .pw-card .pw-msg { color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.5; white-space: pre-line; }
-  .pw-card .pw-input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; outline: none; font-family: inherit; background: #fbfcfe; letter-spacing: 4px; }
+  .pw-card { background: #fff; border-radius: 16px; padding: 22px 22px 18px; width: min(320px, 100%); box-shadow: 0 20px 50px rgba(0,0,0,.28); }
+  .pw-card .pw-title { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+  .pw-card .pw-tip { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 14px; line-height: 1.45; white-space: pre-line; }
+  .pw-card .pw-input { width: 100%; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 18px; text-align: center; letter-spacing: .35em; outline: none; background: #fbfcfe; font-variant-numeric: tabular-nums; font-family: inherit; }
   .pw-card .pw-input:focus { border-color: var(--brand); background: #fff; }
-  .pw-card .pw-err { color: var(--danger); font-size: 12px; min-height: 16px; margin-top: 6px; }
-  .pw-card .pw-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
-  .pw-card .pw-actions .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
-  .pw-card .pw-actions .btn.primary:hover { background: #b86a4b; }
+  .pw-card .pw-err { color: var(--danger); font-size: 12px; height: 16px; text-align: center; margin: 6px 0 8px; }
+  .pw-card .pw-actions { display: flex; gap: 10px; }
+  .pw-card .pw-actions .btn-line { flex: 1; }
+  .pw-card .pw-actions .btn-primary { flex: 1; background: var(--danger); border-color: var(--danger); }
+  .pw-card .pw-actions .btn-primary:hover { background: #c0392b; border-color: #c0392b; }
 
   /* ---------- 工具箱统一部件 ---------- */
   .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,110,95,.45); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
@@ -242,89 +255,117 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   header { padding: 26px 24px 4px; max-width: 1120px; margin: 0 auto; }
   header h1 { font-size: 22px; margin: 0; letter-spacing: .5px; }
   header h1 .tag { font-size: 12px; color: var(--brand); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-left: 10px; vertical-align: middle; font-weight: 500; }
-  header .subtitle { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  header .subtitle { color: #5c544a; font-size: 13.5px; margin: 6px 0 0; line-height: 1.55; }
   .in-frame header { padding: 12px 22px 4px; }   /* iframe 模式压扁顶页眉 */
   .in-frame header h1 { display: none; }            /* 标题在 iframe 里与 portal 顶栏重复，藏掉；保留副标题说明 */
   .in-frame .app { margin-top: 0; }                 /* 顶部间距收紧，让描述贴近主区 */
+  /* 同步面板与 budget/weight/time 完全一致：页面里的普通行内卡片（非浮层），
+     打开后靠页面滚动到达 —— 不用 position:fixed，彻底规避 iOS 对 iframe 内
+     fixed 元素的不可控布局（弹窗超出屏幕、按钮点不到） */
+  .in-frame .data-toolbar { display: none; }        /* iframe 里不需要导入/导出 JSON 工具栏 */
+  .in-frame header .store-line { display: none; }   /* iframe 里 portal 已经显示存储信息 */
+  .in-frame .sync-bar { font-size: 12px; gap: 8px; }
+  .in-frame html, .in-frame body { overflow-x: clip; }   /* 防止 iframe 内内容横向溢出且不破坏 sticky */
+  .in-frame .tip { word-wrap: break-word; overflow-wrap: break-word; }
 
-  /* ---------- GitHub 同步面板 ---------- */
-  .sync-fab { position: fixed; right: 12px; bottom: calc(28px + env(safe-area-inset-bottom)); width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: var(--shadow); cursor: pointer; font-size: 18px; z-index: 30; }
-  .sync-fab:hover { background: #b86a4b; }
-  .in-frame .sync-fab { bottom: calc(8px + env(safe-area-inset-bottom)); }
-  .sync-mask { position: fixed; inset: 0; background: rgba(40,30,20,.45); z-index: 40; display: none; align-items: center; justify-content: center; padding: 16px; }
-  .sync-mask.show { display: flex; }
-  .sync-card { background: var(--panel); border-radius: 16px; padding: 18px; max-width: 480px; width: 100%; max-height: 92vh; overflow: auto; box-shadow: var(--shadow); }
-  .sync-card h3 { margin: 0 0 6px; font-size: 16px; }
-  .sync-card .desc { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
-  .sync-card .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .sync-card .field { flex: 1 1 150px; }
-  .sync-card .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-  .sync-card .field input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; font-size: 14px; outline: none; background: #fbfcfe; font-family: inherit; }
+  /* ---------- GitHub 同步面板（与 budget/weight/time 风格一致） ---------- */
+  .sync-bar { margin-top: 14px; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .sync-status { font-size: 13px; color: #5c544a; }
+  .sync-status.ok { color: #1f6e4a; }
+  .sync-status.err { color: var(--danger); }
+  /* 宽度与下方 .app 内容区对齐：1120px 容器减去左右 24px 内边距 = 1072px，窄屏时自动回落为 100%-48px */
+  .sync-card { margin: 14px auto 0; width: calc(100% - 48px); max-width: calc(1120px - 48px); padding: 16px 18px 14px; }
+  .sync-card h2 { margin: 0 0 6px; font-size: 16px; }
+  .sync-card .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .sync-card .field { flex: 1 1 160px; min-width: 0; }
+  .sync-card .field label { display: block; font-size: 12px; color: #5c544a; margin-bottom: 6px; font-weight: 500; }
+  .sync-card .field input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; font-size: 14px; outline: none; background: #fbfcfe; font-family: inherit; color: var(--ink); }
   .sync-card .field input:focus { border-color: var(--brand); background: #fff; }
-  .sync-card .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-  .sync-card .actions .btn-pri { background: var(--brand); color: #fff; border: 1px solid var(--brand); }
-  .sync-card .actions .btn-pri:hover { background: #b86a4b; }
-  .sync-card .actions .btn-danger { color: var(--danger); border-color: var(--danger); }
-  .sync-card .actions .btn-danger:hover { background: var(--danger); color: #fff; }
-  .sync-card .msg { font-size: 12px; color: var(--muted); margin-top: 10px; min-height: 16px; }
-  .sync-card .msg.ok { color: var(--success); }
-  .sync-card .msg.err { color: var(--danger); }
-  .sync-card .mode { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-  .sync-card .mode b { color: var(--ink); font-weight: 600; }
+  .sync-card .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .tip { font-size: 12.5px; color: #5c544a; margin-top: 8px; line-height: 1.6; }
+  code { background: #f1f3f8; padding: 1px 6px; border-radius: 6px; font-size: 12px; color: var(--ink); }
+  /* 同步面板按钮：主按钮（实心）+ 次按钮（橙色描边/填充透明）视觉一致，danger 用红色 */
+  .btn-primary { background: var(--brand); color: #fff; border: 1px solid var(--brand); padding: 8px 18px; border-radius: 9px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: 500; }
+  .btn-primary:hover { background: #b86a4b; border-color: #b86a4b; }
+  .btn-ghost { background: transparent; color: var(--brand); border: 1px solid var(--brand); padding: 8px 18px; border-radius: 9px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: 500; }
+  .btn-ghost:hover { background: var(--brand-soft); }
+  .btn-line { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 8px 14px; border-radius: 9px; font-size: 14px; font-family: inherit; cursor: pointer; }
+  .btn-line:hover { background: #faf6f0; color: var(--ink); }
+  .btn-danger-ghost { background: transparent; color: var(--danger); border-color: rgba(217,83,79,.4); }
+  .btn-danger-ghost:hover { background: #fbe9e3; color: var(--danger); border-color: var(--danger); }
+  /* 顶部 store-mode 描述 */
+  header .store-line { font-size: 13px; color: #5c544a; margin: 6px 0 0; }
+  header .store-line .mode { color: var(--ink); font-weight: 600; }
+  /* 导入/导出工具栏 */
+  .data-toolbar { display: flex; gap: 8px; align-items: center; padding: 8px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 12px 24px 0; max-width: none; flex-wrap: wrap; }
+  .data-toolbar .spacer { flex: 1; }
+  .data-toolbar .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
+  .data-toolbar button { padding: 6px 12px; font-size: 13px; }
 </style>
 </head>
 <body>
   <header>
     <h1>清居置物箱<span class="tag">室内物品整理归纳</span></h1>
     <p class="subtitle">按「衣柜 / 储物柜 → 第几层 → 放了什么」逐层记录，例如哪层放夏季衣物、哪层放冬季被褥。</p>
+    <p class="store-line">数据存储：<span class="mode" id="store-mode">本机浏览器（IndexedDB）</span> · 可导入/导出 JSON</p>
+    <div class="sync-bar">
+      <span id="sync-status" class="sync-status">未连接 GitHub</span>
+      <button type="button" class="btn-line" id="sync-settings-btn">⚙ 同步设置</button>
+      <button type="button" class="btn-ghost" id="sync-now-btn" style="display:none">↻ 立即同步</button>
+    </div>
   </header>
+
+  <!-- GitHub 同步设置（内联卡片，与 budget/weight/time 完全一致：无遮罩、无 fixed；DOM 紧随 header，展开即在「同步设置」按钮下方） -->
+  <section class="card sync-card" id="sync-card" style="display:none">
+    <h2>GitHub 同步设置</h2>
+    <p class="tip">把数据写入你仓库里的 <code>data/storage.json</code>（JSON 文件，含 locations / levels / items 三个表），多设备自动共享（每次保存 = 一次 commit）。Token 仅存于本机浏览器，不会上传到任何服务器。</p>
+    <div class="row">
+      <div class="field"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="ghp_…" autocomplete="off"></div>
+    </div>
+    <div class="row">
+      <div class="field row-half"><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
+      <div class="field row-half"><label>仓库名</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
+    </div>
+    <div class="row">
+      <div class="field row-half"><label>分支</label><input type="text" id="gh-branch" placeholder="main" maxlength="999" inputmode="text"></div>
+      <div class="field row-half"><label>数据文件路径</label><input type="text" id="gh-path" placeholder="data/storage.json"></div>
+    </div>
+    <p class="tip">💡 每个浏览器 / iOS 主屏幕图标都有<b>独立存储</b>：换环境需重新配置一次 Token；保存后数据自动从 GitHub 云端拉回，不会丢。<br>本工具使用独立的配置文件（<code>storage_gh_cfg_v1</code>），与时光记录器、体重记录器、收支记录器互不干扰。</p>
+    <div class="actions">
+      <button type="button" class="btn-primary" id="gh-connect">保存并连接</button>
+      <button type="button" class="btn-line btn-danger-ghost" id="gh-disconnect" style="display:none">断开链接并清空 Token</button>
+      <button type="button" class="btn-line btn-danger-ghost" id="clear-all-btn-iframe" title="清空本机全部收纳数据，回到空状态（GitHub 仓库里的文件不动）">🧹 清空本机数据</button>
+      <button type="button" class="btn-line" id="gh-close">关闭</button>
+      <span id="gh-msg" class="tip"></span>
+    </div>
+  </section>
 
   <div class="app">
     <aside class="sidebar" id="sidebar"></aside>
     <main id="main"></main>
   </div>
 
-  <!-- GitHub 同步（浮动按钮 + 面板） -->
-  <button class="sync-fab" id="sync-fab" title="GitHub 同步设置">⚙</button>
-  <div class="sync-mask" id="sync-mask">
-    <div class="sync-card" id="sync-card">
-      <h3>GitHub 同步</h3>
-      <p class="desc">把数据存到 GitHub 仓库，换设备也能用。Token 需 <code>contents</code> 读写权限（Fine-grained PAT 最稳）。</p>
-      <div class="mode" id="store-mode">存储：<b>本机浏览器（IndexedDB）</b></div>
-      <div class="row">
-        <div class="field" style="flex:1 1 100%"><label>Token (PAT)</label><input type="password" id="gh-token" placeholder="ghp_xxx" autocomplete="off"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
-        <div class="field"><label>仓库 repo</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
-        <div class="field"><label>分支</label><input type="text" id="gh-branch" placeholder="main" maxlength="999" inputmode="text"></div>
-      </div>
-      <div class="row">
-        <div class="field" style="flex:1 1 100%"><label>数据文件路径</label><input type="text" id="gh-path" placeholder="data/storage.json"></div>
-      </div>
-      <div class="actions">
-        <button class="btn primary" id="sync-save">保存配置</button>
-        <button class="btn" id="sync-pull">从仓库拉取</button>
-        <button class="btn" id="sync-push">推到仓库</button>
-        <button class="btn" id="sync-export">导出 JSON</button>
-        <label class="btn" for="sync-import" style="cursor:pointer">导入 JSON</label>
-        <input type="file" id="sync-import" accept="application/json" hidden>
-        <button class="btn btn-danger" id="gh-disconnect" style="display:none;margin-left:auto">断开链接并清空</button>
-      </div>
-      <div class="msg" id="sync-msg"></div>
-    </div>
+  <!-- 导入/导出 JSON 工具栏（与 weight/budget 风格一致：独立工具栏，不放在同步面板里） -->
+  <div class="data-toolbar">
+    <span class="lbl">本机数据：</span>
+    <button class="btn-line" id="export-json-btn">📤 导出 JSON</button>
+    <label class="btn-line" for="import-json-input" style="cursor:pointer">📥 导入 JSON</label>
+    <input type="file" id="import-json-input" accept="application/json" hidden>
+    <button class="btn-line btn-danger-ghost" id="clear-all-btn" title="清空本机全部收纳数据，回到「新建第一个位置」空状态">🧹 清空本机数据</button>
+    <span class="spacer"></span>
+    <span class="lbl" style="font-size:11px;opacity:.7">本地浏览器 IndexedDB，与 GitHub 仓库互不干扰</span>
   </div>
 
-  <!-- 密码弹窗（删除 / 危险操作用） -->
+  <!-- 密码弹窗（删除 / 危险操作用，样式与「收支规划局」一致） -->
   <div class="pw-mask" id="pw-mask">
     <div class="pw-card">
-      <h3 id="pw-title">请输入密码确认</h3>
-      <p class="pw-msg" id="pw-msg">该操作不可撤销。</p>
-      <input type="password" class="pw-input" id="pw-input" placeholder="••••••" autocomplete="off" inputmode="numeric">
+      <div class="pw-title" id="pw-title">🔒 操作确认</div>
+      <div class="pw-tip" id="pw-tip">该操作不可撤销。<br>请输入密码继续</div>
+      <input type="password" class="pw-input" id="pw-input" placeholder="••••••" autocomplete="off" inputmode="numeric" maxlength="6">
       <div class="pw-err" id="pw-err"></div>
       <div class="pw-actions">
-        <button class="btn" id="pw-cancel">取消</button>
-        <button class="btn primary" id="pw-ok">确认</button>
+        <button type="button" class="btn-line" id="pw-cancel">取消</button>
+        <button type="button" class="btn-primary" id="pw-ok">确认</button>
       </div>
     </div>
   </div>
@@ -578,9 +619,8 @@ function toggleSidebar(force) {
 function renderContent() {
   const main = $("main");
   if (!locations.length) {
-    main.innerHTML = `<div class="empty-hero"><div class="big">🚪</div><div>还没有任何位置，先建一个衣柜或储物柜吧</div><button class="btn primary empty-hero-btn" id="firstLoc">＋ 新建第一个位置</button><br><button class="btn empty-hero-btn" id="loadDemo" style="margin-top:12px">✨ 载入示例衣柜（看看效果）</button></div>`;
+    main.innerHTML = `<div class="empty-hero"><div class="big">🚪</div><div>还没有任何位置，先建一个衣柜或储物柜吧</div><button class="btn primary empty-hero-btn" id="firstLoc">＋ 新建第一个位置</button></div>`;
     $("firstLoc").onclick = () => openLocModal();
-    $("loadDemo").onclick = loadDemo;
     return;
   }
   const loc = locations.find(l => l.id === currentLoc) || locations[0];
@@ -680,7 +720,7 @@ function openLocModal(loc) {
 async function delLocation(loc) {
   const lvlCount = levels.filter(x => x.locId === loc.id).length;
   const itmCount = items.filter(i => levels.some(x => x.locId === loc.id && x.id === i.levelId)).length;
-  const ok = await askPassword(`确定删除「${loc.name}」及其下所有层和物品？\n\n将一并删除：${lvlCount} 层 / ${itmCount} 件物品\n该操作不可撤销，请输入密码确认`);
+  const ok = await askPassword(`确定删除「${loc.name}」及其下所有层和物品？\n\n将一并删除：${lvlCount} 层 / ${itmCount} 件物品\n该操作不可撤销，请输入密码继续`, '🔒 删除位置确认');
   if (!ok) return;
   const myLevels = levels.filter(x => x.locId === loc.id);
   for (const L of myLevels) {
@@ -689,27 +729,6 @@ async function delLocation(loc) {
   }
   await del("locations", loc.id);
   if (currentLoc === loc.id) currentLoc = null;
-  await load();
-  scheduleAutoPush();
-}
-
-/* ---------- 示例数据 ---------- */
-async function loadDemo() {
-  if (locations.length && !confirm("将示例衣柜添加到现有数据之前（不影响已有内容）？")) return;
-  const locId = uid();
-  await put("locations", { id: locId, name: "主卧衣柜", order: locations.length });
-  const layers = [
-    { name: "上层（夏季区）", items: [["夏季T恤", "一摞", "纯棉，当季常穿"], ["短裤", "5条", ""], ["凉席", "1张", "换季收起"]] },
-    { name: "中层（春秋区）", items: [["薄卫衣", "3件", ""], ["长裤", "若干", ""], ["衬衫", "几件", "上班穿"]] },
-    { name: "下层（冬季区）", items: [["羽绒服", "2件", "厚款，过冬"], ["厚毛衣", "一箱", ""], ["换季被褥", "1床", "真空袋收纳"]] }
-  ];
-  for (let i = 0; i < layers.length; i++) {
-    const L = { id: uid(), locId, name: layers[i].name, order: i };
-    await put("levels", L);
-    for (const [name, qty, note] of layers[i].items) {
-      await put("items", { id: uid(), levelId: L.id, name, qty, note, url: "", createdAt: Date.now() });
-    }
-  }
   await load();
   scheduleAutoPush();
 }
@@ -732,7 +751,7 @@ function openLevelModal() {
 async function delLevel(id) {
   const L = levels.find(x => x.id === id);
   const itmCount = items.filter(i => i.levelId === id).length;
-  const ok = await askPassword(`删除「${L?.name}」这一层及其中的 ${itmCount} 件物品？\n该操作不可撤销，请输入密码确认`);
+  const ok = await askPassword(`删除「${L?.name}」这一层及其中的 ${itmCount} 件物品？\n该操作不可撤销，请输入密码继续`, '🔒 删除层级确认');
   if (!ok) return;
   for (const it of items.filter(i => i.levelId === id)) await del("items", it.id);
   await del("levels", id);
@@ -743,7 +762,7 @@ async function delLevel(id) {
 /* ---------- 删除单个物品 ---------- */
 async function removeItem(id) {
   const it = items.find(x => x.id === id);
-  const ok = await askPassword(`删除物品「${it?.name || "未命名"}」？\n请输入密码确认`);
+  const ok = await askPassword(`删除物品「${it?.name || "未命名"}」？\n该操作不可撤销，请输入密码继续`, '🔒 删除物品确认');
   if (!ok) return;
   if (it && it.src === "github") await deleteImageFromGitHub(it.url);
   await del("items", id);
@@ -896,9 +915,10 @@ const ghReady = () => !!(GH.token && !/^YOUR|^ghp_xxxx/i.test(GH.token));
 
 /* ---------- 危险操作密码门 ---------- */
 const CLEAR_PW = '870825';
-function askPassword(msg) {
+function askPassword(msg, title) {
   return new Promise((resolve) => {
-    $('pw-msg').textContent = msg || '该操作不可撤销，请输入密码确认';
+    $('pw-title').textContent = title || '🔒 操作确认';
+    $('pw-tip').textContent = msg || '该操作不可撤销。\n请输入密码继续';
     $('pw-err').textContent = '';
     $('pw-input').value = '';
     $('pw-mask').classList.add('show');
@@ -995,11 +1015,90 @@ async function ghPutFile(content, msg) {
   const j = await res.json(); GH.sha = j.content.sha; return j;
 }
 
-/* 同步面板交互 */
-$('sync-fab').onclick = () => { ghPrefill(); refreshSyncUI(); $('sync-mask').classList.add('show'); };
-$('sync-mask').onclick = (e) => { if (e.target === $('sync-mask')) $('sync-mask').classList.remove('show'); };
+/* ---------- GitHub 同步交互（与 budget/weight/time 一致） ---------- */
+function refreshSyncUI() {
+  // 顶部 store-mode + 状态文字
+  const mode = $('store-mode');
+  mode.textContent = ghReady() ? `GitHub JSON（${GH.owner}/${GH.repo}@${GH.branch}）` : '本机浏览器（IndexedDB）';
+  const st = $('sync-status');
+  st.textContent = ghReady() ? '已连接 GitHub' : '未连接 GitHub';
+  st.className = 'sync-status' + (ghReady() ? ' ok' : '');
+  $('sync-now-btn').style.display = ghReady() ? '' : 'none';
+  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
+}
+function setSyncMsg(msg, cls) {
+  const el = $('gh-msg');
+  el.textContent = msg || '';
+  el.className = 'tip' + (cls === 'ok' ? '' : cls === 'err' ? ' err' : '');
+  if (cls === 'ok' || cls === 'err') {
+    // 同步更新顶部 sync-status
+    const st = $('sync-status');
+    if (cls === 'ok' && msg) { st.textContent = msg; st.className = 'sync-status ok'; }
+    else if (cls === 'err' && msg) { st.textContent = msg.length > 60 ? msg.slice(0, 60) + '…' : msg; st.className = 'sync-status err'; }
+    setTimeout(() => { if (ghReady()) refreshSyncUI(); else { st.textContent = '未连接 GitHub'; st.className = 'sync-status'; } }, 5000);
+  }
+}
+function ghPrefill() {
+  $('gh-token').value = GH.token || '';
+  $('gh-owner').value = GH.owner || 'sumer0825';
+  $('gh-repo').value = GH.repo || 'Sumer';
+  $('gh-branch').value = GH.branch || 'main';
+  $('gh-path').value = GH.path || 'data/storage.json';
+}
+async function ghGetSha() {
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
+  const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('GitHub API ' + res.status);
+  const j = await res.json(); return j.sha || null;
+}
+async function ghGetFile() {
+  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
+  const res = await fetch(apiUrl, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('GitHub API ' + res.status);
+  const j = await res.json();
+  let txt = '';
+  try { txt = decodeURIComponent(escape(atob((j.content || '').replace(/\n/g, '')))); } catch (_) { txt = ''; }
+  return { sha: j.sha, text: txt };
+}
+async function ghPutFile(content, msg) {
+  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
+  const body = { message: msg || ('更新清居置物箱 ' + new Date().toISOString().slice(0, 10)), content: btoa(unescape(encodeURIComponent(content))), branch: GH.branch };
+  if (GH.sha) body.sha = GH.sha;
+  const res = await fetch(apiUrl, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + GH.token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' }, body: JSON.stringify(body) });
+  if (res.status === 422) { GH.sha = null; return ghPutFile(content, msg); }   // sha 冲突 → 重试
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || ('GitHub API ' + res.status)); }
+  const j = await res.json(); GH.sha = j.content.sha; return j;
+}
 
-$('sync-save').onclick = async () => {
+/* ---------- 同步面板交互（与 budget/weight 完全一致：行内卡片，非浮层） ---------- */
+function toggleSyncCard(show) {
+  const card = $('sync-card');
+  const isOpen = card.style.display !== 'none';
+  const next = show === undefined ? !isOpen : show;
+  card.style.display = next ? '' : 'none';
+  if (next && card.scrollIntoView) {
+    // 打开后滚到可视区（budget 的卡片紧跟页眉天然可见；这里卡片位置相同，保险起见滚一下）
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+$('sync-settings-btn').onclick = () => {
+  if ($('sync-card').style.display === 'none') {
+    ghPrefill();
+    toggleSyncCard(true);
+  } else {
+    toggleSyncCard(false);
+  }
+};
+$('gh-close').onclick = () => toggleSyncCard(false);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('sync-card').style.display !== 'none') {
+    toggleSyncCard(false);
+  }
+});
+
+$('gh-connect').onclick = async () => {
   const tk = $('gh-token').value.trim();
   if (!tk) { setSyncMsg('请填写 Token', 'err'); $('gh-token').focus(); return; }
   GH = {
@@ -1012,7 +1111,7 @@ $('sync-save').onclick = async () => {
   };
   localStorage.setItem(GH_KEY, JSON.stringify(GH));
   refreshSyncUI();
-  $('sync-msg').textContent = '连接中…';
+  setSyncMsg('连接中…');
   try {
     const f = await ghGetFile();
     if (!f) {
@@ -1038,49 +1137,35 @@ $('sync-save').onclick = async () => {
   }
 };
 
-$('sync-pull').onclick = async () => {
+/* 「↻ 立即同步」：手动推一次当前本地快照到仓库（手动备份 / 解决自动推送失败） */
+$('sync-now-btn').onclick = async () => {
   if (!ghReady()) { setSyncMsg('请先填写并保存 Token', 'err'); return; }
+  setSyncMsg('正在推到仓库…');
   try {
-    setSyncMsg('正在从仓库拉取…');
-    const f = await ghGetFile();
-    if (!f) { setSyncMsg('仓库里还没有这个文件，可点「推到仓库」创建', 'err'); return; }
-    const data = JSON.parse(f.text || '{}');
-    if (!confirm(`将仓库数据导入到本机？\n\n将覆盖本机 IndexedDB 中的全部收纳数据：${data.locations?.length || 0} 个位置 / ${data.items?.length || 0} 件物品。\n仓库里的文件不动。`)) return;
-    GH.sha = f.sha;
-    // 清空 → 写入
-    await clearAll();
-    if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
-    if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
-    if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
-    await load();
-    setSyncMsg(`✓ 已拉取：${data.locations?.length || 0} 位置 / ${data.levels?.length || 0} 层 / ${data.items?.length || 0} 物品`, 'ok');
-  } catch (e) { setSyncMsg('拉取失败：' + e.message, 'err'); }
-};
-
-$('sync-push').onclick = async () => {
-  if (!ghReady()) { setSyncMsg('请先填写并保存 Token', 'err'); return; }
-  try {
-    setSyncMsg('正在推到仓库…');
     if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
     const snapshot = await exportSnapshot();
-    await ghPutFile(JSON.stringify(snapshot, null, 2), '更新清居置物箱 ' + new Date().toISOString().slice(0, 10));
+    await ghPutFile(JSON.stringify(snapshot, null, 2), '更新清居置物箱 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
     localStorage.setItem(GH_KEY, JSON.stringify(GH));
-    setSyncMsg(`✓ 已推到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品`, 'ok');
-  } catch (e) { setSyncMsg('推送失败：' + e.message, 'err'); }
+    setSyncMsg(`✓ 已推到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
+  } catch (e) {
+    setSyncMsg('推送失败：' + e.message, 'err');
+  }
 };
 
-$('sync-export').onclick = async () => {
-  const snapshot = await exportSnapshot();
-  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `清居置物箱-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  setSyncMsg('✓ 已导出 JSON 文件', 'ok');
+/* ---------- 导入/导出 JSON（独立工具栏，不在同步面板里） ---------- */
+$('export-json-btn').onclick = async () => {
+  try {
+    const snapshot = await exportSnapshot();
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `清居置物箱-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setSyncMsg('✓ 已导出 JSON 文件', 'ok');
+  } catch (e) { setSyncMsg('导出失败：' + e.message, 'err'); }
 };
-
-$('sync-import').onchange = async (e) => {
+$('import-json-input').onchange = async (e) => {
   const file = e.target.files[0]; if (!file) return;
   try {
     const txt = await file.text();
@@ -1101,10 +1186,36 @@ $('gh-disconnect').onclick = async () => {
   localStorage.removeItem(GH_KEY);
   GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/storage.json', sha: null };
   await clearAll();
-  $('sync-mask').classList.remove('show');
+  $('sync-card').style.display = 'none';
   setTimeout(() => alert('已断开链接并清空本机数据\n仓库里的 data/storage.json 与图片未被改动'), 100);
   refreshSyncUI();
 };
+
+/* 「🧹 清空本机数据」：密码确认后清空 IndexedDB，回到「新建第一个位置」空状态
+   不影响 GitHub 仓库；已配置 Token 时会自动把空快照推一次（让云端也保持一致）*/
+async function handleClearAll() {
+  const [locs, lvls, itms] = await Promise.all([getAll('locations'), getAll('levels'), getAll('items')]);
+  if (locs.length === 0 && lvls.length === 0 && itms.length === 0) {
+    alert('本机已经没有数据了，无需清空。');
+    return;
+  }
+  const ok = await askPassword(
+    `确定清空本机全部收纳数据？\n\n将删除：${locs.length} 位置 / ${lvls.length} 层 / ${itms.length} 物品\n不会动：仓库里已写入的 data/storage.json 与 images/ 文件夹（已配置 Token 时会自动推一份空快照上去）\n\n清空后将回到「新建第一个位置」空状态，该操作不可撤销。请输入密码继续`,
+    '🔒 清空确认'
+  );
+  if (!ok) return;
+  await clearAll();
+  await load();
+  // 关闭同步面板（如果在 iframe 模式下打开了）
+  $('sync-card').style.display = 'none';
+  setSyncMsg('✓ 本机数据已清空，已回到「新建第一个位置」空状态', 'ok');
+  // 如果已配置 Token，自动推一份空快照上云（与本地一致）
+  scheduleAutoPush();
+}
+const clearBtnStandalone = $('clear-all-btn');
+if (clearBtnStandalone) clearBtnStandalone.onclick = handleClearAll;
+const clearBtnIframe = $('clear-all-btn-iframe');
+if (clearBtnIframe) clearBtnIframe.onclick = handleClearAll;
 
 /* ---------- 数量字段统一约束：长度 ≤ 999、不允许负号字符 ---------- */
 function bindNumGuard(id) {
@@ -1175,6 +1286,6 @@ openDB().then(async () => {
   }
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v3</div>
+<div class="ver">v23</div>
 </body>
 </html>
