@@ -133,6 +133,7 @@ const TOOLS = [
   { name: '收支规划局', file: 'budget.html', icon: '💰', desc: '每天的开支预算与实际' },
   { name: '时光自撰集', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
   { name: '清居置物箱', file: 'storage.html', icon: '🧺', desc: '室内物品整理归纳' },
+  { name: '账本透视', file: 'ledger.html', icon: '📊', desc: '历史账单导入与分析' },
 ];
 
 const tools = document.getElementById('tools');
@@ -144,7 +145,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 19, 'weight.html': 31, 'budget.html': 16, 'storage.html': 23 };
+const TOOLS_VER = { 'time.html': 19, 'weight.html': 31, 'budget.html': 16, 'storage.html': 23, 'ledger.html': 12 };
 
 TOOLS.forEach((t, i) => {
   const c = document.createElement('div');
