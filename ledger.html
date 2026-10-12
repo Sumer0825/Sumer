@@ -80,7 +80,6 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .in-frame header { padding: 12px 22px 4px; }
   .in-frame header h1 { display: none; }
   .in-frame header .store-line { display: none; }
-  .in-frame .data-toolbar { display: none; }
   .in-frame .sync-bar { font-size: 12px; gap: 8px; }
   .in-frame html, .in-frame body { overflow-x: clip; }
 
@@ -279,6 +278,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 
   <div class="data-toolbar">
     <span class="lbl">本机数据：</span>
+    <button class="btn-line" id="export-xls-btn" title="导出为 Excel，可与记账 App 原始文件核对">📊 导出 Excel</button>
     <button class="btn-line" id="export-json-btn">📤 导出 JSON</button>
     <button class="btn-line btn-danger-ghost" id="reimport-btn">🔄 重新导入（覆盖）</button>
     <button class="btn-line btn-danger-ghost" id="clear-all-btn" title="清空本机全部账单，回到空状态">🧹 清空本机数据</button>
@@ -534,6 +534,27 @@ async function handleClearAll() {
 }
 $('clear-all-btn').onclick = handleClearAll;
 $('clear-all-btn-iframe').onclick = handleClearAll;
+
+/* ---------- 导出 Excel（可直接与记账 App 原始文件核对） ---------- */
+$('export-xls-btn').onclick = () => {
+  if (!RECORDS.length) { alert('本机还没有账单数据'); return; }
+  const header = ['交易类型', '日期', '分类', '子分类', '金额', '备注', '账户'];
+  const body = RECORDS.map(r => [
+    r.type === 'in' ? '收入' : '支出',
+    r.date,
+    r.category || '',
+    r.subcategory || '',
+    r.type === 'in' ? r.amount : -Math.abs(r.amount),
+    r.note || '',
+    r.account || ''
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+  ws['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 34 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '账单明细');
+  XLSX.writeFile(wb, `账本透视-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  alert(`已导出 ${RECORDS.length} 条账单`);
+};
 
 /* ---------- 导入 / 导出 JSON ---------- */
 $('export-json-btn').onclick = () => {
@@ -1023,6 +1044,6 @@ openDB().then(async () => {
   refreshSyncUI();
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v12</div>
+<div class="ver">v14</div>
 </body>
 </html>
