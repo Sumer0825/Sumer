@@ -307,7 +307,7 @@ html.in-frame .month-picker { top: 4px; }
       <span>日预算</span><b id="t-budget">--</b><span class="unit">元</span>
     </div>
     <div class="today-input">
-      <input type="date" id="t-datepick" class="datepick" title="选择日期（仅本月至今日）">
+      <input type="date" id="t-datepick" class="datepick" title="选择日期">
       <input type="number" id="t-input" step="0.01" min="0" inputmode="decimal" placeholder="多少元？">
       <button type="button" class="btn-primary" id="t-save">记一笔</button>
     </div>
@@ -405,6 +405,20 @@ const pad = n => String(n).padStart(2, '0');
 function ymd(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function todayStr() { return ymd(new Date()); }                       // 每次实时取，不缓存
 function curMonth() { return todayStr().slice(0, 7); }                // 'YYYY-MM'
+// ===== 补录窗口 =====
+// 次月 1~7 号仍可补录「上个月」的数据（与「8 号冻结日预算」同一节奏）；
+// 次月 8 号起上个月自动结清，只剩当月与未来月可编辑。
+function inBackfillWindow() { return new Date().getDate() < 8; }     // 今天是 1~7 号 → 补录窗口开启
+function monthKeyOffset(month, n) {                                  // 月份偏移，n=-1 表示上个月
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+function prevMonthKey() { return monthKeyOffset(curMonth(), -1); }
+// 正在补录的那个月（仅当月 1~7 号时，上个月处于未结清状态）
+function isBackfillMonth(m) { return inBackfillWindow() && m === prevMonthKey(); }
+// 最早可编辑的月份：默认当月；补录窗口内额外放开上个月
+function earliestEditableMonth() { return inBackfillWindow() ? prevMonthKey() : curMonth(); }
 function parseYmd(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
 function addDays(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
 function dayDiff(a, b) { return Math.round((parseYmd(b) - parseYmd(a)) / 864e5); }
@@ -516,7 +530,8 @@ function monthActualSoFar(month, d) {
   }
   return { sum, filled, past };
 }
-const canEditMonth = m => m >= curMonth();
+// 可编辑月份：当月及未来；补录窗口内（当月 1~7 号）额外允许上个月，直到次月 8 号自动结清
+const canEditMonth = m => m >= earliestEditableMonth();
 // 8 号起冻结本月日预算（金额阈定）：当月 day >= 8 时不可改；月初 1~7 日可改；下月 1 号自动解锁
 function budgetLockedThisMonth() {
   return curMonth() === VIEW && new Date().getDate() >= 8;
@@ -763,7 +778,7 @@ function renderPicker() {
   const [y, m] = VIEW.split('-').map(Number);
   const editable = canEditMonth(VIEW);
   $('mp-title').innerHTML = `${monthLabel(VIEW)}${editable
-    ? (VIEW === curMonth() ? '' : '<small>可规划</small>')
+    ? (isBackfillMonth(VIEW) ? '<small>补录中</small>' : (VIEW === curMonth() ? '' : '<small>可规划</small>'))
     : '<small class="lock">🔒 已结清</small>'}`;
   // 范围：过去 24 个月 ~ 未来 12 个月
   const now = curMonth();
@@ -836,11 +851,17 @@ function renderToday() {
   $('t-budget').textContent = daily == null ? '--' : money(daily);
   const rec = DATA.actuals.find(a => a.date === today);
 
-  // 日期选择：默认今天；约束在 [本月1号, 今天]；保存后保持在上一次操作的日期
+  // 日期选择：默认今天；约束在 [最早可编辑月1号, 今天]；保存后保持在上一次操作的日期
   const dp = $('t-datepick');
-  dp.min = curMonth() + '-01';
+  const minDate = earliestEditableMonth() + '-01';
+  dp.min = minDate;
   dp.max = today;
-  if (document.activeElement !== dp) dp.value = (lastPick && lastPick <= today) ? lastPick : today;
+  dp.title = inBackfillWindow() ? '选择日期（补录窗口内可回填上个月）' : '选择日期（仅本月至今日）';
+  if (document.activeElement !== dp) {
+    let v = (lastPick && lastPick <= today) ? lastPick : today;
+    if (v < minDate) v = today;
+    dp.value = v;
+  }
   const picked = dp.value;
   // 当用户改日期时，输入框里同步显示该日的实际（如有），方便修改历史日
   dp.onchange = () => {
@@ -911,12 +932,14 @@ function renderSummary() {
   if (hasB) parts.push('总预算 = 每日预算 × 当月天数');
   if (filled) parts.push(`已填 ${filled}/${past} 天，未填日期不计入实际`);
   else if (past) parts.push(`已填 0/${past} 天，未填日期不计入实际`);
-  if (isCur) parts.push('跨月后该月自动冻结，不可再改');
+  if (isCur) parts.push(inBackfillWindow() ? '上月可补录至本月 7 号，8 号自动结清' : '跨月后该月自动冻结，不可再改');
+  if (isBackfillMonth(VIEW)) parts.push(`⏰ 补录窗口：${monthLabel(VIEW)}可修改至本月 7 号`);
   $('sum-note').textContent = parts.join(' · ');
 
-  // 按钮可用性
-  $('clear-btn').disabled = !isCur;
-  $('clear-btn').title = isCur ? '清空本月记录（需密码）' : '该月已结清，不可修改';
+  // 按钮可用性（补录窗口内上月也可整月清空）
+  const canClear = isCur || isBackfillMonth(VIEW);
+  $('clear-btn').disabled = !canClear;
+  $('clear-btn').title = canClear ? `清空${isCur ? '本月' : monthLabel(VIEW)}记录（需密码）` : '该月已结清，不可修改';
 }
 
 function renderBudgetSetting() {
@@ -938,6 +961,8 @@ function renderBudgetSetting() {
     ? `本月 ${VIEW}-01 ~ ${addDays(segs[0].effective_from, -1).slice(5)} 补录的日期按首段 ¥${money(segs[0].daily)}/天 计。` : '';
   if (!monthEditable) {
     hint.innerHTML = `🔒 ${monthLabel(VIEW)}已结清，预算与记录均不可修改。`;
+  } else if (isBackfillMonth(VIEW)) {
+    hint.innerHTML = `⏰ <b>补录窗口</b>：${monthLabel(VIEW)}尚未结清，本月 1~7 号仍可补录与修改，<b>本月 8 号起自动结清</b>。<br>${segs.length ? `当前日预算：¥${money(val)}/天。` : '该月尚未设置日预算。'}${segs.length > 1 ? `<br>该月预算调整过 ${segs.length - 1} 次，统计按各段实际天数分别累加。` : ''}${retroNote ? '<br>' + retroNote : ''}`;
   } else if (frozenThisMonth && !budgetUnlocked) {
     hint.innerHTML = `🔒 本月已过 8 号，日预算已锁定（每月仅 1~7 号可改，或点「🔓 输密码解锁」临时修改）。<br>当前：¥${money(val)}/天，已生效。${retroNote ? '<br>' + retroNote : ''}`;
   } else if (frozenThisMonth && budgetUnlocked) {
@@ -962,6 +987,7 @@ function renderBudgetSetting() {
 function renderHistory() {
   const box = $('history');
   const today = todayStr();
+  const monthEditable = canEditMonth(VIEW);   // 补录窗口内上月也可增删
   const isCur = VIEW === curMonth();
   const monthDays = daysInMonth(VIEW);
   const monthActuals = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW);
@@ -985,7 +1011,7 @@ function renderHistory() {
       <td class="num"><span class="${over ? 'amt-over' : 'amt-ok'}">${money(a.amount)}</span></td>
       <td class="num note">${dl == null ? '--' : money(dl)}</td>
       <td class="note">${a.note || ''}</td>
-      <td style="text-align:right">${isCur
+      <td style="text-align:right">${monthEditable
         ? `<button class="del" data-date="${a.date}">删除</button>`
         : `<button class="del" disabled title="该月已结清，不可修改">删除</button>`}</td>
     </tr>`;
@@ -1090,10 +1116,10 @@ $('t-save').onclick = async () => {
   if (raw === '') { toast('请先填写金额'); $('t-input').focus(); return; }
   const v = parseFloat(raw);
   if (isNaN(v) || v < 0) { toast('请输入有效的金额'); return; }
-  // 日期校验：只能选 [本月1号, 今天]
+  // 日期校验：只能选 [最早可编辑月1号, 今天]（补录窗口内含上个月）
   const dp = $('t-datepick').value;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dp)) { toast('日期格式错误'); return; }
-  if (dp < curMonth() + '-01') { toast('只能补录本月数据'); return; }
+  if (dp < earliestEditableMonth() + '-01') { toast(inBackfillWindow() ? '最早只能补录上个月的数据' : '只能补录本月数据'); return; }
   if (dp > today) { toast('不能录入未来日期'); return; }
   const rec = DATA.actuals.find(a => a.date === dp);
   upsertActual(dp, Math.round(v * 100) / 100, rec ? rec.note : '');
@@ -1135,7 +1161,7 @@ $('b-save').onclick = async () => {
 };
 
 $('clear-btn').onclick = async () => {
-  if (VIEW !== curMonth()) { toast('该月已结清，不可修改'); return; }
+  if (!isCur && !isBackfillMonth(VIEW)) { toast('该月已结清，不可修改'); return; }
   const list = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW);
   if (!list.length && !DATA.budgets.some(b => b.month === VIEW)) { toast('本月没有记录可清空'); return; }
   const ok = await askPassword(`将清空 <b>${monthLabel(VIEW)}</b> 的 <b>${list.length}</b> 条记录与预算设置，<br>此操作不可恢复。请输入密码继续`);
@@ -1311,6 +1337,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v16</div>
+<div class="ver">v17</div>
 </body>
 </html>
