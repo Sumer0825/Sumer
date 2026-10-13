@@ -134,6 +134,7 @@ const TOOLS = [
   { name: '时光自撰集', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
   { name: '清居置物箱', file: 'storage.html', icon: '🧺', desc: '室内物品整理归纳' },
   { name: '账本透视', file: 'ledger.html', icon: '📊', desc: '历史账单导入与分析' },
+  { name: '年度总账', file: 'annual.html', icon: '📅', desc: '一年里的钱、身体与经历' },
 ];
 
 const tools = document.getElementById('tools');
@@ -145,7 +146,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 19, 'weight.html': 31, 'budget.html': 17, 'storage.html': 23, 'ledger.html': 14 };
+const TOOLS_VER = { 'time.html': 20, 'weight.html': 31, 'budget.html': 17, 'storage.html': 25, 'ledger.html': 16, 'annual.html': 1 };
 
 TOOLS.forEach((t, i) => {
   const c = document.createElement('div');

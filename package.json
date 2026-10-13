@@ -1,0 +1,10 @@
+{
+  "name": "planet612-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Planet 612 工具箱 + 下载页",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

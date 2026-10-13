@@ -67,6 +67,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .sync-card .field input:focus { border-color: var(--brand); background: #fff; }
   .sync-card .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
   .tip { font-size: 12.5px; color: #5c544a; margin-top: 8px; line-height: 1.6; }
+  /* 加密状态条 */
   code { background: #f1f3f8; padding: 1px 6px; border-radius: 6px; font-size: 12px; color: var(--ink); }
   .btn-primary { background: var(--brand); color: #fff; border: 1px solid var(--brand); padding: 8px 18px; border-radius: 9px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: 500; }
   .btn-primary:hover { background: #6a5bb0; border-color: #6a5bb0; }
@@ -201,9 +202,9 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     <!-- 导入区 -->
     <div class="card">
       <div class="upzone" id="upzone">
-        <div class="ph"><b>点击或拖拽</b> 上传记账 Excel（.xlsx / .xls / .csv）<br><span style="font-size:12px">自动识别「交易类型 / 日期 / 分类 / 子分类 / 金额 / 备注」等表头，支持「支出 / 收入」多个 Sheet 自动合并</span></div>
+        <div class="ph"><b>点击或拖拽</b> 上传记账 Excel（.xlsx / .xls / .csv）或账本备份（.json）<br><span style="font-size:12px">自动识别「交易类型 / 日期 / 分类 / 子分类 / 金额 / 备注」等表头，支持「支出 / 收入」多个 Sheet 自动合并；.json 备份可一键完整恢复</span></div>
       </div>
-      <input type="file" id="xls-input" accept=".xlsx,.xls,.csv" hidden>
+      <input type="file" id="xls-input" accept=".xlsx,.xls,.csv,.json" hidden>
       <div class="import-meta" id="import-meta" style="display:none"></div>
     </div>
 
@@ -358,14 +359,19 @@ function ghPrefill() {
   $('gh-path').value = GH.path || 'data/ledger.json';
 }
 function refreshSyncUI() {
-  $('store-mode').innerHTML = ghReady()
-    ? '存储：<b>本机浏览器（IndexedDB）</b> · 已配置 GitHub 同步（拉到本地后断网也可用）'
-    : '存储：<b>本机浏览器（IndexedDB）</b>';
+  // ghConnected：配置存在 ≠ 真连上了。探测失败时不能谎报"已连接"。
+  const configured = ghReady();
+  const online = configured && ghConnected !== false;
+  $('store-mode').innerHTML = online
+    ? '存储：<b>本机浏览器（IndexedDB）</b> · 已连接 GitHub 同步（拉到本地后断网也可用）'
+    : (configured
+      ? '存储：<b>本机浏览器（IndexedDB）</b> · 已配置 GitHub，但<b>连接失败</b>（见下方提示）'
+      : '存储：<b>本机浏览器（IndexedDB）</b>');
   const st = $('sync-status');
-  st.textContent = ghReady() ? '已连接 GitHub' : '未连接 GitHub';
-  st.className = 'sync-status' + (ghReady() ? ' ok' : '');
-  $('sync-now-btn').style.display = ghReady() ? '' : 'none';
-  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
+  st.textContent = online ? '已连接 GitHub' : (configured ? 'GitHub 连接失败' : '未连接 GitHub');
+  st.className = 'sync-status' + (online ? ' ok' : (configured ? ' err' : ''));
+  $('sync-now-btn').style.display = configured ? '' : 'none';
+  $('gh-disconnect').style.display = configured ? '' : 'none';
 }
 function setSyncMsg(msg, cls) {
   const el = $('gh-msg');
@@ -378,15 +384,20 @@ function setSyncMsg(msg, cls) {
     setTimeout(() => { if (ghReady()) refreshSyncUI(); else { st.textContent = '未连接 GitHub'; st.className = 'sync-status'; } }, 5000);
   }
 }
+// GitHub 实际连通性（配置存在 ≠ 连上了；探测失败时置 false，避免谎报"已连接"）
+let ghConnected = null;   // null=未探测  true=正常  false=探测失败
 let autoPushTimer = null;
 function scheduleAutoPush() {
   if (!ghReady()) return;
+  // 安全阀：本机没有记录时绝不自动推送，避免空快照覆盖云端已有数据
+  if (!RECORDS.length) return;
   if (autoPushTimer) clearTimeout(autoPushTimer);
   autoPushTimer = setTimeout(async () => {
     autoPushTimer = null;
     try {
       if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
       const snap = exportSnapshot();
+      if (!snap.records.length) return;
       await ghPutFile(JSON.stringify(snap, null, 2), '更新账本透视 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
       localStorage.setItem(GH_KEY, JSON.stringify(GH));
       setSyncMsg(`✓ 已自动同步到仓库：${snap.records.length} 条记录 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
@@ -410,6 +421,7 @@ async function ghGetFile() {
   try { txt = decodeURIComponent(escape(atob((j.content || '').replace(/\n/g, '')))); } catch (_) { txt = ''; }
   return { sha: j.sha, text: txt };
 }
+
 async function ghPutFile(content, msg) {
   const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
   const body = { message: msg || ('更新账本透视 ' + new Date().toISOString().slice(0, 10)), content: btoa(unescape(encodeURIComponent(content))), branch: GH.branch };
@@ -441,6 +453,7 @@ $('gh-connect').onclick = async () => {
   setSyncMsg('连接中…');
   try {
     const f = await ghGetFile();
+    ghConnected = true;
     if (!f) {
       GH.sha = null;
       setSyncMsg(`✓ 已保存配置。仓库里还没有 ${GH.path}，首次保存时自动创建。`, 'ok');
@@ -452,14 +465,29 @@ $('gh-connect').onclick = async () => {
       if (ok) { await loadFromSnapshot(data, true); setSyncMsg(`✓ 已保存配置 + 从仓库拉取：${n} 条记录`, 'ok'); }
       else { setSyncMsg(`✓ 已保存配置，保留本机数据。下次改动时会自动推到仓库。`, 'ok'); }
     }
-  } catch (e) { setSyncMsg('已保存配置，但连接检查失败：' + e.message, 'err'); }
+  } catch (e) {
+    ghConnected = false;
+    setSyncMsg('已保存配置，但连接检查失败：' + e.message, 'err');
+  }
 };
 $('sync-now-btn').onclick = async () => {
   if (!ghReady()) { setSyncMsg('请先填写并保存 Token', 'err'); return; }
+  // 安全阀：本机为空时默认拒绝推送，必须二次明确确认
+  if (!RECORDS.length) {
+    const okPush = confirm(
+      '⚠️ 本机当前没有账单数据。\n\n' +
+      '若继续，仓库里的 data/ledger.json 会被覆盖成空文件，云端已有数据将丢失。\n\n' +
+      '推荐操作：点「取消」，然后用「🔄 重新导入」导入 Excel，或填好 Token 后从云端拉取。\n\n' +
+      '只有在你确信云端数据不需要保留时，才点「确定」继续。'
+    );
+    if (!okPush) { setSyncMsg('已取消，未改动云端数据', ''); return; }
+  }
   setSyncMsg('正在推到仓库…');
   try {
     if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
     const snap = exportSnapshot();
+    // 最后一道保险：绝不上传空快照
+    if (!snap.records.length) { setSyncMsg('⚠️ 本机无数据，已跳过推送，云端未改动', 'err'); return; }
     await ghPutFile(JSON.stringify(snap, null, 2), '更新账本透视 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
     localStorage.setItem(GH_KEY, JSON.stringify(GH));
     setSyncMsg(`✓ 已推到仓库：${snap.records.length} 条记录 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
@@ -468,6 +496,7 @@ $('sync-now-btn').onclick = async () => {
 $('gh-disconnect').onclick = async () => {
   if (!confirm('确定断开 GitHub 链接？\n\n将清空：本机 Token、本机 IndexedDB 缓存的全部账单\n不会动：仓库里已写入的 data/ledger.json\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
   localStorage.removeItem(GH_KEY);
+  ghConnected = null;
   GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/ledger.json', sha: null };
   await kvDel(); RECORDS = []; OPENING = 0;
   $('sync-card').style.display = 'none';
@@ -526,11 +555,20 @@ function askChoice(title, tip) {
 }
 async function handleClearAll() {
   if (RECORDS.length === 0) { alert('本机已经没有数据了，无需清空。'); return; }
-  const ok = await askPassword(`确定清空本机全部账单？\n\n将删除：${RECORDS.length} 条记录\n不会动：仓库里已写入的 data/ledger.json（已配置 Token 时会自动推一份空快照上去）\n\n清空后将回到空状态，该操作不可撤销。请输入密码继续`, '🔒 清空确认');
+  const ok = await askPassword(
+    `确定清空本机全部账单？\n\n` +
+    `将删除：本机 ${RECORDS.length} 条记录\n` +
+    `不会动：仓库里已写入的 data/ledger.json（云端数据完全保留）\n\n` +
+    `清空后本机回到空状态，该操作不可撤销。\n` +
+    `建议先点「📊 导出 Excel」或「📤 导出 JSON」备份一份。\n\n` +
+    `请输入密码继续`, '🔒 清空确认'
+  );
   if (!ok) return;
   await kvDel(); RECORDS = []; OPENING = 0;
   $('f-opening').value = 0;
-  renderAll(); setSyncMsg('✓ 本机数据已清空', 'ok'); scheduleAutoPush();
+  // 清空本机数据不动云端：刻意不调用 scheduleAutoPush()，避免空快照覆盖仓库
+  renderAll();
+  setSyncMsg('✓ 本机数据已清空（云端 data/ledger.json 未改动）', 'ok');
 }
 $('clear-all-btn').onclick = handleClearAll;
 $('clear-all-btn-iframe').onclick = handleClearAll;
@@ -593,12 +631,23 @@ function normDate(v) {
     }
   }
   const s = s0.replace(/\//g, '-').replace(/年/g, '-').replace(/月/g, '-').replace(/日/g, '').replace(/\s/g, '');
+  // 组装成 y-m-d 后统一做日历合法性校验（拒绝 2026-13-01 / 2026-02-30 这类不存在的日期）
+  const build = (y, mo, d) => {
+    const yy = +y, mm = +mo, dd = +d;
+    if (!(yy >= 1900 && yy <= 2999)) return null;      // 年份合理区间
+    if (!(mm >= 1 && mm <= 12)) return null;           // 月份 1-12
+    if (!(dd >= 1 && dd <= 31)) return null;           // 日 1-31
+    // 用 UTC Date 反查，2月30日会被自动进位成3月 → 判定非法
+    const dt = new Date(Date.UTC(yy, mm - 1, dd));
+    if (dt.getUTCFullYear() !== yy || dt.getUTCMonth() !== mm - 1 || dt.getUTCDate() !== dd) return null;
+    return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  };
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  if (m) return build(m[1], m[2], m[3]);
   m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
-  if (m) return `${m[3]}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
+  if (m) return build(m[3], m[1], m[2]);
   m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (m) return build(m[1], m[2], m[3]);
   return null;
 }
 // 解析金额：先剥离千分位逗号、货币符号、空格；支持括号负数 (123.00)
@@ -693,6 +742,10 @@ function parseRecords(rows, sheetHint) {
   return { records: out, skipped, isBillSheet: true };
 }
 async function importExcelFile(file) {
+  // JSON 备份（账本透视导出的 .json）走单独解析，不当 Excel 读
+  if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+    return importJsonBackup(file);
+  }
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true, codepage: 65001 });
@@ -744,6 +797,67 @@ async function importExcelFile(file) {
     await persist();
     renderAll();
     setImportMeta(finalRecords.length, totalSkipped, merged ? 0 : sheetsUsed, dupCount, '');
+    scheduleAutoPush();
+  } catch (err) {
+    console.error(err);
+    setImportMeta(0, 0, 0, 0, '读取失败：' + (err && err.message ? err.message : err));
+  }
+}
+/* ---------- 导入 JSON 备份（账本透视自己导出的 .json，可完整恢复） ---------- */
+async function importJsonBackup(file) {
+  try {
+    const text = await file.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch (e) { return setImportMeta(0, 0, 0, 0, 'JSON 解析失败：文件不是有效的 JSON'); }
+
+    // 兼容两种结构：{records:[...]} 快照，或直接是数组
+    const raw = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : null);
+    if (!raw) return setImportMeta(0, 0, 0, 0, 'JSON 里没有找到账单记录（期望 {records:[...]} 或数组）');
+
+    // 逐条规范化 + 校验，与 Excel 导入保持同一套字段
+    const out = [];
+    let skipped = 0;
+    for (const r of raw) {
+      if (!r || typeof r !== 'object') { skipped++; continue; }
+      const date = normDate(r.date);
+      const amount = parseAmount(r.amount);
+      if (!date || isNaN(amount)) { skipped++; continue; }
+      let type = r.type === 'in' || r.type === 'income' || r.type === '收入' ? 'in'
+               : r.type === 'out' || r.type === 'expense' || r.type === '支出' ? 'out'
+               : (amount < 0 ? 'in' : 'out');   // 无 type 时按金额正负推断
+      let amt = Math.abs(amount);
+      out.push({
+        id: r.id || uid(),
+        date, type, amount: Math.round(amt * 100) / 100,
+        category: String(r.category ?? '').trim(),
+        subcategory: String(r.subcategory ?? '').trim(),
+        note: String(r.note ?? '').trim(),
+        account: String(r.account ?? '').trim()
+      });
+    }
+    if (!out.length) return setImportMeta(0, skipped, 0, 0, 'JSON 中没有有效记录（每条都需要有效的 date 和 amount）');
+
+    // 本机已有数据时，同样询问合并 / 覆盖
+    let finalRecords, merged = false, dupCount = 0;
+    if (RECORDS.length > 0) {
+      const choice = await askChoice('导入方式确认',
+        `本机已有 ${RECORDS.length} 条记录，JSON 备份含 ${out.length} 条。\n\n• 合并追加：两份数据叠加（自动跳过重复）\n• 覆盖替换：仅保留备份里的数据`);
+      if (choice === 'cancel') return;
+      if (choice === 'merge') {
+        const existing = new Set(RECORDS.map(dupKey));
+        const fresh = out.filter(r => !existing.has(dupKey(r)));
+        dupCount = out.length - fresh.length;
+        finalRecords = RECORDS.concat(fresh); merged = true;
+      } else { finalRecords = out; OPENING = parseFloat($('f-opening').value) || 0; }
+    } else {
+      finalRecords = out; OPENING = parseFloat($('f-opening').value) || 0;
+    }
+    RECORDS = finalRecords;
+    ['f-year', 'f-month', 'f-type', 'f-cat'].forEach(id => { $(id).value = ''; });
+    await persist();
+    renderAll();
+    setImportMeta(finalRecords.length, skipped, 0, dupCount, '');
     scheduleAutoPush();
   } catch (err) {
     console.error(err);
@@ -1032,18 +1146,32 @@ openDB().then(async () => {
   if (ghReady()) {
     try {
       const f = await ghGetFile();
+      ghConnected = true;
       if (f) {
         GH.sha = f.sha;
         const data = JSON.parse(f.text || '{}');
         const cloud = (data.records?.length) || 0;
         if (cloud > RECORDS.length) { await loadFromSnapshot(data, true); setSyncMsg(`✓ 启动时从仓库拉取：${cloud} 条记录`, 'ok'); }
+        else if (cloud === 0 && RECORDS.length > 0) setSyncMsg(`⚠️ 云端仓库为空（0 条），本机有 ${RECORDS.length} 条。若要备份到云端请点「立即同步」。`, 'err');
         else setSyncMsg(`已连接 GitHub（云端 ${cloud} 条，本机 ${RECORDS.length} 条）`, '');
+      } else {
+        // 仓库还没有数据文件：首次使用时属正常，仅记录不打扰
+        GH.sha = null;
       }
-    } catch (_) {}
+    } catch (e) {
+      // 静默失败会让「Token 失效 / 仓库不存在 / 网络异常」都表现为"已连接"，必须明确告知
+      console.warn('GitHub 启动同步失败：', e);
+      GH.sha = null;
+      const hint = (e && e.message === 'GitHub API 401')
+        ? 'Token 无效或已过期，请在同步设置里重新填入有效的 Personal Access Token'
+        : `连接 GitHub 失败：${(e && e.message) || e}。本机数据不受影响，可检查 Token / 仓库名 / 网络后重试`;
+      setSyncMsg('⚠️ ' + hint, 'err');
+      ghConnected = false;
+    }
   }
   refreshSyncUI();
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v14</div>
+<div class="ver">v16</div>
 </body>
 </html>

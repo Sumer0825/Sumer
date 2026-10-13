@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sumer 部署包下载</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+       background:linear-gradient(160deg,#f5f4f8,#ece9f6);color:#2c2a36;padding:24px}
+  .card{background:#fff;border:1px solid #e6e3f0;border-radius:16px;padding:38px 42px;
+        max-width:520px;width:100%;box-shadow:0 12px 40px rgba(80,66,140,.10)}
+  h1{font-size:21px;margin:0 0 4px}
+  .sub{color:#8b8496;font-size:13px;margin-bottom:24px}
+  .pkg{background:#faf9fd;border:1px solid #e6e3f0;border-radius:11px;padding:18px 20px;margin-bottom:22px}
+  .pkg .nm{font-weight:700;font-size:16px;margin-bottom:6px}
+  .pkg .meta{color:#8b8496;font-size:12.5px}
+  .btn{display:block;width:100%;text-align:center;border:0;border-radius:11px;padding:15px 20px;
+       font-size:16px;font-weight:700;cursor:pointer;color:#fff;
+       background:#7c6cc4;transition:.15s;text-decoration:none}
+  .btn:hover{background:#6a5ab2;transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .note{margin-top:20px;background:#fff8ec;border:1px solid #f2e0c4;border-left:4px solid #e0a04c;
+        border-radius:8px;padding:13px 16px;font-size:13px;color:#6a5a3a}
+  .note b{color:#8a6420}
+  .note ol{margin:7px 0 0;padding-left:19px}
+  .note li{margin:4px 0}
+  .tip{margin-top:14px;font-size:12px;color:#a09aae;text-align:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Sumer 页面部署包</h1>
+  <div class="sub">GitHub Pages 整包覆盖上传用</div>
+
+  <div class="pkg">
+    <div class="nm">sumer-pages-v39.zip</div>
+    <div class="meta">27 个文件 · 1160 KB · 🆕 第 6 个工具「年度总账」· 账本透视修 Token 失效谎报「已连接」</div>
+  </div>
+
+  <a class="btn" href="/dl" download="sumer-pages-v39.zip">⬇ 下载 sumer-pages-v39.zip</a>
+
+  <div class="note">
+    <b>下载后：</b>
+    <ol>
+      <li>解压得到 27 个文件（<b>没有</b> md 说明文件）</li>
+      <li>把解压出的文件<b>全量覆盖</b>上传到 GitHub 仓库根目录（<code>main</code> 分支）</li>
+      <li>等 GitHub Pages 构建完成（约 1 分钟）</li>
+      <li>浏览器 <b>Ctrl+Shift+R</b> 强制刷新</li>
+    </ol>
+  </div>
+
+  <div class="tip">务必确认 sw.js 一起上传（缓存版本 p612-v39），否则页面看起来"没变化"</div>
+</div>
+</body>
+</html>

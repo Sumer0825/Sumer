@@ -334,7 +334,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     <div class="actions">
       <button type="button" class="btn-primary" id="gh-connect">保存并连接</button>
       <button type="button" class="btn-line btn-danger-ghost" id="gh-disconnect" style="display:none">断开链接并清空 Token</button>
-      <button type="button" class="btn-line btn-danger-ghost" id="clear-all-btn-iframe" title="清空本机全部收纳数据，回到空状态（GitHub 仓库里的文件不动）">🧹 清空本机数据</button>
+      <button type="button" class="btn-line btn-danger-ghost" id="clear-all-btn-iframe" title="清空本机全部收纳数据，回到空状态（云端仓库文件完全不动）">🧹 清空本机数据</button>
       <button type="button" class="btn-line" id="gh-close">关闭</button>
       <span id="gh-msg" class="tip"></span>
     </div>
@@ -351,7 +351,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     <button class="btn-line" id="export-json-btn">📤 导出 JSON</button>
     <label class="btn-line" for="import-json-input" style="cursor:pointer">📥 导入 JSON</label>
     <input type="file" id="import-json-input" accept="application/json" hidden>
-    <button class="btn-line btn-danger-ghost" id="clear-all-btn" title="清空本机全部收纳数据，回到「新建第一个位置」空状态">🧹 清空本机数据</button>
+    <button class="btn-line btn-danger-ghost" id="clear-all-btn" title="清空本机全部收纳数据，回到「新建第一个位置」空状态（云端仓库文件完全不动）">🧹 清空本机数据</button>
     <span class="spacer"></span>
     <span class="lbl" style="font-size:11px;opacity:.7">本地浏览器 IndexedDB，与 GitHub 仓库互不干扰</span>
   </div>
@@ -527,6 +527,8 @@ function makeImageFileName(dataUrl) {
   const ext = m ? m[1].split("/")[1] : "jpg";
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 }
+
+/** 上传图片到仓库 images/ 目录（原图直传，不做加密） */
 
 /* ---------- 状态 ---------- */
 let locations = [], levels = [], items = [];
@@ -962,13 +964,9 @@ function setSyncMsg(txt, cls) {
   const el = $('sync-msg'); el.textContent = txt; el.className = 'msg' + (cls ? ' ' + cls : '');
   if (cls === 'ok' || cls === 'err') setTimeout(() => { el.textContent = ''; el.className = 'msg'; }, 4000);
 }
-function refreshSyncUI() {
-  $('store-mode').innerHTML = ghReady()
-    ? '存储：<b>本机浏览器（IndexedDB）</b> · 已配置 GitHub 同步（拉到本地后断网也可用）'
-    : '存储：<b>本机浏览器（IndexedDB）</b>';
-  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
-}
 /* ---------- 自动同步（每次改动后自动推到仓库） ---------- */
+// GitHub 实际连通性（null=未探测  true=正常  false=探测失败）
+let ghConnected = null;
 let autoPushTimer = null;
 function scheduleAutoPush() {
   if (!ghReady()) return;
@@ -979,6 +977,11 @@ function scheduleAutoPush() {
     try {
       if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
       const snapshot = await exportSnapshot();
+      // 安全阀：绝不上传空快照，避免清空本机时把云端数据覆盖为空
+      if (!snapshot.locations.length && !snapshot.levels.length && !snapshot.items.length) {
+        setSyncMsg('⚠️ 本机已无数据，已跳过自动同步，云端未改动', 'err');
+        return;
+      }
       const msg = `更新清居置物箱 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
       await ghPutFile(JSON.stringify(snapshot, null, 2), msg);
       localStorage.setItem(GH_KEY, JSON.stringify(GH));
@@ -1017,14 +1020,18 @@ async function ghPutFile(content, msg) {
 
 /* ---------- GitHub 同步交互（与 budget/weight/time 一致） ---------- */
 function refreshSyncUI() {
-  // 顶部 store-mode + 状态文字
+  // 顶部 store-mode + 状态文字（配置存在 ≠ 真连上了，探测失败不能谎报"已连接"）
+  const configured = ghReady();
+  const online = configured && ghConnected !== false;
   const mode = $('store-mode');
-  mode.textContent = ghReady() ? `GitHub JSON（${GH.owner}/${GH.repo}@${GH.branch}）` : '本机浏览器（IndexedDB）';
+  mode.textContent = online
+    ? `GitHub JSON（${GH.owner}/${GH.repo}@${GH.branch}）`
+    : (configured ? '本机浏览器（IndexedDB）· 已配置 GitHub，但连接失败' : '本机浏览器（IndexedDB）');
   const st = $('sync-status');
-  st.textContent = ghReady() ? '已连接 GitHub' : '未连接 GitHub';
-  st.className = 'sync-status' + (ghReady() ? ' ok' : '');
-  $('sync-now-btn').style.display = ghReady() ? '' : 'none';
-  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
+  st.textContent = online ? '已连接 GitHub' : (configured ? 'GitHub 连接失败' : '未连接 GitHub');
+  st.className = 'sync-status' + (online ? ' ok' : (configured ? ' err' : ''));
+  $('sync-now-btn').style.display = configured ? '' : 'none';
+  $('gh-disconnect').style.display = configured ? '' : 'none';
 }
 function setSyncMsg(msg, cls) {
   const el = $('gh-msg');
@@ -1114,6 +1121,7 @@ $('gh-connect').onclick = async () => {
   setSyncMsg('连接中…');
   try {
     const f = await ghGetFile();
+    ghConnected = true;
     if (!f) {
       GH.sha = null;
       setSyncMsg(`✓ 已保存配置。仓库里还没有 ${GH.path}，首次保存数据时自动创建。`, 'ok');
@@ -1133,17 +1141,34 @@ $('gh-connect').onclick = async () => {
       }
     }
   } catch (e) {
+    ghConnected = false;
     setSyncMsg('已保存配置，但连接检查失败：' + e.message, 'err');
+    refreshSyncUI();
   }
 };
 
 /* 「↻ 立即同步」：手动推一次当前本地快照到仓库（手动备份 / 解决自动推送失败） */
 $('sync-now-btn').onclick = async () => {
   if (!ghReady()) { setSyncMsg('请先填写并保存 Token', 'err'); return; }
+  // 安全阀：本机为空时默认拒绝推送，必须二次明确确认
+  if (!(await hasAnyData())) {
+    const okPush = confirm(
+      '⚠️ 本机当前没有收纳数据。\n\n' +
+      '若继续，仓库里的 data/storage.json 会被覆盖成空文件，云端已有数据将丢失。\n\n' +
+      '推荐操作：点「取消」，然后重新导入 JSON 恢复。\n\n' +
+      '只有在你确信云端数据不需要保留时，才点「确定」继续。'
+    );
+    if (!okPush) { setSyncMsg('已取消，未改动云端数据', ''); return; }
+  }
   setSyncMsg('正在推到仓库…');
   try {
     if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
     const snapshot = await exportSnapshot();
+    // 最后一道保险：绝不上传空快照
+    if (!snapshot.locations.length && !snapshot.levels.length && !snapshot.items.length) {
+      setSyncMsg('⚠️ 本机无数据，已跳过推送，云端未改动', 'err');
+      return;
+    }
     await ghPutFile(JSON.stringify(snapshot, null, 2), '更新清居置物箱 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
     localStorage.setItem(GH_KEY, JSON.stringify(GH));
     setSyncMsg(`✓ 已推到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
@@ -1184,6 +1209,7 @@ $('import-json-input').onchange = async (e) => {
 $('gh-disconnect').onclick = async () => {
   if (!confirm('确定断开 GitHub 链接？\n\n将清空：本机 Token、本机 IndexedDB 缓存的全部收纳数据\n不会动：仓库里已写入的 data/storage.json 与 images/ 文件夹\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
   localStorage.removeItem(GH_KEY);
+  ghConnected = null;
   GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/storage.json', sha: null };
   await clearAll();
   $('sync-card').style.display = 'none';
@@ -1200,7 +1226,12 @@ async function handleClearAll() {
     return;
   }
   const ok = await askPassword(
-    `确定清空本机全部收纳数据？\n\n将删除：${locs.length} 位置 / ${lvls.length} 层 / ${itms.length} 物品\n不会动：仓库里已写入的 data/storage.json 与 images/ 文件夹（已配置 Token 时会自动推一份空快照上去）\n\n清空后将回到「新建第一个位置」空状态，该操作不可撤销。请输入密码继续`,
+    `确定清空本机全部收纳数据？\n\n` +
+    `将删除：本机 ${locs.length} 位置 / ${lvls.length} 层 / ${itms.length} 物品\n` +
+    `不会动：仓库里已写入的 data/storage.json 与 images/ 文件夹（云端数据完全保留）\n\n` +
+    `清空后将回到「新建第一个位置」空状态，该操作不可撤销。\n` +
+    `建议先断开同步或点「导出」备份一份。\n\n` +
+    `请输入密码继续`,
     '🔒 清空确认'
   );
   if (!ok) return;
@@ -1208,9 +1239,8 @@ async function handleClearAll() {
   await load();
   // 关闭同步面板（如果在 iframe 模式下打开了）
   $('sync-card').style.display = 'none';
-  setSyncMsg('✓ 本机数据已清空，已回到「新建第一个位置」空状态', 'ok');
-  // 如果已配置 Token，自动推一份空快照上云（与本地一致）
-  scheduleAutoPush();
+  // 清空本机数据不动云端：刻意不调用 scheduleAutoPush()，避免空快照覆盖仓库
+  setSyncMsg('✓ 本机数据已清空（云端 data/storage.json 与 images/ 未改动）', 'ok');
 }
 const clearBtnStandalone = $('clear-all-btn');
 if (clearBtnStandalone) clearBtnStandalone.onclick = handleClearAll;
@@ -1246,6 +1276,12 @@ async function exportSnapshot() {
   return { version: 1, exportedAt: new Date().toISOString(), locations: locs, levels: lvls, items: itms };
 }
 
+/** 本机是否还有任何收纳数据（用于清空/推送前的安全判断） */
+async function hasAnyData() {
+  const [locs, lvls, itms] = await Promise.all([getAll('locations'), getAll('levels'), getAll('items')]);
+  return locs.length > 0 || lvls.length > 0 || itms.length > 0;
+}
+
 /* ---------- 启动 ---------- */
 // 极窄屏（≤480px）首次访问时自动收起侧栏；用户手动切换后尊重用户选择
 function applyAutoSidebar() {
@@ -1265,6 +1301,7 @@ openDB().then(async () => {
   if (ghReady()) {
     try {
       const f = await ghGetFile();
+      ghConnected = true;
       if (f) {
         GH.sha = f.sha;
         const data = JSON.parse(f.text || '{}');
@@ -1282,10 +1319,23 @@ openDB().then(async () => {
           setSyncMsg(`已连接 GitHub（云端 ${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品，本机 ${localCount} 条）`, '');
         }
       }
-    } catch (e) { /* 静默失败，不打扰 */ }
+      // 配置存在 ≠ 真连上了：成功探测后必须刷新状态栏，否则仍显示"未连接 GitHub"
+      refreshSyncUI();
+    } catch (e) {
+      // 静默失败会让 Token 失效也表现为"已连接"，必须明确告知
+      console.warn('GitHub 启动同步失败：', e);
+      GH.sha = null;
+      ghConnected = false;
+      const hint = (e && e.message === 'GitHub API 401')
+        ? 'Token 无效或已过期，请在同步设置里重新填入有效的 Personal Access Token'
+        : `连接 GitHub 失败：${(e && e.message) || e}。本机数据不受影响，可检查 Token / 仓库名 / 网络后重试`;
+      setSyncMsg('⚠️ ' + hint, 'err');
+      // 探测失败后立刻同步状态栏，避免 5 秒内仍显示"已连接"
+      refreshSyncUI();
+    }
   }
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v23</div>
+<div class="ver">v25</div>
 </body>
 </html>

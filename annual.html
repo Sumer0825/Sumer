@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>年度总账</title>
+<meta name="theme-color" content="#1a1230">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<script>
+/* 必须放在 head 第一个同步执行：提前标记被 iframe 嵌入，避免布局闪烁 */
+try { if (window.self !== window.top) document.documentElement.classList.add('in-frame'); }
+catch (e) { document.documentElement.classList.add('in-frame'); }
+</script>
+<style>
+  :root {
+    --bg: #f5f3fb;
+    --panel: #ffffff;
+    --ink: #322e3a;
+    --muted: #8b8499;
+    --line: #e7e2f0;
+    --brand: #7c6cc4;
+    --brand-soft: #efeaf8;
+    --accent: #6f9c76;
+    --danger: #d9534f;
+    --success: #2c8e60;
+    --up: #ff5d6c;
+    --down: #1f9e5c;
+    --income: #4f7cff;
+    --expense: #f0a04b;
+    --shadow: 0 10px 30px rgba(80, 60, 90, 0.10);
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.66) 100%),
+      url('assets/bg-annual.png') center / cover no-repeat;
+    color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+  header { padding: 26px 24px 4px; max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: 1px; }
+  h1 .tag { font-size: 13px; color: var(--brand); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-left: 10px; vertical-align: middle; }
+  .subtitle { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .readonly-note { font-size: 12.5px; color: #5c544a; margin: 8px 0 0; }
+  .readonly-note b { color: var(--ink); }
+
+  .bar { margin-top: 14px; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .status { font-size: 13px; color: #5c544a; }
+  .status.ok { color: #1f6e4a; }
+  .status.warn { color: var(--danger); }
+
+  .app { max-width: 1120px; margin: 0 auto; padding: 16px 24px 60px; }
+  .card { background: rgba(255,255,255,.92); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
+  .card > h2 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card > .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.6; }
+  .card > .sub .scroll-hint { margin-left: 8px; }
+
+  /* 数据覆盖条 */
+  .cover { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .pill { font-size: 12px; padding: 4px 11px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
+  .pill.off { background: #f0eef5; color: #a49db4; }
+  .pill b { font-weight: 700; }
+
+  .filters { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  select { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); min-width: 128px; }
+  .btn { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  .btn:hover { border-color: var(--brand); color: var(--brand); }
+  .btn.brand { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.brand:hover { opacity: .9; color: #fff; }
+  label.sw { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #5c544a; cursor: pointer; user-select: none; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 12px; }
+  .stat { background: #faf9fd; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; }
+  .stat .label { font-size: 12px; color: var(--muted); }
+  .stat .value { font-size: 19px; font-weight: 700; margin-top: 3px; letter-spacing: .2px; }
+  .stat .value.sm { font-size: 15px; }
+  .stat .x { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .v-in { color: var(--income); }
+  .v-out { color: var(--expense); }
+  .v-good { color: var(--success); }
+  .v-bad { color: var(--danger); }
+
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 16px; }
+  .chart-card { background: #faf9fd; border: 1px solid var(--line); border-radius: 14px; padding: 14px 15px; }
+  .chart-card h3 { font-size: 14px; margin: 0; }
+  .chart-card .sub { font-size: 12px; color: var(--muted); margin: 3px 0 8px; line-height: 1.6; }
+  @media (max-width: 620px) { .charts { grid-template-columns: 1fr; } }
+
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; }
+  .chart-scroll::-webkit-scrollbar { height: 8px; }
+  .chart-scroll::-webkit-scrollbar-thumb { background: #d8d3e4; border-radius: 4px; }
+  .chart-scroll::-webkit-scrollbar-track { background: transparent; }
+  .scroll-hint { display: none; font-size: 11px; color: var(--muted); margin-left: 8px; }
+  .scroll-hint.on { display: inline; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+
+  .sumlist { margin: 0; padding: 0; list-style: none; }
+  .sumlist li { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; align-items: baseline; }
+  .sumlist li:last-child { border-bottom: none; }
+  .sumlist .k { color: var(--muted); flex: 0 0 108px; }
+  .sumlist .v { flex: 1; }
+
+  .story { font-size: 14px; line-height: 1.9; margin: 0; }
+  .raw-hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  .raw-hint code { background: rgba(124,108,196,.12); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  .note.warn { color: #a8641f; }
+  .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 11px; color: #b6afc4; z-index: 9; }
+
+  .in-frame header { padding: 12px 22px 4px; }
+  .in-frame header h1 { display: none; }
+  .in-frame .ver { display: none; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>年度总账<span class="tag">本机只读汇总</span></h1>
+  <p class="subtitle">把这一年的钱、身体、经历、预算放在一页里复盘。</p>
+  <p class="readonly-note">本页只从<b>本机浏览器</b>读取上述四个工具已保存的数据，不联网、不填 Token、<b>不修改也不清空任何其他工具的数据</b>。清空某个工具的本机数据后，这里的结果也会随之变化。</p>
+</header>
+
+<div class="bar">
+  <span class="status ok" id="status">读取中…</span>
+  <button class="btn" id="reload-btn" type="button">↻ 重新汇总</button>
+</div>
+
+<div class="app">
+
+  <!-- 区块 A：数据覆盖条 -->
+  <div class="card" id="card-cover">
+    <h2>数据覆盖 <span class="tag" style="font-size:12px;color:var(--muted);background:none;font-weight:400">四个来源独立读取，缺哪个只影响那一块</span></h2>
+    <div class="sub" id="cover-sub">正在统计各来源…</div>
+    <div class="cover" id="cover-pills"></div>
+    <div class="filters" style="margin-top:14px">
+      <div class="field">
+        <label for="f-year">复盘年份</label>
+        <select id="f-year"></select>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <label class="sw"><input type="checkbox" id="f-norm" checked> 合并同义分类写法</label>
+      </div>
+    </div>
+    <div class="note" id="year-hint"></div>
+  </div>
+
+  <!-- 区块 B：钱 -->
+  <div class="card" id="card-money" hidden>
+    <h2>💰 钱</h2>
+    <div class="sub">来自账本透视的本机账本数据。<b>总额与净额永远按原始金额计算</b>，分类归一化只影响分类占比图，不改变任何总数。</div>
+    <div class="stats" id="money-stats"></div>
+    <div class="charts" style="margin-top:16px">
+      <div class="chart-card">
+        <h3>月度收支</h3>
+        <div class="sub">半透明柱为上一年同期<span class="scroll-hint" data-hint="1">↔ 可左右滑动</span></div>
+        <div class="chart-scroll" id="chart-dual"></div>
+        <div class="legend">
+          <span><span class="dot" style="background:#4f7cff"></span>本年收入</span>
+          <span><span class="dot" style="background:#f0a04b"></span>本年支出</span>
+          <span><span class="dot" style="background:#aebfe8"></span>上一年</span>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>支出分类占比</h3>
+        <div class="sub" id="pie-sub">按归一化后的分类汇总</div>
+        <div id="chart-cat"></div>
+      </div>
+    </div>
+    <div class="charts" style="margin-top:16px">
+      <div class="chart-card">
+        <h3>收支账户构成</h3>
+        <div class="sub">这一维度是本工具独有的视角：钱从哪个账户进出</div>
+        <div id="chart-acct"></div>
+      </div>
+      <div class="chart-card">
+        <h3>记账密度</h3>
+        <div class="sub">按周聚合的记账笔数（深色代表记得更勤）</div>
+        <div id="chart-heat"></div>
+      </div>
+    </div>
+    <ul class="sumlist" id="money-sum" style="margin-top:16px"></ul>
+  </div>
+
+  <!-- 区块 C：身体 -->
+  <div class="card" id="card-body" hidden>
+    <h2>🎯 身体</h2>
+    <div class="sub">来自轻身时光簿的本机记录，<b>统一按斤显示</b>。同日多个时段以「早」段为当日代表值。</div>
+    <div class="stats" id="body-stats"></div>
+    <div class="chart-card" style="margin-top:16px">
+      <h3>体重曲线（斤）</h3>
+      <div class="sub" id="body-sub">绿色区间为距目标 3 斤以内</div>
+      <div class="chart-scroll" id="chart-weight"></div>
+    </div>
+    <ul class="sumlist" id="body-sum" style="margin-top:14px"></ul>
+  </div>
+
+  <!-- 区块 D：经历 -->
+  <div class="card" id="card-time" hidden>
+    <h2>⏳ 经历</h2>
+    <div class="sub">来自时光自撰集。事件的时间精度有年 / 月 / 日三种，都已统一到同一条年度轴上；跨年的事件会在两个年份各出现一次。</div>
+    <div class="chart-card">
+      <h3>年度时间轴</h3>
+      <div class="sub">上：记账笔数　中：体重　下：事件<span class="scroll-hint" data-hint="1">↔ 可左右滑动</span></div>
+      <div class="chart-scroll" id="chart-timeline"></div>
+    </div>
+    <div class="charts" style="margin-top:16px">
+      <div class="chart-card">
+        <h3>事件分类分布</h3>
+        <div class="sub">按记录时选择的分类计数</div>
+        <div id="chart-timecat"></div>
+      </div>
+      <div class="chart-card">
+        <h3>本月小结</h3>
+        <div class="sub" id="time-hint">—</div>
+        <ul class="sumlist" id="time-sum"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 区块 E：预算 -->
+  <div class="card" id="card-budget" hidden>
+    <h2>🧮 预算</h2>
+    <div class="sub">来自收支规划局。<b>实际只统计填了记录的日，未填的日子按 0 计</b>（与收支规划局口径一致）。日预算按月中分段逐日累加。</div>
+    <div class="chart-card">
+      <h3>月度预算完成率</h3>
+      <div class="sub">竖虚线为 100%，超过部分以红色溢出段表示</div>
+      <div id="chart-budget"></div>
+    </div>
+    <ul class="sumlist" id="budget-sum" style="margin-top:14px"></ul>
+  </div>
+
+  <!-- 区块 F：一句话总结 -->
+  <div class="card" id="card-story" hidden>
+    <h2>📌 这一年</h2>
+    <div class="sub">由本页从本机数据自动生成</div>
+    <p class="story" id="story"></p>
+  </div>
+
+</div>
+
+<div class="ver">v1</div>
+<script>
+/* =====================================================================
+ * 年度总账 · 本机只读汇总页
+ * ---------------------------------------------------------------------
+ * 硬约束：本页只允许 localStorage.getItem 与 IndexedDB readonly 事务。
+ * 唯一允许写入的键是 annual_cfg_v1（归一化开关 + 记住的年份），
+ * 且写入必须经 cfgSet() —— 它是唯一能打开写入哨兵白名单的地方。
+ * ===================================================================== */
+
+/* ---------- 写入哨兵：把「只读」从约定变成机制 ---------- */
+/* 白名单：cfgSet() 内部会置 LS_SENTINEL.allow。
+ * __annualTestPermit 仅供自动化测试在「页面加载前」注入种子数据时使用 ——
+ * 本页自身代码从不设置它，生产环境下恒为 undefined，等于不放行任何东西。 */
+const LS_SENTINEL = { allow: 0 };
+function guardStorage() {
+  const verb = (proto, name) => {
+    const orig = proto[name];
+    if (typeof orig !== 'function' || orig.__annualGuard) return;
+    const wrapped = function (...args) {
+      if (!LS_SENTINEL.allow && !window.__annualTestPermit) {
+        console.error('[年度总账] 违规写入已被拦截：' + name + ' → ' + args[0]);
+        return;
+      }
+      return orig.apply(this, args);
+    };
+    wrapped.__annualGuard = true;
+    proto[name] = wrapped;
+  };
+  [Storage.prototype, IDBObjectStore.prototype, IDBTransaction.prototype].forEach(p => {
+    ['setItem', 'removeItem', 'clear', 'put', 'add', 'delete'].forEach(n => verb(p, n));
+  });
+}
+function guardIndexedDB() {
+  const orig = IDBDatabase.prototype.transaction;
+  if (typeof orig !== 'function' || orig.__annualGuard) return;
+  const wrapped = function (names, mode, ...rest) {
+    if ((mode && mode !== 'readonly') && !LS_SENTINEL.allow && !window.__annualTestPermit) {
+      console.error('[年度总账] 违规写入已被拦截：transaction(' + mode + ')');
+      return null;
+    }
+    return orig.call(this, names, mode, ...rest);
+  };
+  wrapped.__annualGuard = true;
+  IDBDatabase.prototype.transaction = wrapped;
+}
+guardStorage();
+guardIndexedDB();
+
+/* ---------- 本工具唯一可写的键 ---------- */
+const CFG_KEY = 'annual_cfg_v1';
+function cfgGet(k, dflt) {
+  try {
+    const s = localStorage.getItem(CFG_KEY);
+    if (s == null) return dflt;
+    const o = JSON.parse(s);
+    return o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : dflt;
+  } catch (e) { return dflt; }
+}
+function cfgSet(k, v) {
+  let cur = {};
+  try { cur = JSON.parse(localStorage.getItem(CFG_KEY) || '{}') || {}; } catch (e) { cur = {}; }
+  cur[k] = v;
+  LS_SENTINEL.allow++;
+  try { localStorage.setItem(CFG_KEY, JSON.stringify(cur)); }
+  finally { LS_SENTINEL.allow--; }
+}
+
+/* ---------- 通用小工具 ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+const money = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money0 = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+const jin = (kg) => Math.round((isFinite(kg) ? kg : 0) * 2 * 10) / 10;      // kg → 斤
+const jinFmt = (kg) => jin(kg).toFixed(1);
+// SVG 用具体色值（CSS 变量作为 SVG 表现属性不会生效，会渲染成黑色）
+const C = { income: '#4f7cff', expense: '#f0a04b', up: '#ff5d6c', down: '#1f9e5c', brand: '#7c6cc4', gray: '#c9c2d8' };
+const PALETTE = ['#7c6cc4', '#4f7cff', '#f0a04b', '#6f9c76', '#e06b9c', '#5bb0c4'];
+const pieColor = (i) => (i < 6 ? PALETTE[i] : C.gray);
+
+/* ---------- 日历工具（不依赖 new Date(string)，避免 Safari 把 2024-00-00 解析成上一年） ---------- */
+const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const dim = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const daysInMonth = (y, m) => (m === 2 && isLeap(y) ? 29 : dim[m - 1] || 30);
+const daysInYear = (y) => (isLeap(y) ? 366 : 365);
+function isRealDate(y, m, d) {
+  if (!(y >= 1900 && y <= 2999)) return false;
+  if (!(m >= 1 && m <= 12)) return false;
+  if (!(d >= 1 && d <= 31)) return false;
+  return d <= daysInMonth(y, m);
+}
+// 把 (y,m,d) 换算成该年第几天（1..366），非法日期返回 null
+function dayOfYear(y, m, d) {
+  if (!isRealDate(y, m, d)) return null;
+  let doy = d;
+  for (let i = 1; i < m; i++) doy += dim[i - 1] + (i === 2 && isLeap(y) ? 1 : 0);
+  return doy;
+}
+
+/* =====================================================================
+ * 一、只读数据适配层
+ * 以下函数全部只读。任何写入需求都不该在这里实现。
+ * ===================================================================== */
+function lsJSON(key, fallback) {
+  // localStorage.getItem 本身在 Safari 无痕模式会抛 SecurityError，必须整段 try
+  try {
+    const s = localStorage.getItem(key);
+    if (s == null) return fallback;
+    return JSON.parse(s);
+  } catch (e) { return fallback; }
+}
+
+function readTime() {
+  const out = { ok: false, items: [], n: 0, warn: 0, years: [] };
+  let arr = [];
+  try { const s = localStorage.getItem('time_events_v1'); if (s != null) arr = JSON.parse(s) || []; }
+  catch (e) { out.warn++; return out; }
+  if (!Array.isArray(arr)) { out.warn++; return out; }
+  out.ok = true;
+  arr.forEach(r => {
+    if (!r || typeof r !== 'object') { out.warn++; return; }
+    const sk = String(r.sortKey || r.from || '');
+    if (!/^\d{4}/.test(sk)) { out.warn++; return; }
+    const from = String(r.from || sk);
+    const to = String(r.to || from);
+    // 粒度只能靠字符串长度判断：'2024'=年 '2024-05'=月 '2024-05-06'=日
+    const g = (s) => (s.length <= 4 ? 'y' : (s.length <= 7 ? 'm' : 'd'));
+    out.items.push({
+      id: r.id || '',
+      sortKey: sk,
+      from, to, span: !!r.span,
+      title: String(r.title || ''),
+      cat: String(r.cat || '其他'),
+      note: String(r.note || ''),
+      granFrom: g(from), granTo: g(to)
+    });
+    out.n++;
+  });
+  return out;
+}
+
+function readWeight() {
+  const out = { ok: false, items: [], goalKg: null, n: 0, warn: 0 };
+  let arr = [];
+  try { const s = localStorage.getItem('weight_records_v1'); if (s != null) arr = JSON.parse(s) || []; }
+  catch (e) { out.warn++; return out; }
+  if (!Array.isArray(arr)) { out.warn++; return out; }
+  out.ok = true;
+  arr.forEach(r => {
+    if (!r || typeof r !== 'object') { out.warn++; return; }
+    const d = String(r.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { out.warn++; return; }
+    const y = +d.slice(0, 4), m = +d.slice(5, 7), dd = +d.slice(8, 10);
+    if (!isRealDate(y, m, dd)) { out.warn++; return; }
+    const kg = parseFloat(r.weight);
+    if (!isFinite(kg) || kg <= 0) { out.warn++; return; }
+    out.items.push({ date: d, seg: String(r.seg || '早'), kg });
+    out.n++;
+  });
+  // 目标：NaN 就显示「未设目标」，不借用体重工具自己的业务默认值（那是它的语义，不是本页的）
+  try {
+    const g = parseFloat(localStorage.getItem('weight_goal'));
+    if (isFinite(g) && g > 0) out.goalKg = g;
+  } catch (e) { out.warn++; }
+  return out;
+}
+
+function readBudget() {
+  const out = { ok: false, budgets: [], actuals: [], actualByDate: new Map(), n: 0, warn: 0 };
+  let d = null;
+  try { const s = localStorage.getItem('budget_records_v1'); if (s != null) d = JSON.parse(s); }
+  catch (e) { out.warn++; return out; }
+  if (!d) return out;
+  // 结构探测：测试数据与旧版本都存在直接写数组的形态
+  let bs = [], acs = [];
+  if (Array.isArray(d)) { out.warn++; bs = d; }
+  else if (d && typeof d === 'object') { bs = Array.isArray(d.budgets) ? d.budgets : []; acs = Array.isArray(d.actuals) ? d.actuals : []; }
+  else { out.warn++; return out; }
+  out.ok = true;
+  bs.forEach(b => {
+    if (!b || typeof b !== 'object') { out.warn++; return; }
+    const m = String(b.month || ''), ef = String(b.effective_from || '');
+    if (!/^\d{4}-\d{2}$/.test(m)) { out.warn++; return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ef)) { out.warn++; return; }
+    const daily = parseFloat(b.daily);
+    if (!isFinite(daily) || daily < 0) { out.warn++; return; }
+    out.budgets.push({ month: m, effective_from: ef, daily });
+  });
+  // dailyAt() 依赖 effective_from 升序，必须先排
+  out.budgets.sort((a, b) => (a.effective_from < b.effective_from ? -1 : 1));
+  acs.forEach(a => {
+    if (!a || typeof a !== 'object') { out.warn++; return; }
+    const d2 = String(a.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d2)) { out.warn++; return; }
+    const y = +d2.slice(0, 4), m = +d2.slice(5, 7), dd = +d2.slice(8, 10);
+    if (!isRealDate(y, m, dd)) { out.warn++; return; }
+    const amt = parseFloat(a.amount);
+    if (!isFinite(amt)) { out.warn++; return; }
+    out.actuals.push({ date: d2, amount: amt });
+    out.actualByDate.set(d2, amt);
+  });
+  out.n = out.budgets.length + out.actuals.length;
+  return out;
+}
+
+// 日预算查询，语义与 budget.html 的 dailyAt() 完全一致（budget.html L494-504）
+// 三条规则：常规生效段 / 本月首段回溯 / 沿用上月最后一段
+function dailyAt(date, budgets) {
+  const month = date.slice(0, 7);
+  let cur = null, firstOfMonth = null;
+  for (const b of budgets) {
+    if (!firstOfMonth && b.month === month) firstOfMonth = b;
+    if (b.effective_from <= date) cur = b;   // 字符串比较等价于日期比较
+  }
+  if (firstOfMonth) return (cur && cur.month === month) ? cur.daily : firstOfMonth.daily;
+  return cur ? cur.daily : null;
+}
+
+function readLedger() {
+  // 异步：读 IndexedDB ledger-p612。库可能不存在（从未用过账本透视），
+  // 也可能存在但结构不符。任何一种都必须静默降级，绝不能让页面报错。
+  return new Promise((resolve) => {
+    const out = { ok: false, records: [], openingBalance: 0, n: 0, warn: 0 };
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(out); } };
+    let req;
+    try { req = indexedDB.open('ledger-p612'); }
+    catch (e) { done(); return; }
+    req.onupgradeneeded = () => {
+      // 不传 version 时库不存在会被创建成 version=1 的空库 —— 那也是写系统状态，主动中止
+      try { if (req.transaction) req.transaction.abort(); } catch (e) {}
+    };
+    req.onerror = () => done();
+    req.onblocked = () => done();
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        if (!db.objectStoreNames || !db.objectStoreNames.contains('kv')) { try { db.close(); } catch (e) {} done(); return; }
+        const tx = db.transaction('kv', 'readonly');   // 全文件唯一一处 transaction()，模式硬编码 readonly
+        if (!tx) { try { db.close(); } catch (e) {} done(); return; }
+        const rq = tx.objectStore('kv').get('main');
+        rq.onsuccess = () => {
+          const v = rq.result;
+          if (v && Array.isArray(v.records)) {
+            out.ok = true;
+            out.openingBalance = isFinite(v.openingBalance) ? v.openingBalance : 0;
+            v.records.forEach(r => {
+              if (!r || typeof r !== 'object') { out.warn++; return; }
+              const d = String(r.date || '');
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { out.warn++; return; }
+              const y = +d.slice(0, 4), m = +d.slice(5, 7), dd = +d.slice(8, 10);
+              if (!isRealDate(y, m, dd)) { out.warn++; return; }
+              const t = String(r.type || '');
+              if (t !== 'in' && t !== 'out') { out.warn++; return; }
+              let a = parseFloat(r.amount);
+              if (!isFinite(a)) { out.warn++; return; }
+              if (a < 0) { a = Math.abs(a); out.warn++; }   // 导入时符号搞反了，取绝对值
+              out.records.push({
+                id: r.id || '', date: d, type: t, amount: a,
+                category: String(r.category || ''),
+                subcategory: String(r.subcategory || ''),
+                note: String(r.note || ''),
+                account: String(r.account || '')
+              });
+              out.n++;
+            });
+          }
+          done();
+        };
+        rq.onerror = () => done();
+        tx.onerror = () => done();
+        tx.onabort = () => done();
+      } catch (e) { done(); }
+      finally { try { db.close(); } catch (e) {} }   // 防句柄泄漏
+    };
+    setTimeout(done, 4000);   // 兜底，绝不让页面卡在"读取中"
+  });
+}
+
+/* =====================================================================
+ * 二、分类归一化
+ * 用户的账本类别字段存在同义异形与日文混入（实测 6912 条支出）：
+ *   '饮食男女'(2292) 与 '饮食女子'(837)、'其 他'(215) 与 '其他类'(338)、
+ *   '生活消费'(987) 与 '生活中の'(873)、'交通出行'(287) 与 '缴费/交通/出行'(315)
+ * 其中「生活中の」「文娱宠物」「缴费/交通/出行」是**复合写法**：
+ * category 只表示大范围，真实语义藏在 subcategory 里（如 生活中の + 肉蔬食材 = 餐饮）。
+ * 因此归一化必须「子分类优先」，否则这三类会整体掉进「未分类」。
+ * ===================================================================== */
+function catKey(s) {
+  let t = String(s ?? '');
+  // 全角转半角（含全角空格 U+3000）
+  t = t.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  t = t.replace(/　/g, ' ');
+  t = t.replace(/[\s\u3000]+/g, '');     // 去掉所有空白
+  return t.toLowerCase();
+}
+// ⚠️ 下面的 key 必须已经是 catKey() 处理后的值，
+//    否则 '其 他' 这种带空格的写法永远匹配不上（源码里请写规范化后的 '其他'）
+const CAT_MAP = {
+  '饮食男女': '餐饮', '饮食女子': '餐饮', '餐饮': '餐饮', '吃饭': '餐饮', '美食': '餐饮', '早饭': '餐饮', '中饭': '餐饮', '晚饭': '餐饮',
+  // 复合写法：先按前缀归到中间类，再由 subcategory 细化
+  '生活消费': '生活', '生活中の': '生活', '生活': '生活',
+  '文娱宠物': '文娱', '文娱': '文娱',
+  '缴费/交通/出行': '缴费交通', '交通出行': '缴费交通', '缴费充值': '缴费交通', '缴费': '缴费交通',
+  '交通': '缴费交通', '打车': '缴费交通', '地铁': '缴费交通', '加油': '缴费交通', '油费': '缴费交通',
+  '日用杂碎': '日用', '日用': '日用', '日用品': '日用', '超市': '日用',
+  '收の入': '收入', '收入': '收入', '工资': '收入',
+  '其他': '其他', '其它': '其他', '其他类': '其他', '其他支出': '其他', '历史账单': '其他',
+  '房租': '居住', '住房': '居住', '物业': '居住', '水费': '居住', '电费': '居住', '燃气': '居住',
+  '医疗': '医疗', '看病': '医疗',
+  '娱乐': '文娱', '电影': '文娱', '游戏': '文娱', '演唱会': '文娱',
+  '服饰': '服饰', '衣服': '服饰',
+  '教育': '教育', '学费': '教育', '培训': '教育',
+  '通讯': '通讯', '话费': '通讯', '宽带': '通讯'
+};
+// 开发期自检：映射表的 key 若不是规范化后的值，会永远匹配不上
+console.assert(Object.keys(CAT_MAP).every(k => catKey(k) === k), '[年度总账] CAT_MAP 的 key 必须是 catKey() 之后值');
+// 子分类归一化：复合类别靠它细化。key 同样是 catKey() 之后的值
+const SUB_MAP = {
+  '肉蔬食材': '餐饮', '肉果蔬食材': '餐饮', '食材': '餐饮', '蔬菜': '餐饮', '水果': '餐饮',
+  '家居日用': '日用', '日化护肤': '日用', '家居日常': '日用', '厨房杂用': '日用', '生活杂项': '生活',
+  '帽饰服鞋': '服饰', '数码周边': '数码', '数码产品': '数码',
+  '医疗/养生': '医疗', '养生': '医疗',
+  '电费&燃气': '居住', '电费充值': '居住', '水费充值': '居住', '房租': '居住', '房租交费': '居住',
+  '公共交通支出': '交通', '出租滴滴': '交通', '火车高铁': '交通', '火车高铁飞机': '交通', '机票': '交通',
+  '酒店住宿': '住宿', '话费&公交卡': '通讯', '手机话费充值': '通讯', '公交卡充值': '交通',
+  '游戏娱乐充值': '文娱', '影娱演出门票': '文娱'
+};
+// 规则表兜住没见过的写法，必须有序，先命中先赢
+const CAT_RULES = [
+  { re: /^(?!.*の).*收/, cat: '收入' },      // 负向断言把「收の入」排除，靠精确表先兜住
+  { re: /充值|缴费/, cat: '缴费交通' },
+  { re: /食材|蔬菜|水果|肉|饮|食|餐|饭|吃|外卖/, cat: '餐饮' },
+  { re: /日用|杂碎|纸巾|清洁|超市|厨房/, cat: '日用' },
+  { re: /房租|物业|水费|电费|燃气|住房/, cat: '居住' },
+  { re: /交通|打车|地铁|加油|油费|车费|公交|火车|飞机|滴滴|出租/, cat: '交通' },
+  { re: /酒店|住宿|旅馆/, cat: '住宿' },
+  { re: /医疗|看病|药|挂号|体检|养生/, cat: '医疗' },
+  { re: /服饰|衣服|鞋|帽|包|服/, cat: '服饰' },
+  { re: /数码|电子|手机|电脑/, cat: '数码' },
+  { re: /文娱|娱乐|电影|游戏|演唱|门票|宠物/, cat: '文娱' },
+  { re: /生活/, cat: '生活' },
+  { re: /教育|学费|培训|课程/, cat: '教育' },
+  { re: /通讯|话费|宽带|流量/, cat: '通讯' },
+  { re: /其他|其它/, cat: '其他' }
+];
+const UNCATEGORIZED = '未分类';
+// 复合类别：有 subcategory 就按 subcategory 定，没有才回落到 category 的中间类
+const COMPOSITE = new Set(['生活', '文娱', '缴费交通', '其他']);
+function normCat(raw, rawSub) {
+  const ck = catKey(raw);
+  const sk = catKey(rawSub);
+  // 1) 子分类最优先：语义最明确
+  if (sk && Object.prototype.hasOwnProperty.call(SUB_MAP, sk)) return SUB_MAP[sk];
+  if (sk) for (const r of CAT_RULES) if (r.re.test(sk)) return r.cat;
+  // 2) 再看 category
+  if (!ck) return UNCATEGORIZED;
+  const mapped = Object.prototype.hasOwnProperty.call(CAT_MAP, ck) ? CAT_MAP[ck] : null;
+  if (mapped) {
+    // 复合类别没有明确子分类时，保留其中间类，不退化成"未分类"
+    if (COMPOSITE.has(mapped) && mapped !== '其他') return mapped;
+    return mapped;
+  }
+  for (const r of CAT_RULES) if (r.re.test(ck)) return r.cat;
+  // 绝不用「其他」兜底 —— 那会变成垃圾桶、掩盖数据质量问题
+  return UNCATEGORIZED;
+}
+
+/* =====================================================================
+ * 三、按年聚合
+ * ===================================================================== */
+const SRC = { ledger: null, weight: null, budget: null, time: null };
+let NORM_ON = true;
+let YEAR = '';
+let YEAR_HINT = '';
+
+// 预先按年分桶，切换年份时 O(1) 取桶，避免在渲染循环里反复 filter 全量
+let BUCKET = { ledger: new Map(), weight: new Map(), time: new Map(), budgetMonths: new Set(), budgetActualYears: new Set() };
+
+function buildBuckets() {
+  BUCKET.ledger = new Map();
+  BUCKET.weight = new Map();
+  BUCKET.time = new Map();
+  BUCKET.budgetMonths = new Set();
+  BUCKET.budgetActualYears = new Set();
+  if (SRC.ledger) for (const r of SRC.ledger.records) {
+    const y = r.date.slice(0, 4);
+    if (!BUCKET.ledger.has(y)) BUCKET.ledger.set(y, []);
+    BUCKET.ledger.get(y).push(r);
+  }
+  if (SRC.weight) for (const r of SRC.weight.items) {
+    const y = r.date.slice(0, 4);
+    if (!BUCKET.weight.has(y)) BUCKET.weight.set(y, []);
+    BUCKET.weight.get(y).push(r);
+  }
+  if (SRC.time) for (const e of SRC.time.items) {
+    // 跨年事件在起始年与结束年各算一次
+    const y0 = e.sortKey.slice(0, 4);
+    if (!BUCKET.time.has(y0)) BUCKET.time.set(y0, []);
+    BUCKET.time.get(y0).push({ ...e, cross: false });
+    if (e.span && e.to && /^\d{4}/.test(e.to)) {
+      const y1 = e.to.slice(0, 4);
+      if (y1 !== y0) {
+        if (!BUCKET.time.has(y1)) BUCKET.time.set(y1, []);
+        BUCKET.time.get(y1).push({ ...e, cross: true });
+      }
+    }
+  }
+  if (SRC.budget) {
+    for (const b of SRC.budget.budgets) BUCKET.budgetMonths.add(b.month);
+    for (const a of SRC.budget.actuals) BUCKET.budgetActualYears.add(a.date.slice(0, 4));
+  }
+}
+
+function allYears() {
+  const s = new Set();
+  BUCKET.ledger.forEach((v, y) => { if (v.length) s.add(y); });
+  BUCKET.weight.forEach((v, y) => { if (v.length) s.add(y); });
+  BUCKET.time.forEach((v, y) => { if (v.length) s.add(y); });
+  BUCKET.budgetMonths.forEach(m => s.add(m.slice(0, 4)));
+  BUCKET.budgetActualYears.forEach(y => s.add(y));
+  // 并集而非交集：交集会把「2025 有账单无体重」的年份全部滤掉，用户会发现 2025 根本选不了
+  return [...s].filter(y => /^\d{4}$/.test(y) && +y >= 1900 && +y <= 2999).sort().reverse();
+}
+
+/* ---------- 各区块聚合 ---------- */
+function aggMoney(year) {
+  const rs = BUCKET.ledger.get(year) || [];
+  const prev = BUCKET.ledger.get(String(+year - 1)) || [];
+  const st = {
+    has: rs.length > 0, count: rs.length,
+    income: 0, expense: 0, net: 0, days: new Set(),
+    ins: new Array(12).fill(0), outs: new Array(12).fill(0),
+    pIns: new Array(12).fill(0), pOuts: new Array(12).fill(0),
+    byCat: new Map(), byAcct: new Map(),
+    maxOut: null, maxIn: null, rawCats: new Map()
+  };
+  rs.forEach(r => {
+    const mi = +r.date.slice(5, 7) - 1;
+    st.days.add(r.date);
+    if (r.type === 'in') { st.income += r.amount; st.ins[mi] += r.amount; }
+    else { st.expense += r.amount; st.outs[mi] += r.amount; }
+    // 账户构成：收入与支出分开看
+    const acct = r.account || '未标注';
+    const cur = st.byAcct.get(acct) || { in: 0, out: 0 };
+    if (r.type === 'in') cur.in += r.amount; else cur.out += r.amount;
+    st.byAcct.set(acct, cur);
+    if (r.type === 'out') {
+      // 分类只对支出做；总额永远用原始 amount，归一化不改变总数
+      const nc = NORM_ON ? normCat(r.category, r.subcategory) : (r.category || UNCATEGORIZED);
+      st.byCat.set(nc, (st.byCat.get(nc) || 0) + r.amount);
+      if (r.category) { const kk = String(r.category); st.rawCats.set(kk, (st.rawCats.get(kk) || 0) + 1); }
+      if (!st.maxOut || r.amount > st.maxOut.amount) st.maxOut = r;
+    } else if (!st.maxIn || r.amount > st.maxIn.amount) st.maxIn = r;
+  });
+  prev.forEach(r => {
+    const mi = +r.date.slice(5, 7) - 1;
+    if (r.type === 'in') st.pIns[mi] += r.amount; else st.pOuts[mi] += r.amount;
+  });
+  st.net = st.income - st.expense;   // amount 恒为正，方向只由 type 决定
+  st.dayAvg = st.days.size ? st.expense / st.days.size : 0;
+  st.hasPrev = prev.length > 0;
+  return st;
+}
+
+function aggWeight(year) {
+  const rs = (BUCKET.weight.get(year) || []).slice()
+    .sort((a, b) => (a.date < b.date ? -1 : (a.date > b.date ? 1 : (a.seg < b.seg ? -1 : 1))));
+  // 同日多时段以「早」为当日代表值
+  const byDate = new Map();
+  rs.forEach(r => { if (!byDate.has(r.date)) byDate.set(r.date, r.kg); });
+  const days = [...byDate.keys()].sort();
+  return {
+    has: days.length >= 2, hasAny: days.length > 0, dayCount: days.length,
+    first: days.length ? { date: days[0], kg: byDate.get(days[0]) } : null,
+    last: days.length ? { date: days[days.length - 1], kg: byDate.get(days[days.length - 1]) } : null,
+    goalKg: SRC.weight ? SRC.weight.goalKg : null,
+    labels: days, values: days.map(d => jin(byDate.get(d)))
+  };
+}
+
+function aggTime(year) {
+  const es = BUCKET.time.get(year) || [];
+  const byCat = new Map();
+  let longest = null;
+  es.forEach(e => {
+    byCat.set(e.cat, (byCat.get(e.cat) || 0) + 1);
+    if (e.span) {
+      const days = spanDays(e);
+      if (days != null && (!longest || days > longest.days)) longest = { e, days };
+    }
+  });
+  return { has: es.length > 0, items: es, count: es.length, byCat, longest };
+}
+
+// 事件跨度天数（跨粒度、跨年），无法确定时返回 null
+function spanDays(e) {
+  const p = (s) => {
+    if (!/^\d{4}/.test(s)) return null;
+    const y = +s.slice(0, 4), m = s.length >= 7 ? +s.slice(5, 7) : 1, d = s.length >= 10 ? +s.slice(8, 10) : 1;
+    if (!isRealDate(y, m, d)) return null;
+    return Date.UTC(y, m - 1, d) / 86400000;
+  };
+  const a = p(e.from), b = p(e.to || e.from);
+  if (a == null || b == null) return null;
+  return Math.round(b - a);
+}
+
+function aggBudget(year) {
+  const months = [];
+  if (!SRC.budget) return { has: false, months };
+  let sumB = 0, sumA = 0, over = 0, hasAny = false;
+  for (let m = 1; m <= 12; m++) {
+    const mk = year + '-' + String(m).padStart(2, '0');
+    let budget = 0, actual = 0, bDays = 0;
+    // 逐日累加：日预算按生效分段变化，不能用单一 daily 乘天数
+    for (let d = 1; d <= daysInMonth(+year, m); d++) {
+      const ds = mk + '-' + String(d).padStart(2, '0');
+      const dl = dailyAt(ds, SRC.budget.budgets);
+      if (dl != null) { budget += dl; bDays++; }
+      const a = SRC.budget.actualByDate.get(ds);
+      if (a != null) actual += a;
+    }
+    const filled = SRC.budget.actuals.some(a => a.date.slice(0, 7) === mk);
+    // 有预算但整月没记账 → rate 为 null（显示「未记账」），不能算成「完成率 0% 超支」
+    const rate = (budget > 0 && filled) ? actual / budget : null;
+    const isOver = rate != null && rate > 1;
+    if (bDays) hasAny = true;
+    if (filled) hasAny = true;
+    sumB += budget; sumA += actual;
+    if (isOver) over++;
+    months.push({ m, label: m + '月', budget, actual, rate, over: isOver, hasBudget: bDays > 0, filled });
+  }
+  return {
+    has: hasAny, months, sumB, sumA,
+    rate: sumB > 0 ? sumA / sumB : null, overMonths: over
+  };
+}
+
+/* ---------- 周聚合（记账密度用，避免画 6912 个点） ---------- */
+function weekCounts(records, year) {
+  const nDays = daysInYear(+year);
+  const buckets = new Array(53).fill(0);
+  if (!records) return buckets;
+  records.forEach(r => {
+    const y = +r.date.slice(0, 4), m = +r.date.slice(5, 7), d = +r.date.slice(8, 10);
+    const doy = dayOfYear(y, m, d);
+    if (doy == null) return;
+    const wk = Math.min(52, Math.floor((doy - 1) / 7));
+    buckets[wk]++;
+  });
+  void nDays;
+  return buckets;
+}
+
+/* =====================================================================
+ * 四、SVG 图表（全部字符串拼接后 innerHTML 注入，不用 createElementNS）
+ * ===================================================================== */
+function chartEmpty(msg) {
+  return `<svg viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" role="img"><text x="300" y="122" text-anchor="middle" font-size="30" fill="#d8d3e4">◦</text><text x="300" y="152" text-anchor="middle" font-size="13" fill="#9a93a8">${esc(msg || '本年度无数据')}</text></svg>`;
+}
+
+/* 折线 / 面积图。相比 ledger.html 增加了 bands、hlines、yfmt、per、zeroBase：
+ * - zeroBase:false  必须给体重用，否则 Math.min(0,...) 会把 0 拉进值域，图被压成贴顶直线
+ * - per 要调小（体重一年最多 366 点，per=28 会撑出 10K px 宽）
+ */
+function svgLine(series, labels, opts) {
+  const o = opts || {};
+  const W = 600, H = o.h || 250, PL = 48, PR = 14, PT = 16, PB = 30;
+  const n = labels.length;
+  const per = o.per || 28;
+  const yfmt = o.yfmt || money0;
+  const contentW = n > 1 ? PL + PR + (n - 1) * per : W;
+  const scroll = contentW > W;
+  const VW = scroll ? Math.round(contentW) : W;
+  const iw = VW - PL - PR, ih = H - PT - PB;
+  const all = series.flatMap(s => s.values).filter(v => v != null && isFinite(v));
+  if (!all.length) return chartEmpty(o.emptyMsg);
+  let min = (o.zeroBase === false) ? Math.min(...all) : Math.min(0, ...all);
+  let max = Math.max(...all);
+  if (min === max) { max = min + 1; }
+  const yPad = (max - min) * 0.08;
+  max += yPad; min -= yPad;
+  const X = i => n <= 1 ? PL + iw / 2 : PL + iw * i / (n - 1);
+  const Y = v => PT + ih * (1 - (v - min) / (max - min));
+  let g = '';
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = min + (max - min) * t / ticks; const y = Y(v);
+    g += `<line x1="${PL}" y1="${y}" x2="${VW - PR}" y2="${y}" stroke="#eee" stroke-width="1"/>`;
+    g += `<text x="${PL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#9a93a8">${esc(yfmt(v))}</text>`;
+  }
+  // 区间带画在序列之下
+  (o.bands || []).forEach(b => {
+    const y1 = Y(Math.min(b.hi, max)), y2 = Y(Math.max(b.lo, min));
+    if (y2 > y1) g += `<rect x="${PL}" y="${y1}" width="${VW - PL - PR}" height="${y2 - y1}" fill="${b.color}" opacity="${b.opacity || 0.16}"/>`;
+  });
+  (o.hlines || []).forEach(h => {
+    if (h.v < min || h.v > max) return;
+    const y = Y(h.v);
+    g += `<line x1="${PL}" y1="${y}" x2="${VW - PR}" y2="${y}" stroke="${h.color}" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+    if (h.label) g += `<text x="${VW - PR}" y="${y - 4}" text-anchor="end" font-size="10" fill="${h.color}">${esc(h.label)}</text>`;
+  });
+  const step = scroll ? Math.max(1, Math.round(70 / per)) : Math.ceil(n / 10);
+  labels.forEach((lb, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${X(i)}" y="${H - 10}" text-anchor="middle" font-size="10" fill="#9a93a8">${esc(lb)}</text>`; });
+  let paths = '';
+  series.forEach(s => {
+    if (s.area) {
+      const pts = s.values.map((v, i) => (v == null ? null : `${X(i)},${Y(v)}`)).filter(Boolean);
+      if (pts.length > 1) paths += `<polygon points="${PL},${Y(min)} ${pts.join(' ')} ${X(pts.length - 1)},${Y(min)}" fill="${s.area}"/>`;
+    }
+    // null 值断开：遇 null 重新起笔，避免出现横穿全图的假线
+    let d = '', started = false;
+    s.values.forEach((v, i) => {
+      if (v == null || !isFinite(v)) { started = false; return; }
+      d += `${started ? 'L' : 'M'} ${X(i)} ${Y(v)} `;
+      started = true;
+    });
+    paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s.values.forEach((v, i) => { if (v != null && isFinite(v)) paths += `<circle cx="${X(i)}" cy="${Y(v)}" r="2.4" fill="${s.color}"/>`; });
+  });
+  return `<svg viewBox="0 0 ${VW} ${H}" style="${scroll ? `width:${VW}px` : 'width:100%'}" preserveAspectRatio="xMidYMid meet" role="img">${g}${paths}</svg>`;
+}
+
+/* 甜甜圈。segs = [{label, value, color}] */
+function svgDonut(inputSegs, opts) {
+  const o = opts || {};
+  const segs = (inputSegs || []).filter(s => s.value > 0);
+  if (!segs.length) return chartEmpty(o.emptyMsg);
+  const W = 600, H = 250, cx = 150, cy = 125, r = 92, sw = 34;
+  const total = segs.reduce((s, x) => s + x.value, 0) || 1;
+  const Circ = 2 * Math.PI * r;
+  let offset = 0, arcs = '';
+  segs.forEach(s => {
+    const len = s.value / total * Circ;
+    if (len <= 0) return;
+    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-dasharray="${len} ${Circ - len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += len;
+  });
+  const cLabel = o.centerLabel != null ? o.centerLabel : '支出合计';
+  const cValue = o.centerValue != null ? o.centerValue : ('¥' + money0(total));
+  const center = (cLabel ? `<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="13" fill="#9a93a8">${esc(cLabel)}</text>` : '')
+    + `<text x="${cx}" y="${cLabel ? cy + 16 : cy + 5}" text-anchor="middle" font-size="18" font-weight="700" fill="#322e3a">${esc(cValue)}</text>`;
+  const list = segs.map((s, i) => {
+    const pct = (s.value / total * 100).toFixed(1);
+    return `<g transform="translate(310, ${24 + i * 25})"><rect x="0" y="0" width="12" height="12" rx="3" fill="${s.color}"/><text x="20" y="11" font-size="12" fill="#322e3a">${esc(s.label)}</text><text x="290" y="11" text-anchor="end" font-size="12" fill="#9a93a8">${esc(pct)}%</text></g>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">${arcs}${center}${list}</svg>`;
+}
+
+/* 分组柱：每月两根（收/支），并叠加上一年的半透明柱 */
+function svgDualBars(labels, ins, outs, pIns, pOuts) {
+  const W = 600, H = 250, PL = 48, PR = 14, PT = 14, PB = 30;
+  const n = labels.length;
+  const per = 46;
+  const contentW = n > 1 ? PL + PR + (n - 1) * per : W;
+  const scroll = contentW > W;
+  const VW = scroll ? Math.round(contentW) : W;
+  const iw = VW - PL - PR, ih = H - PT - PB;
+  const all = [...ins, ...outs, ...(pIns || []), ...(pOuts || [])];
+  const maxV = Math.max(1, ...all);
+  const Y0 = PT + ih * 0.9;
+  const scale = ih * 0.82 / maxV;
+  let g = `<line x1="${PL}" y1="${Y0}" x2="${VW - PR}" y2="${Y0}" stroke="#ddd" stroke-width="1"/>`;
+  const stepX = n <= 1 ? 0 : iw / (n - 1);
+  const X = i => n <= 1 ? PL + iw / 2 : PL + stepX * i;
+  let bars = '';
+  const bw = Math.min(11, per * 0.28), gap = 2;
+  const labelStep = scroll ? Math.max(1, Math.round(70 / per)) : 1;
+  labels.forEach((lb, i) => {
+    const cx = X(i);
+    const prevMax = Math.max(pIns ? pIns[i] : 0, pOuts ? pOuts[i] : 0);
+    if (prevMax > 0) {
+      const pw = bw, ph = prevMax * scale;
+      if (pOuts && pOuts[i] > 0) bars += `<rect x="${cx - bw - gap / 2 - pw / 2}" y="${Y0 - ph}" width="${pw}" height="${Math.max(1, ph)}" rx="2" fill="${C.income}" opacity=".22"/>`;
+      if (pIns && pIns[i] > 0) bars += `<rect x="${cx + gap / 2 - pw / 2}" y="${Y0 - ph}" width="${pw}" height="${Math.max(1, ph)}" rx="2" fill="${C.expense}" opacity=".22"/>`;
+    }
+    if (ins[i] > 0) bars += `<rect x="${cx - bw - gap / 2}" y="${Y0 - ins[i] * scale}" width="${bw}" height="${Math.max(1, ins[i] * scale)}" rx="2" fill="${C.income}"/>`;
+    if (outs[i] > 0) bars += `<rect x="${cx + gap / 2}" y="${Y0 - outs[i] * scale}" width="${bw}" height="${Math.max(1, outs[i] * scale)}" rx="2" fill="${C.expense}"/>`;
+    if (i % labelStep === 0 || i === n - 1) g += `<text x="${cx}" y="${H - 10}" text-anchor="middle" font-size="10" fill="#9a93a8">${esc(lb)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${VW} ${H}" style="${scroll ? `width:${VW}px` : 'width:100%'}" preserveAspectRatio="xMidYMid meet" role="img">${g}${bars}</svg>`;
+}
+
+/* 记账密度：按周聚合的细柱，深色代表记得更勤 */
+function svgHeatStrip(weekCounts) {
+  const W = 600, H = 110, PL = 40, PR = 14, PT = 12, PB = 26;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const maxV = Math.max(1, ...weekCounts);
+  const bw = iw / 53;
+  let g = '', bars = '';
+  g += `<line x1="${PL}" y1="${PT + ih}" x2="${W - PR}" y2="${PT + ih}" stroke="#eee"/>`;
+  weekCounts.forEach((v, i) => {
+    const h = v > 0 ? Math.max(2, v / maxV * ih) : 0;
+    // 0 / 1-2 笔 / ≥3 笔 三档色
+    const color = v === 0 ? '#f0eef5' : (v <= 2 ? '#c9d6f5' : C.income);
+    bars += `<rect x="${(PL + i * bw).toFixed(2)}" y="${(PT + ih - h).toFixed(2)}" width="${Math.max(1.5, bw - 1.2).toFixed(2)}" height="${h.toFixed(2)}" rx="1" fill="${color}"/>`;
+  });
+  for (let mo = 1; mo <= 12; mo++) {
+    const x = PL + (daysBeforeMonth(+YEAR, mo) / daysInYear(+YEAR)) * iw;
+    g += `<line x1="${x.toFixed(2)}" y1="${PT}" x2="${x.toFixed(2)}" y2="${PT + ih}" stroke="#f2f0f7"/>`;
+    if (mo % 2 === 0) g += `<text x="${x.toFixed(2)}" y="${H - 8}" font-size="9" fill="#9a93a8">${mo}月</text>`;
+  }
+  g += `<text x="${PL - 6}" y="${PT + ih + 4}" text-anchor="end" font-size="9" fill="#9a93a8">0</text>`;
+  g += `<text x="${PL - 6}" y="${PT + 4}" text-anchor="end" font-size="9" fill="#9a93a8">${maxV}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%" preserveAspectRatio="xMidYMid meet" role="img">${g}${bars}</svg>`;
+}
+// 该年第 m 月 1 号之前已经过了多少天
+function daysBeforeMonth(y, m) {
+  let d = 0;
+  for (let i = 1; i < m; i++) d += dim[i - 1] + (i === 2 && isLeap(y) ? 1 : 0);
+  return d;
+}
+
+/* 三泳道年度时间轴：记账密度 / 体重 / 事件 */
+function svgTimeline(lanes) {
+  const W = 600, PL = 44, PR = 16, PT = 26, PB = 26;
+  const nDays = daysInYear(+YEAR);
+  const LH = 54;
+  const H = PT + lanes.length * LH + PB;
+  const iw = W - PL - PR;
+  const X = (doy) => PL + (doy - 1) / nDays * iw;
+  let g = '', body = '';
+  // 12 个月分隔线 + 标签
+  for (let mo = 1; mo <= 12; mo++) {
+    const d0 = daysBeforeMonth(+YEAR, mo);
+    const x = X(d0 + 1);
+    g += `<line x1="${x.toFixed(2)}" y1="${PT - 8}" x2="${x.toFixed(2)}" y2="${PT + lanes.length * LH}" stroke="#f2f0f7"/>`;
+    g += `<text x="${x.toFixed(2)}" y="${PT - 12}" font-size="9" fill="#9a93a8" text-anchor="middle">${mo}月</text>`;
+  }
+  lanes.forEach((lane, li) => {
+    const ly = PT + li * LH + LH / 2;
+    g += `<text x="${PL - 8}" y="${ly + 4}" text-anchor="end" font-size="11" fill="#8b8499">${esc(lane.label)}</text>`;
+    g += `<line x1="${PL}" y1="${ly}" x2="${W - PR}" y2="${ly}" stroke="#f5f3fa"/>`;
+    body += lane.marks || '';
+    // lane.marks 已由调用方算好 y 坐标，这里只做溢出保护
+    void ly;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%" preserveAspectRatio="xMidYMid meet" role="img">${g}${body}</svg>`;
+}
+
+/* 预算完成率进度条。rows = [{label, rate, actual, budget, over, filled, hasBudget}] */
+function svgProgressRows(rows) {
+  if (!rows || !rows.length) return chartEmpty('本年度无预算记录');
+  const W = 600, PL = 42, PR = 78, PT = 22, RH = 26;
+  const rowsShown = rows.filter(r => r.hasBudget || r.filled);
+  if (!rowsShown.length) return chartEmpty('本年度没有预算或实际记录');
+  const H = PT + rowsShown.length * RH + 8;
+  const iw = W - PL - PR;
+  let g = `<text x="${PL}" y="12" font-size="10" fill="#9a93a8">100%</text>`;
+  let out = '';
+  const x100 = PL + iw;
+  g += `<line x1="${x100.toFixed(2)}" y1="${PT - 6}" x2="${x100.toFixed(2)}" y2="${H - 6}" stroke="#c9c2d8" stroke-width="1" stroke-dasharray="4 3"/>`;
+  rowsShown.forEach((r, i) => {
+    const y = PT + i * RH + 4;
+    const label = `<text x="${PL - 8}" y="${y + 11}" text-anchor="end" font-size="11" fill="${r.over ? '#d9534f' : '#322e3a'}">${r.over ? '●' : ''}${esc(r.label)}</text>`;
+    const track = `<rect x="${PL}" y="${y + 3}" width="${iw}" height="9" rx="4.5" fill="#f0eef5"/>`;
+    let fill = '';
+    let right = '';
+    if (r.rate == null) {
+      right = `<text x="${W - PR + 8}" y="${y + 11}" font-size="11" fill="#b6afc4">未记账</text>`;
+    } else {
+      const w = Math.min(1, r.rate) * iw;
+      fill = `<rect x="${PL}" y="${y + 3}" width="${Math.max(2, w).toFixed(2)}" height="9" rx="4.5" fill="${r.over ? '#d9534f' : C.income}" opacity="${r.over ? .85 : .8}"/>`;
+      if (r.rate > 1) {
+        const ow = Math.min(0.5, r.rate - 1) * iw;
+        fill += `<rect x="${x100.toFixed(2)}" y="${y + 3}" width="${ow.toFixed(2)}" height="9" fill="#d9534f" opacity=".55"/>`;
+      }
+      right = `<text x="${W - PR + 8}" y="${y + 11}" font-size="11" fill="${r.over ? '#d9534f' : '#8b8499'}">${(r.rate * 100).toFixed(0)}%</text>`;
+    }
+    out += `<g>${label}${track}${fill}${right}</g>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%" preserveAspectRatio="xMidYMid meet" role="img">${g}${out}</svg>`;
+}
+
+/* =====================================================================
+ * 五、渲染
+ * ===================================================================== */
+function statHtml(label, value, cls, small, extra) {
+  // extra：第二行小字补充说明（如目标体重本身）
+  return `<div class="stat"><div class="label">${esc(label)}</div><div class="value${small ? ' sm' : ''} ${cls || ''}">${esc(value)}</div>${extra ? `<div class="x">${esc(extra)}</div>` : ''}</div>`;
+}
+function sumHtml(items) {
+  return items.filter(Boolean).map(i => `<li><span class="k">${esc(i.k)}</span><span class="v">${i.v}</span></li>`).join('');
+}
+// topN：降序取前 n 项，其余合并为「其他」
+function topN(map, n) {
+  const arr = [...map.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  if (arr.length <= n) return { segs: arr, rest: 0 };
+  const head = arr.slice(0, n);
+  const rest = arr.slice(n).reduce((s, x) => s + x.value, 0);
+  return { segs: head, rest };
+}
+
+function renderCover(years) {
+  const pills = [];
+  const srcName = { ledger: '账本透视', weight: '轻身时光簿', time: '时光自撰集', budget: '收支规划局' };
+  for (const k of ['ledger', 'weight', 'time', 'budget']) {
+    const s = SRC[k];
+    if (!s || !s.ok) { pills.push(`<span class="pill off">${srcName[k]}　未找到数据</span>`); continue; }
+    let ys = [];
+    if (k === 'ledger') ys = [...BUCKET.ledger.entries()].filter(([, v]) => v.length).map(([y]) => y);
+    if (k === 'weight') ys = [...BUCKET.weight.entries()].filter(([, v]) => v.length).map(([y]) => y);
+    if (k === 'time') ys = [...BUCKET.time.entries()].filter(([, v]) => v.length).map(([y]) => y);
+    if (k === 'budget') ys = [...new Set([...BUCKET.budgetMonths].map(m => m.slice(0, 4)).concat([...BUCKET.budgetActualYears]))].sort();
+    const span = ys.length ? (ys.length === 1 ? ys[0] : `${ys[ys.length - 1]}–${ys[ys.length - 1] ? ys[0] : ''}`) : '—';
+    const inYear = ys.includes(YEAR);
+    pills.push(`<span class="pill${inYear ? '' : ' off'}">${srcName[k]}　${s.n} 条${inYear ? '' : '（本年无）'}${span !== '—' ? `　${esc(span)}` : ''}</span>`);
+  }
+  $('cover-pills').innerHTML = pills.join('');
+
+  const warns = [];
+  if (SRC.ledger && SRC.ledger.warn) warns.push(`账本 ${SRC.ledger.warn} 条`);
+  if (SRC.weight && SRC.weight.warn) warns.push(`体重 ${SRC.weight.warn} 条`);
+  if (SRC.time && SRC.time.warn) warns.push(`事件 ${SRC.time.warn} 条`);
+  if (SRC.budget && SRC.budget.warn) warns.push(`预算 ${SRC.budget.warn} 条`);
+  const okCount = ['ledger', 'weight', 'time', 'budget'].filter(k => SRC[k] && SRC[k].ok && SRC[k].n > 0).length;
+  $('cover-sub').textContent = warns.length
+    ? `已从 ${okCount} 个来源读到数据，已忽略异常记录：${warns.join('、')}。`
+    : (okCount ? `已从 ${okCount} 个来源读到数据。` : '没有读到任何数据源。请先使用账本透视、轻身时光簿、时光自撰集或收支规划局记录一些内容。');
+
+  const nowY = new Date().getFullYear();
+  $('year-hint').textContent = YEAR_HINT || (YEAR !== String(nowY) ? `本年度是 ${nowY} 年，本机尚无该年记录，已自动切到最近有数据的 ${YEAR} 年。` : '');
+}
+
+function renderMoney(st) {
+  const card = $('card-money');
+  if (!st.has) { card.hidden = true; return; }
+  card.hidden = false;
+  $('money-stats').innerHTML = [
+    statHtml('总支出', '¥' + money(st.expense), 'v-out'),
+    statHtml('总收入', '¥' + money(st.income), 'v-in'),
+    statHtml('净结余', (st.net >= 0 ? '¥' : '-¥') + money(Math.abs(st.net)), st.net >= 0 ? 'v-good' : 'v-bad'),
+    statHtml('日均支出', '¥' + money(st.dayAvg), ''),
+    statHtml('记录笔数', String(st.count) + ' 笔', '', true),
+    statHtml('记账天数', st.days.size + ' 天', '', true)
+  ].join('');
+
+  const labels = Array.from({ length: 12 }, (_, i) => (i + 1) + '月');
+  $('chart-dual').innerHTML = svgDualBars(labels, st.ins, st.outs, st.hasPrev ? st.pIns : null, st.hasPrev ? st.pOuts : null);
+
+  const { segs, rest } = topN(st.byCat, 6);
+  const catSegs = segs.map((s, i) => ({ ...s, color: pieColor(i) }));
+  if (rest > 0) catSegs.push({ label: '其他', value: rest, color: C.gray });
+  $('chart-cat').innerHTML = svgDonut(catSegs, { centerLabel: '支出合计', centerValue: '¥' + money0(st.expense) });
+
+  // 未归类占比提示 + 原名，帮助用户回账本透视补数据
+  const unc = st.byCat.get(UNCATEGORIZED) || 0;
+  const rawNames = [...st.rawCats.keys()].filter(k => NORM_ON && normCat(k) === UNCATEGORIZED).slice(0, 5);
+  let sub = NORM_ON ? '按归一化后的分类汇总' : '按原始分类写法汇总（未合并同义）';
+  if (NORM_ON) {
+    const uniq = st.rawCats.size;
+    const merged = uniq - new Set([...st.rawCats.keys()].map(normCat)).size;
+    if (merged > 0) sub += `，已合并 ${merged} 种同义写法`;
+    if (unc > 0) {
+      const pct = (unc / (st.expense || 1) * 100).toFixed(1);
+      sub += `。有 ${pct}% 未归类`;
+      $('pie-sub').innerHTML = esc(sub) + `<br><span class="raw-hint">未归类的原始写法：${rawNames.map(n => `<code>${esc(n)}</code>`).join(' ') || '—'}（可在账本透视里补充分类）</span>`;
+    } else { $('pie-sub').textContent = sub; }
+  } else { $('pie-sub').textContent = sub; }
+
+  const acctArr = [...st.byAcct.entries()].map(([label, v]) => ({ label, value: v.in + v.out })).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
+  $('chart-acct').innerHTML = svgDonut(
+    acctArr.slice(0, 6).map((s, i) => ({ ...s, color: pieColor(i) })),
+    { centerLabel: '账户合计', centerValue: '¥' + money0(acctArr.reduce((s, x) => s + x.value, 0)) }
+  );
+
+  $('chart-heat').innerHTML = svgHeatStrip(weekCounts(BUCKET.ledger.get(YEAR) || [], YEAR));
+
+  // 自动摘要
+  const sum = [];
+  if (st.maxOut) {
+    const r = st.maxOut;
+    sum.push({ k: '最大单笔支出', v: `${esc('¥' + money(r.amount))}　${esc(r.date.slice(5, 7) + '月' + r.date.slice(8, 10) + '日')}　${esc((NORM_ON ? normCat(r.category, r.subcategory) : r.category) || UNCATEGORIZED)}${r.account ? ' · ' + esc(r.account) : ''}` });
+  }
+  if (st.maxIn) {
+    const r = st.maxIn;
+    sum.push({ k: '最大单笔收入', v: `${esc('¥' + money(r.amount))}　${esc(r.date.slice(5, 7) + '月' + r.date.slice(8, 10) + '日')}${r.account ? ' · ' + esc(r.account) : ''}` });
+  }
+  const monthExp = st.outs.map((v, i) => ({ i, v, n: 0 }));
+  const cnt = new Array(12).fill(0);
+  (BUCKET.ledger.get(YEAR) || []).forEach(r => { if (r.type === 'out') cnt[+r.date.slice(5, 7) - 1]++; });
+  monthExp.forEach(m => { m.n = cnt[m.i]; });
+  const topMonth = monthExp.filter(m => m.v > 0).sort((a, b) => b.v - a.v || b.n - a.n)[0];
+  if (topMonth) {
+    const days = daysInMonth(+YEAR, topMonth.i + 1);
+    const pct = (topMonth.v / (st.expense || 1) * 100).toFixed(1);
+    sum.push({ k: '支出最集中', v: `${topMonth.i + 1} 月　${esc('¥' + money(topMonth.v))}（占全年 ${pct}%）` });
+    const dayCnt = new Array(12).fill(0);
+    (BUCKET.ledger.get(YEAR) || []).forEach(r => { dayCnt[+r.date.slice(5, 7) - 1]++; });
+    const topDays = dayCnt.map((n, i) => ({ n, i })).sort((a, b) => b.n - a.n)[0];
+    if (topDays && topDays.n > 0) sum.push({ k: '记账最勤', v: `${topDays.i + 1} 月　记了 ${topDays.n} 天` });
+    void days;
+  }
+  const catArr = [...st.byCat.entries()].sort((a, b) => b[1] - a[1]);
+  if (catArr.length) sum.push({ k: '花得最多', v: `${esc(catArr[0][0])}　${esc('¥' + money(catArr[0][1]))}（占 ${(catArr[0][1] / (st.expense || 1) * 100).toFixed(1)}%）` });
+  if (st.count) sum.push({ k: '笔均支出', v: `¥${money(st.expense / st.count)}` });
+  if (st.hasPrev) {
+    const prev = BUCKET.ledger.get(String(+YEAR - 1)) || [];
+    let pE = 0; prev.forEach(r => { if (r.type === 'out') pE += r.amount; });
+    if (pE > 0) {
+      const d = (st.expense - pE) / pE * 100;
+      sum.push({ k: '与上一年比', v: `支出${d >= 0 ? '增加' : '减少'} ${Math.abs(d).toFixed(1)}%（上年 ¥${money0(pE)}）` });
+    }
+  }
+  $('money-sum').innerHTML = sumHtml(sum);
+}
+
+function renderBody(st) {
+  const card = $('card-body');
+  if (!st.hasAny) { card.hidden = true; return; }
+  card.hidden = false;
+  if (!st.has) {
+    $('body-stats').innerHTML = statHtml('本年度记录', `${st.dayCount} 天（不足 2 天，无法绘制曲线）`, '', true);
+    $('chart-weight').innerHTML = chartEmpty('本年度仅 ' + st.dayCount + ' 天记录，至少需要 2 天才能成线');
+    $('body-sum').innerHTML = '';
+    return;
+  }
+  const goalJin = st.goalKg != null ? jin(st.goalKg) : null;
+  const delta = jin(st.last.kg) - jin(st.first.kg);
+  $('body-stats').innerHTML = [
+    statHtml('年初体重', jinFmt(st.first.kg) + ' 斤', '', true),
+    statHtml('年末体重', jinFmt(st.last.kg) + ' 斤', '', true),
+    statHtml('年内变化', (delta >= 0 ? '+' : '') + delta.toFixed(1) + ' 斤', delta <= 0 ? 'v-good' : 'v-bad', true),
+    goalJin != null
+      ? statHtml('距目标', (jin(st.last.kg) - goalJin).toFixed(1) + ' 斤', '', true, '目标 ' + goalJin.toFixed(1) + ' 斤')
+      : statHtml('目标', '未设置', '', true)
+  ].join('');
+
+  const labels = st.labels.map(d => d.slice(5));
+  const opts = {
+    per: Math.max(3, Math.floor(600 / Math.max(1, st.labels.length))) || 3,
+    zeroBase: false,
+    yfmt: (v) => v.toFixed(0),
+    hlines: goalJin != null ? [{ v: goalJin, color: C.accent, label: '目标 ' + goalJin.toFixed(1) + ' 斤' }] : [],
+    bands: goalJin != null ? [{ lo: goalJin - 3, hi: goalJin + 3, color: C.accent }] : []
+  };
+  $('chart-weight').innerHTML = svgLine([{ values: st.values, color: C.brand, area: 'rgba(124,108,196,.10)' }], labels, opts);
+  $('body-sub').textContent = goalJin != null ? '绿色区间为距目标 3 斤以内，虚线为目标体重' : '未设置目标体重，暂不显示目标线';
+
+  const sum = [
+    { k: '年内变化', v: (delta >= 0 ? '增加 ' : '减少 ') + Math.abs(delta).toFixed(1) + ' 斤（' + st.first.date + ' → ' + st.last.date + '）' },
+    { k: '记录天数', v: st.dayCount + ' 天' }
+  ];
+  if (goalJin != null) {
+    const gap = jin(st.last.kg) - goalJin;
+    sum.push({ k: '目标进度', v: gap <= 0 ? `已达成目标（低于目标 ${Math.abs(gap).toFixed(1)} 斤）` : `还差 ${gap.toFixed(1)} 斤` });
+  }
+  $('body-sum').innerHTML = sumHtml(sum);
+}
+
+function renderTime(st) {
+  const card = $('card-time');
+  if (!st.has) { card.hidden = true; return; }
+  card.hidden = false;
+  const catArr = [...st.byCat.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  $('chart-timecat').innerHTML = svgDonut(
+    catArr.map((s, i) => ({ ...s, color: pieColor(i) })),
+    { centerLabel: '事件总数', centerValue: String(st.count) + ' 件' }
+  );
+
+  // ---- 三泳道时间轴：记账密度 / 体重 / 事件 ----
+  const nDays = daysInYear(+YEAR);
+  const PL = 44, PR = 16, PT = 26, LH = 54;
+  const X = (doy) => PL + (doy - 1) / nDays * (600 - PL - PR);
+  const laneY = (li) => PT + li * LH + LH / 2;   // 泳道中心线
+
+  // lane0 记账密度：按周聚合，避免画 6912 个点
+  const lane0 = [];
+  const wc = weekCounts(BUCKET.ledger.get(YEAR) || [], YEAR);
+  const wcMax = Math.max(1, ...wc);
+  wc.forEach((v, i) => {
+    if (!v) return;
+    const h = Math.max(2, v / wcMax * 16);
+    const doy = Math.min(nDays, i * 7 + 4);
+    lane0.push(`<rect x="${(X(doy) - 1.5).toFixed(2)}" y="${(laneY(0) - h / 2).toFixed(2)}" width="3" height="${h.toFixed(2)}" rx="1" fill="${C.income}" opacity=".65"/>`);
+  });
+
+  // lane1 体重折线（含目标虚线）
+  const lane1 = [`<line x1="${PL}" y1="${laneY(1) + 16}" x2="${600 - PR}" y2="${laneY(1) + 16}" stroke="#f5f3fa"/>`];
+  const wst = aggWeight(YEAR);
+  if (wst.has) {
+    const vals = wst.values;
+    const gJ = (SRC.weight && SRC.weight.goalKg != null) ? jin(SRC.weight.goalKg) : null;
+    let vmin = Math.min(...vals), vmax = Math.max(...vals);
+    if (gJ != null) { vmin = Math.min(vmin, gJ); vmax = Math.max(vmax, gJ); }
+    if (vmin === vmax) vmax = vmin + 1;
+    const YW = (v) => laneY(1) + 14 - (v - vmin) / (vmax - vmin) * 26;
+    let d = '', started = false;
+    const dots = [];
+    wst.labels.forEach((dt, i) => {
+      // dayOfYear 内部做日历校验，非法日期返回 null → 断线而不是画到错误位置
+      const doy = dayOfYear(+dt.slice(0, 4), +dt.slice(5, 7), +dt.slice(8, 10));
+      if (doy == null) { started = false; return; }
+      d += `${started ? 'L' : 'M'} ${X(doy).toFixed(2)} ${YW(vals[i]).toFixed(2)} `;
+      started = true;
+      dots.push(`<circle cx="${X(doy).toFixed(2)}" cy="${YW(vals[i]).toFixed(2)}" r="2.6" fill="${C.brand}"/>`);
+    });
+    if (d) lane1.push(`<path d="${d}" fill="none" stroke="${C.brand}" stroke-width="2"/>`);
+    lane1.push(...dots);
+    if (gJ != null) lane1.push(`<line x1="${PL}" y1="${YW(gJ).toFixed(2)}" x2="${600 - PR}" y2="${YW(gJ).toFixed(2)}" stroke="${C.accent}" stroke-width="1" stroke-dasharray="4 3"/>`);
+  }
+
+  // lane2 事件：粒度决定条长，年=整年 / 月=整月 / 日=一点
+  const lane2 = [];
+  const placed = [];
+  st.items.forEach(e => {
+    const parts = String(e.sortKey).split('-');
+    const y = +parts[0], m = parts[1] ? +parts[1] : 1, d0 = parts[2] ? +parts[2] : 1;
+    // sortKey 可能是 2024-00-00（只有年份的事件），靠 dayOfYear 返回 null 时兜底到第 1 天
+    const doy0 = dayOfYear(y, m, d0) || 1;
+    const spanLen = e.granFrom === 'y' ? daysInYear(y) : (e.granFrom === 'm' ? daysInMonth(y, m) : 1);
+    const x0 = X(Math.min(nDays, doy0));
+    const x1 = X(Math.min(nDays, doy0 + spanLen));
+    const xm = (x0 + x1) / 2;
+    // 标签防重叠：同 lane 内 x 距 <46px 则下沉一行，最多 2 级
+    let lvl = 0;
+    while (lvl < 2 && placed.some(p => p.lvl === lvl && Math.abs(p.x - xm) < 46)) lvl++;
+    placed.push({ lvl, x: xm });
+    const ly = laneY(2) - 14 + lvl * 13;
+    if (spanLen > 1) lane2.push(`<rect x="${x0.toFixed(2)}" y="${(ly - 2.5).toFixed(2)}" width="${Math.max(2, x1 - x0).toFixed(2)}" height="5" rx="2.5" fill="${C.brand}" opacity=".75"/>`);
+    else lane2.push(`<circle cx="${x0.toFixed(2)}" cy="${ly.toFixed(2)}" r="4" fill="${C.brand}"/>`);
+    const t = e.title + (e.cross ? '（跨年）' : '');
+    if (t) lane2.push(`<text x="${x0.toFixed(2)}" y="${(ly + 13).toFixed(2)}" font-size="9" fill="#8b8499">${esc(String(t).slice(0, 10))}</text>`);
+  });
+
+  $('chart-timeline').innerHTML = svgTimeline([
+    { label: '记账', marks: lane0.join('') },
+    { label: '体重', marks: lane1.join('') },
+    { label: '事件', marks: lane2.join('') }
+  ]);
+
+  const sum = [{ k: '事件总数', v: st.count + ' 件' }];
+  if (catArr.length) sum.push({ k: '最多的一类', v: `${esc(catArr[0].label)}　${catArr[0].value} 件` });
+  if (st.longest) sum.push({ k: '最长跨度', v: `${esc(String(st.longest.e.title).slice(0, 16))}　${esc(st.longest.e.from)} → ${esc(st.longest.e.to)}（约 ${st.longest.days} 天）` });
+  $('time-sum').innerHTML = sumHtml(sum);
+  $('time-hint').textContent = `${YEAR} 年共 ${st.count} 件事件` + (catArr.length ? `，涉及 ${catArr.length} 个分类` : '');
+}
+
+function renderBudget(st) {
+  const card = $('card-budget');
+  if (!st.has) { card.hidden = true; return; }
+  card.hidden = false;
+  $('chart-budget').innerHTML = svgProgressRows(st.months);
+  const sum = [];
+  if (st.rate != null) sum.push({ k: '全年预算', v: `¥${money(st.sumB)}　实际 ¥${money(st.sumA)}　完成率 ${(st.rate * 100).toFixed(0)}%` });
+  if (st.overMonths) {
+    const worst = st.months.filter(m => m.over).sort((a, b) => b.rate - a.rate)[0];
+    sum.push({ k: '超支月份', v: `${st.overMonths} 个月${worst ? `，最严重是 ${worst.label}（${(worst.rate * 100).toFixed(0)}%）` : ''}` });
+  } else if (st.rate != null) {
+    sum.push({ k: '超支月份', v: '无，全年未超支' });
+  }
+  const unfilled = st.months.filter(m => m.hasBudget && !m.filled).map(m => m.label);
+  if (unfilled.length) sum.push({ k: '未记账', v: unfilled.join('、') + '（有预算但没填实际）' });
+  $('budget-sum').innerHTML = sumHtml(sum);
+}
+
+function renderStory(m, b, w, t) {
+  const card = $('card-story');
+  const parts = [];
+  if (m && m.has) {
+    let s = `${YEAR} 年共记录 ${m.count} 笔账单，收入 ¥${money(m.income)}、支出 ¥${money(m.expense)}，净结余 ${m.net >= 0 ? '¥' : '-¥'}${money(Math.abs(m.net))}。`;
+    const catArr = [...m.byCat.entries()].sort((a, b) => b[1] - a[1]);
+    const topMonth = m.outs.map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v)[0];
+    if (topMonth && topMonth.v > 0) s += `支出最集中的月份是 ${topMonth.i + 1} 月（¥${money0(topMonth.v)}，占全年 ${(topMonth.v / (m.expense || 1) * 100).toFixed(1)}%），`;
+    if (catArr.length) s += `花得最多的是「${catArr[0][0]}」（占 ${(catArr[0][1] / (m.expense || 1) * 100).toFixed(1)}%），`;
+    if (m.maxOut) s += `最大一笔是 ${m.maxOut.date.slice(5, 7)} 月 ${m.maxOut.date.slice(8, 10)} 日的 ¥${money(m.maxOut.amount)}。`;
+    parts.push(s);
+  }
+  if (w && w.has) {
+    const d = jin(w.last.kg) - jin(w.first.kg);
+    let s = `体重从年初 ${jinFmt(w.first.kg)} 斤到年末 ${jinFmt(w.last.kg)} 斤，${d <= 0 ? '降了' : '涨了'} ${Math.abs(d).toFixed(1)} 斤`;
+    if (w.goalKg != null) {
+      const gap = jin(w.last.kg) - jin(w.goalKg);
+      s += gap <= 0 ? `，已达成目标（目标 ${jin(w.goalKg).toFixed(1)} 斤）。` : `，距目标 ${jin(w.goalKg).toFixed(1)} 斤还差 ${gap.toFixed(1)} 斤。`;
+    } else s += '。';
+    parts.push(s);
+  }
+  if (t && t.has) {
+    let s = `这一年你记了 ${t.count} 件事`;
+    const catArr = [...t.byCat.entries()].sort((a, b) => b[1] - a[1]);
+    if (catArr.length) s += `，多集中在「${catArr[0][0]}」`;
+    s += '。';
+    parts.push(s);
+  }
+  if (b && b.has && b.rate != null) {
+    parts.push(`预算方面，全年预算 ¥${money(b.sumB)}、实际 ¥${money(b.sumA)}，完成率 ${(b.rate * 100).toFixed(0)}%${b.overMonths ? `，有 ${b.overMonths} 个月超支。` : '，没有超支。'}`);
+  }
+  if (!parts.length) { card.hidden = true; return; }
+  card.hidden = false;
+  $('story').textContent = parts.join('');
+}
+
+function renderHints() {
+  document.querySelectorAll('.chart-scroll[data-hint]').forEach(el => {
+    const h = el.parentElement.querySelector('.scroll-hint');
+    if (h) h.classList.toggle('on', el.scrollWidth > el.clientWidth + 2);
+  });
+  document.querySelectorAll('.chart-scroll').forEach(el => {
+    const h = el.parentElement.querySelector('.scroll-hint');
+    if (h) h.classList.toggle('on', el.scrollWidth > el.clientWidth + 2);
+  });
+}
+
+function renderYear() {
+  renderCover();
+  const m = aggMoney(YEAR);
+  const b = aggBudget(YEAR);
+  const w = aggWeight(YEAR);
+  const t = aggTime(YEAR);
+  renderMoney(m);
+  renderBudget(b);
+  renderBody(w);
+  renderTime(t);
+  renderStory(m, b, w, t);
+  renderHints();
+  const st = $('status');
+  const n = [m.has, b.has, w.has, t.has].filter(Boolean).length;
+  st.textContent = n ? `${YEAR} 年汇总完成，${n} 个区块有数据` : `${YEAR} 年暂无数据`;
+  st.className = n ? 'status ok' : 'status';
+}
+
+async function loadAll() {
+  const st = $('status');
+  st.textContent = '读取中…';
+  st.className = 'status';
+  try {
+    SRC.time = readTime();
+    SRC.weight = readWeight();
+    SRC.budget = readBudget();
+    SRC.ledger = await readLedger();
+  } catch (e) {
+    console.warn('[年度总账] 数据读取异常', e);
+  }
+  buildBuckets();
+  const years = allYears();
+  const sel = $('f-year');
+  if (!years.length) {
+    sel.innerHTML = '<option value="">— 无可用年份 —</option>';
+    sel.disabled = true;
+    ['card-money', 'card-body', 'card-time', 'card-budget', 'card-story'].forEach(id => { $(id).hidden = true; });
+    renderCover(years);
+    $('status').textContent = '没有读到任何数据';
+    $('status').className = 'status warn';
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = years.map(y => `<option value="${y}">${y} 年</option>`).join('');
+  const nowY = String(new Date().getFullYear());
+  const want = String(cfgGet('year', ''));
+  YEAR = (want && years.includes(want)) ? want : years[0];
+  YEAR_HINT = (YEAR !== nowY) ? `本年度是 ${nowY} 年，本机尚无该年记录，已自动切到最近有数据的 ${YEAR} 年。` : '';
+  sel.value = YEAR;
+  renderYear();
+}
+
+$('f-year').addEventListener('change', (e) => {
+  YEAR = e.target.value;
+  cfgSet('year', YEAR);
+  YEAR_HINT = '';
+  renderYear();
+});
+$('f-norm').checked = NORM_ON;
+$('f-norm').addEventListener('change', (e) => {
+  NORM_ON = e.target.checked;
+  cfgSet('norm', NORM_ON ? 1 : 0);
+  renderYear();
+});
+$('reload-btn').addEventListener('click', () => { loadAll(); });
+// 恢复记住的归一化开关（在首屏渲染后立即生效）
+try { const v = cfgGet('norm', 1); NORM_ON = v !== 0 && v !== false; $('f-norm').checked = NORM_ON; } catch (e) {}
+
+loadAll();
+</script>
+</body>
+</html>

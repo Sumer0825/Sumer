@@ -883,6 +883,7 @@ function loadGh() {
   try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {}
 }
 function ghReady() { return !!(GH.token && GH.owner && GH.repo); }
+
 function ghApi() { return `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`; }
 function ghHeaders() {
   return { 'Authorization': `Bearer ${GH.token}`, 'Accept': 'application/vnd.github+json' };
@@ -989,8 +990,13 @@ async function doPull(silent) {
       $('sync-msg').textContent = '云端文件是空的';
     }
   } catch (e) {
-    if (!silent) $('sync-msg').textContent = '连接失败：' + e.message;
-    else console.warn('ghPull 失败:', e.message);
+    // 启动静默拉取失败也必须让用户知道，否则 Token 失效会表现为"一切正常"
+    const hint = (e && /401/.test(e.message || ''))
+      ? '⚠️ Token 无效或已过期，本机数据不受影响，请在同步设置里重新填入有效的 Token'
+      : '连接 GitHub 失败：' + e.message + '（本机数据不受影响）';
+    $('sync-msg').textContent = hint;
+    $('sync-msg').style.color = 'var(--danger)';
+    console.warn('ghPull 失败:', e.message);
   }
 }
 function openSync() {
@@ -1081,6 +1087,6 @@ loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v19</div>
+<div class="ver">v20</div>
 </body>
 </html>
