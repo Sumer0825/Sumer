@@ -4,7 +4,7 @@ const path = require('path');
 
 const DIR = __dirname;
 const PORT = process.env.PORT || 3000;
-const ZIP = path.join(DIR, 'sumer-pages-v39.zip');
+const ZIP = path.join(DIR, 'sumer-pages-v47.zip');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -23,7 +23,7 @@ const MIME = {
 // 原因：整目录开放会让任何放在 portal/ 下的文件（如账本备份 JSON、历史 zip）可被直接下载。
 const ALLOW_FILES = new Set([
   'index.html', 'time.html', 'weight.html', 'budget.html',
-  'storage.html', 'ledger.html', 'annual.html', 'download.html', 'sw.js'
+  'storage.html', 'ledger.html', 'analysis.html', 'download.html', 'sw.js'
 ]);
 const ALLOW_DIRS = ['assets', 'lib'];
 
@@ -45,7 +45,7 @@ http.createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': stat.size,
-      'Content-Disposition': 'attachment; filename="sumer-pages-v39.zip"',
+      'Content-Disposition': 'attachment; filename="sumer-pages-v47.zip"',
       'Cache-Control': 'no-store'
     });
     return fs.createReadStream(ZIP).pipe(res);

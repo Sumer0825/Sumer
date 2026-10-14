@@ -975,7 +975,7 @@ function scheduleAutoPush() {
   autoPushTimer = setTimeout(async () => {
     autoPushTimer = null;
     try {
-      if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
+      if (!GH.sha) { try { const m = await ghGetMeta(); GH.sha = m ? m.sha : null; } catch (_) {} }
       const snapshot = await exportSnapshot();
       // 安全阀：绝不上传空快照，避免清空本机时把云端数据覆盖为空
       if (!snapshot.locations.length && !snapshot.levels.length && !snapshot.items.length) {
@@ -991,92 +991,91 @@ function scheduleAutoPush() {
     }
   }, 600);   // 600ms 防抖，连续编辑不会反复推
 }
-async function ghGetSha() {
+/* ================================================================
+ * GitHub 文件读写：双通道
+ *   contents API 对超过 1MB 的文件不返回内容（content 为空、
+ *   encoding=none）。置物箱图片多时快照很容易超过 1MB，
+ *   因此读：contents 拿 sha，小文件顺带取全文，大文件改走
+ *   Git Blobs API；写：按大小自动选contents 快路径或 blob 六步链。
+ * ================================================================ */
+const GH_HDR = (extra) => Object.assign({
+  'Authorization': 'Bearer ' + GH.token,
+  'Accept': 'application/vnd.github+json'
+}, extra || {});
+const b64decode = (s) => decodeURIComponent(escape(atob(String(s || '').replace(/\n/g, ''))));
+const b64encode = (s) => btoa(unescape(encodeURIComponent(s)));
+async function ghGetMeta() {
   const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
-  const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error('GitHub API ' + res.status);
-  const j = await res.json(); return j.sha || null;
-}
-async function ghGetFile() {
-  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
-  const res = await fetch(apiUrl, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
+  const res = await fetch(url, { headers: GH_HDR() });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('GitHub API ' + res.status);
   const j = await res.json();
-  let txt = '';
-  try { txt = decodeURIComponent(escape(atob((j.content || '').replace(/\n/g, '')))); } catch (_) { txt = ''; }
-  return { sha: j.sha, text: txt };
+  const tooBig = !j.content || j.encoding === 'none' || j.encoding === undefined;
+  return { sha: j.sha || null, size: j.size || 0, inline: tooBig ? '' : b64decode(j.content) };
 }
-async function ghPutFile(content, msg) {
-  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
-  const body = { message: msg || ('更新清居置物箱 ' + new Date().toISOString().slice(0, 10)), content: btoa(unescape(encodeURIComponent(content))), branch: GH.branch };
-  if (GH.sha) body.sha = GH.sha;
-  const res = await fetch(apiUrl, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + GH.token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' }, body: JSON.stringify(body) });
-  if (res.status === 422) { GH.sha = null; return ghPutFile(content, msg); }   // sha 冲突 → 重试
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || ('GitHub API ' + res.status)); }
-  const j = await res.json(); GH.sha = j.content.sha; return j;
-}
-
-/* ---------- GitHub 同步交互（与 budget/weight/time 一致） ---------- */
-function refreshSyncUI() {
-  // 顶部 store-mode + 状态文字（配置存在 ≠ 真连上了，探测失败不能谎报"已连接"）
-  const configured = ghReady();
-  const online = configured && ghConnected !== false;
-  const mode = $('store-mode');
-  mode.textContent = online
-    ? `GitHub JSON（${GH.owner}/${GH.repo}@${GH.branch}）`
-    : (configured ? '本机浏览器（IndexedDB）· 已配置 GitHub，但连接失败' : '本机浏览器（IndexedDB）');
-  const st = $('sync-status');
-  st.textContent = online ? '已连接 GitHub' : (configured ? 'GitHub 连接失败' : '未连接 GitHub');
-  st.className = 'sync-status' + (online ? ' ok' : (configured ? ' err' : ''));
-  $('sync-now-btn').style.display = configured ? '' : 'none';
-  $('gh-disconnect').style.display = configured ? '' : 'none';
-}
-function setSyncMsg(msg, cls) {
-  const el = $('gh-msg');
-  el.textContent = msg || '';
-  el.className = 'tip' + (cls === 'ok' ? '' : cls === 'err' ? ' err' : '');
-  if (cls === 'ok' || cls === 'err') {
-    // 同步更新顶部 sync-status
-    const st = $('sync-status');
-    if (cls === 'ok' && msg) { st.textContent = msg; st.className = 'sync-status ok'; }
-    else if (cls === 'err' && msg) { st.textContent = msg.length > 60 ? msg.slice(0, 60) + '…' : msg; st.className = 'sync-status err'; }
-    setTimeout(() => { if (ghReady()) refreshSyncUI(); else { st.textContent = '未连接 GitHub'; st.className = 'sync-status'; } }, 5000);
-  }
-}
-function ghPrefill() {
-  $('gh-token').value = GH.token || '';
-  $('gh-owner').value = GH.owner || 'sumer0825';
-  $('gh-repo').value = GH.repo || 'Sumer';
-  $('gh-branch').value = GH.branch || 'main';
-  $('gh-path').value = GH.path || 'data/storage.json';
-}
-async function ghGetSha() {
-  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
-  const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error('GitHub API ' + res.status);
-  const j = await res.json(); return j.sha || null;
+async function ghGetBlob(sha) {
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/git/blobs/${sha}`;
+  const res = await fetch(url, { headers: GH_HDR() });
+  if (!res.ok) throw new Error('GitHub Blob API ' + res.status);
+  const j = await res.json();
+  if (j.encoding !== 'base64') throw new Error('Blob 编码异常：' + j.encoding);
+  return b64decode(j.content);
 }
 async function ghGetFile() {
-  const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}?ref=${encodeURIComponent(GH.branch)}`;
-  const res = await fetch(apiUrl, { headers: { 'Authorization': 'Bearer ' + GH.token, 'Accept': 'application/vnd.github+json' } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error('GitHub API ' + res.status);
-  const j = await res.json();
-  let txt = '';
-  try { txt = decodeURIComponent(escape(atob((j.content || '').replace(/\n/g, '')))); } catch (_) { txt = ''; }
-  return { sha: j.sha, text: txt };
+  const m = await ghGetMeta();
+  if (!m) return null;
+  if (m.inline) return { sha: m.sha, text: m.inline, size: m.size };
+  if (!m.sha) return { sha: null, text: '', size: m.size };
+  const text = await ghGetBlob(m.sha);
+  return { sha: m.sha, text, size: m.size };
 }
 async function ghPutFile(content, msg) {
+  if (content.length <= 900000) return ghPutContents(content, msg);
+  return ghPutBlob(content, msg);
+}
+async function ghPutContents(content, msg) {
   const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
-  const body = { message: msg || ('更新清居置物箱 ' + new Date().toISOString().slice(0, 10)), content: btoa(unescape(encodeURIComponent(content))), branch: GH.branch };
+  const body = { message: msg || ('更新清居置物箱 ' + new Date().toISOString().slice(0, 10)), content: b64encode(content), branch: GH.branch };
   if (GH.sha) body.sha = GH.sha;
-  const res = await fetch(apiUrl, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + GH.token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' }, body: JSON.stringify(body) });
-  if (res.status === 422) { GH.sha = null; return ghPutFile(content, msg); }   // sha 冲突 → 重试
+  const res = await fetch(apiUrl, { method: 'PUT', headers: GH_HDR({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+  if (res.status === 422) { GH.sha = null; return ghPutContents(content, msg); }
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || ('GitHub API ' + res.status)); }
   const j = await res.json(); GH.sha = j.content.sha; return j;
+}
+async function ghPutBlob(content, msg) {
+  const api = `https://api.github.com/repos/${GH.owner}/${GH.repo}`;
+  const r1 = await fetch(api + '/git/blobs', {
+    method: 'POST', headers: GH_HDR({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ content: b64encode(content), encoding: 'base64' })
+  });
+  if (!r1.ok) { const e = await r1.json().catch(() => ({})); throw new Error(e.message || ('Blob API ' + r1.status)); }
+  const blobSha = (await r1.json()).sha;
+  const r2 = await fetch(api + `/git/ref/heads/${encodeURIComponent(GH.branch)}`, { headers: GH_HDR() });
+  if (!r2.ok) throw new Error('Git Ref API ' + r2.status);
+  const refSha = (await r2.json()).object.sha;
+  const r3 = await fetch(api + '/git/commits/' + refSha, { headers: GH_HDR() });
+  if (!r3.ok) throw new Error('Git Commit API ' + r3.status);
+  const baseTree = (await r3.json()).tree.sha;
+  const r4 = await fetch(api + '/git/trees', {
+    method: 'POST', headers: GH_HDR({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ base_tree: baseTree, tree: [{ path: GH.path, mode: '100644', type: 'blob', sha: blobSha }] })
+  });
+  if (!r4.ok) { const e = await r4.json().catch(() => ({})); throw new Error(e.message || ('Tree API ' + r4.status)); }
+  const treeSha = (await r4.json()).sha;
+  const commitMsg = msg || ('更新清居置物箱 ' + new Date().toISOString().slice(0, 10));
+  const r5 = await fetch(api + '/git/commits', {
+    method: 'POST', headers: GH_HDR({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ message: commitMsg, tree: treeSha, parents: [refSha] })
+  });
+  if (!r5.ok) { const e = await r5.json().catch(() => ({})); throw new Error(e.message || ('Commit API ' + r5.status)); }
+  const commitSha = (await r5.json()).sha;
+  const r6 = await fetch(api + '/git/refs/heads/' + encodeURIComponent(GH.branch), {
+    method: 'PATCH', headers: GH_HDR({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ sha: commitSha, force: false })
+  });
+  if (!r6.ok) { const e = await r6.json().catch(() => ({})); throw new Error(e.message || ('Ref API ' + r6.status)); }
+  GH.sha = blobSha;
+  return { blobSha, commitSha, size: content.length };
 }
 
 /* ---------- 同步面板交互（与 budget/weight 完全一致：行内卡片，非浮层） ---------- */
@@ -1127,7 +1126,10 @@ $('gh-connect').onclick = async () => {
       setSyncMsg(`✓ 已保存配置。仓库里还没有 ${GH.path}，首次保存数据时自动创建。`, 'ok');
     } else {
       GH.sha = f.sha;
-      const data = JSON.parse(f.text || '{}');
+      // 空内容必须报错：contents API 对 >1MB 文件返回空 content，
+      // 静默当成空对象会导致「云端有数据」被误判为「云端是空的」。
+      if (!f.text) throw new Error(`仓库返回了空内容（文件 ${Math.round((f.size || 0) / 1024)} KB）。请检查 Token 权限是否包含 contents:read。`);
+      const data = JSON.parse(f.text);
       const ok = confirm(`已连接到 GitHub。\n\n仓库现有数据：${data.locations?.length || 0} 个位置 / ${data.items?.length || 0} 件物品。\n\n是否将仓库数据导入本机？（选「取消」则保留本机数据，下次改动时会自动推到仓库）`);
       if (ok) {
         await clearAll();
@@ -1162,7 +1164,7 @@ $('sync-now-btn').onclick = async () => {
   }
   setSyncMsg('正在推到仓库…');
   try {
-    if (!GH.sha) { try { GH.sha = await ghGetSha(); } catch (_) {} }
+    if (!GH.sha) { try { const m = await ghGetMeta(); GH.sha = m ? m.sha : null; } catch (_) {} }
     const snapshot = await exportSnapshot();
     // 最后一道保险：绝不上传空快照
     if (!snapshot.locations.length && !snapshot.levels.length && !snapshot.items.length) {
@@ -1304,7 +1306,8 @@ openDB().then(async () => {
       ghConnected = true;
       if (f) {
         GH.sha = f.sha;
-        const data = JSON.parse(f.text || '{}');
+        if (!f.text) throw new Error(`仓库返回了空内容（文件 ${Math.round((f.size || 0) / 1024)} KB），无法读取。`);
+        const data = JSON.parse(f.text);
         const cloudCount = (data.locations?.length || 0) + (data.items?.length || 0);
         const localCount = locations.length + items.length;
         // 仅当云端数据明显多于本地时（避免误覆盖本机最近改动），自动合并
@@ -1336,6 +1339,6 @@ openDB().then(async () => {
   }
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v25</div>
+<div class="ver">v26</div>
 </body>
 </html>

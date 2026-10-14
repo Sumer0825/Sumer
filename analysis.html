@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>账单透视镜</title>
+<meta name="theme-color" content="#1a1230">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<script>
+/* 必须放在 head 第一个同步执行：提前标记被 iframe 嵌入，避免布局闪烁 */
+try { if (window.self !== window.top) document.documentElement.classList.add('in-frame'); }
+catch (e) { document.documentElement.classList.add('in-frame'); }
+</script>
+<style>
+  :root {
+    --bg: #f5f3fb;
+    --panel: #ffffff;
+    --ink: #322e3a;
+    --muted: #8b8499;
+    --line: #e7e2f0;
+    --brand: #7c6cc4;
+    --brand-soft: #efeaf8;
+    --accent: #6f9c76;
+    --danger: #d9534f;
+    --success: #2c8e60;
+    --up: #ff5d6c;
+    --down: #1f9e5c;
+    --income: #4f7cff;
+    --expense: #f0a04b;
+    --shadow: 0 10px 30px rgba(80, 60, 90, 0.10);
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.66) 100%),
+      url('assets/bg-analysis.png') center / cover no-repeat;
+    color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+  header { padding: 26px 24px 4px; max-width: 1240px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: 1px; }
+  h1 .tag { font-size: 13px; color: var(--brand); background: var(--brand-soft); padding: 3px 10px; border-radius: 999px; margin-left: 10px; vertical-align: middle; }
+  .subtitle { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .readonly-note { font-size: 12.5px; color: #5c544a; margin: 8px 0 0; }
+  .readonly-note b { color: var(--ink); }
+
+  .bar { margin-top: 14px; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .status { font-size: 13px; color: #5c544a; }
+  .status.ok { color: #1f6e4a; }
+  .status.warn { color: var(--danger); }
+
+  .app { max-width: 1240px; margin: 0 auto; padding: 16px 24px 60px; }
+  .card { background: rgba(255,255,255,.92); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
+  .card > h2 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card > .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.6; }
+
+  /* 基线提示条 */
+  .baseline { background: #fff8e8; border: 1px solid #f0dfae; border-left: 4px solid var(--expense); border-radius: 10px; padding: 11px 14px; font-size: 13px; color: #6b5a2e; line-height: 1.7; margin-bottom: 18px; }
+  .baseline b { color: #4d3f18; }
+
+  /* 分层导航 */
+  .layers { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .layers button {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    padding: 8px 15px; border-radius: 999px; font-size: 13.5px; cursor: pointer;
+    font-family: inherit; transition: .15s;
+  }
+  .layers button.on { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+  .layers button:hover:not(.on) { border-color: var(--brand); color: var(--brand); }
+
+  /* 内部 tab */
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+  .tabs button {
+    border: none; background: none; color: var(--muted); font-size: 14.5px;
+    padding: 7px 13px; border-radius: 8px; cursor: pointer; font-family: inherit;
+  }
+  .tabs button.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+
+  /* 粒度切换 */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .seg button { border: none; background: none; padding: 7px 15px; font-size: 13.5px; cursor: pointer; color: var(--muted); font-family: inherit; }
+  .seg button.on { background: var(--brand); color: #fff; font-weight: 600; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row.end { justify-content: flex-end; }
+  .grow { flex: 1; }
+
+  /* 表格 */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+  table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+  table.tbl th, table.tbl td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.tbl th:first-child, table.tbl td:first-child { text-align: left; position: sticky; left: 0; background: rgba(255,255,255,.97); z-index: 1; }
+  table.tbl th { color: var(--muted); font-weight: 500; font-size: 12.5px; user-select: none; }
+  table.tbl th.sortable { cursor: pointer; }
+  table.tbl th.sortable:hover { color: var(--brand); }
+  table.tbl th .arrow { font-size: 10px; opacity: .75; }
+  table.tbl tbody tr:hover td { background: #faf8ff; }
+  table.tbl tbody tr:hover td:first-child { background: #faf8ff; }
+  table.tbl td.num { font-variant-numeric: tabular-nums; }
+  table.tbl .cat-cell { cursor: pointer; }
+  table.tbl .cat-cell:hover { color: var(--brand); }
+  /* 下钻表的「年份小计」行：与矩阵年度金额核对用，需明显区别于明细行 */
+  table.tbl tfoot td { background: #f6f4fc; border-top: 2px solid var(--brand); border-bottom: none; font-size: 12.5px; }
+  table.tbl tfoot td:first-child { background: #f6f4fc; color: var(--brand); }
+  table.tbl tfoot td:first-child, table.tbl tfoot td.num { position: static; }
+  .expand-tip { font-size: 11px; color: var(--brand); margin-left: 5px; }
+
+  .bar-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .bar-track { width: 78px; height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; flex: none; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--brand); }
+
+  .pos { color: var(--up); }      /* 涨 */
+  .neg { color: var(--down); }    /* 跌 */
+  .dim { color: var(--muted); }
+
+  /* 季度/月度色块 */
+  .mini-bar { display: flex; gap: 3px; align-items: flex-end; height: 42px; }
+  .mini-bar i { flex: 1; background: var(--brand-soft); border-radius: 2px 2px 0 0; min-height: 2px; }
+  .mini-bar i.pk { background: var(--expense); }
+
+  /* 标记行 */
+  .flag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+  .flag.waste { background: #fdecec; color: #c0392b; }
+  .flag.need { background: #eaf4ee; color: #2c8e60; }
+
+  /* 大额清单 */
+  .thr-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .thr-row input[type=range] { width: 240px; accent-color: var(--brand); }
+  .thr-val { font-size: 15px; font-weight: 700; color: var(--brand); min-width: 76px; font-variant-numeric: tabular-nums; }
+  .quick { display: flex; gap: 5px; flex-wrap: wrap; }
+  .quick button { border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 8px; padding: 5px 11px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+  .quick button.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+
+  .yr-grp { border: 1px solid var(--line); border-radius: 11px; margin-bottom: 8px; overflow: hidden; }
+  .yr-head { display: flex; align-items: center; gap: 12px; padding: 11px 14px; cursor: pointer; background: #fbfaff; flex-wrap: wrap; }
+  .yr-head:hover { background: #f6f3fe; }
+  .yr-head .yr { font-weight: 700; font-size: 15px; min-width: 48px; }
+  .yr-head .cnt { font-size: 12.5px; color: var(--muted); }
+  .yr-head .top1 { font-size: 12.5px; color: var(--ink); flex: 1; min-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .yr-head .amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .caret { color: var(--brand); font-size: 11px; transition: transform .2s; display: inline-block; }
+  .yr-grp.open .caret { transform: rotate(90deg); }
+  .yr-body { display: none; border-top: 1px solid var(--line); }
+  .yr-grp.open .yr-body { display: block; }
+  .big-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid #f3f0fa; font-size: 13px; flex-wrap: wrap; }
+  .big-item:last-child { border-bottom: none; }
+  .big-item .d { color: var(--muted); font-size: 12px; min-width: 92px; font-variant-numeric: tabular-nums; }
+  .big-item .nt { flex: 1; min-width: 180px; }
+  .big-item .c { font-size: 11.5px; color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: 999px; }
+  .big-item .a { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* 可省项卡片 */
+  .save-item { border: 1px solid var(--line); border-radius: 11px; padding: 13px 15px; margin-bottom: 9px; }
+  .save-item.focus { border-color: var(--brand); background: #fbfaff; }
+  .si-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; }
+  .si-name { font-weight: 600; font-size: 14.5px; }
+  .si-metrics { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+  .si-metrics b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .si-ctrl { display: flex; align-items: center; gap: 9px; margin-top: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+  .si-ctrl input[type=number] { width: 88px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: inherit; }
+  .si-ctrl input[type=range] { width: 130px; accent-color: var(--brand); }
+  .si-out { font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; font-size: 13.5px; }
+
+  .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 6px 13px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+  .btn:hover { border-color: var(--brand); color: var(--brand); }
+  .btn.on-w { background: #fdecec; border-color: #e8a9a4; color: #c0392b; font-weight: 600; }
+  .btn.on-n { background: #eaf4ee; border-color: #9fcdb3; color: #2c8e60; font-weight: 600; }
+
+  .total-box { background: linear-gradient(135deg, var(--brand) 0%, #9b8bd8 100%); color: #fff; border-radius: 13px; padding: 18px 20px; margin: 14px 0 6px; }
+  .total-box .lbl { font-size: 12.5px; opacity: .9; }
+  .total-box .num { font-size: 30px; font-weight: 700; margin: 3px 0; font-variant-numeric: tabular-nums; }
+  .total-box .hint { font-size: 12px; opacity: .88; line-height: 1.6; }
+
+  .empty { text-align: center; padding: 34px 16px; color: var(--muted); font-size: 13.5px; line-height: 1.8; }
+  .empty .big { font-size: 32px; margin-bottom: 8px; }
+
+  .note { font-size: 12px; color: var(--muted); line-height: 1.75; background: #fbfaff; border-radius: 9px; padding: 10px 13px; margin-top: 12px; }
+  .note b { color: var(--ink); }
+
+  .ver { text-align: center; color: var(--muted); font-size: 12px; padding: 10px 0 0; }
+  html.in-frame .app { padding-bottom: 30px; }
+
+  @media (max-width: 640px) {
+    header { padding: 18px 15px 4px; }
+    .app { padding: 14px 15px 40px; }
+    .card { padding: 15px 14px; }
+    h1 { font-size: 20px; }
+    .thr-row input[type=range] { width: 100%; }
+    .bar-track { width: 46px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>账单透视镜<span class="tag">只读</span></h1>
+  <p class="subtitle">看清钱去了哪儿，并找出那些多花、不该花、可以省下来的部分</p>
+  <p class="readonly-note">本页<b>只读</b>本机账本数据，不会新增、修改或删除任何账单。数据源：账本透视 <b>IndexedDB · ledger-p612</b>。唯一可保存的是本页自己的偏好设置（键 <b>analysis_cfg_v1</b>）。</p>
+  <div class="bar">
+    <span class="status" id="status">正在读取账本…</span>
+    <button class="btn" id="btnReload">重新读取</button>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- 空态 -->
+  <div class="card" id="cardEmpty" hidden>
+    <h2>没有读到账本数据</h2>
+    <div class="sub">本页需要账本透视里的本机账单。请先在账本透视导入或录入数据。</div>
+    <div class="empty">
+      <div class="big">📭</div>
+      读到的记录数为 0<br>若账本透视里明明有数据，请确认导入时选择了<b>合并追加</b>，并检查浏览器是否为无痕模式
+    </div>
+  </div>
+
+  <!-- 基线提示条：常驻 -->
+  <div class="baseline" id="baseline" hidden></div>
+
+  <!-- 数据总览 -->
+  <div class="card" id="cardOverview">
+    <h2>📊 数据总览</h2>
+    <div class="sub" id="ovSub">口径：仅统计明细年（逐笔记账）。2012–2018 为平台汇总数、2019 无记录，均不参与占比计算。</div>
+    <div class="sub" style="margin:10px 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="dim" style="font-size:12.5px">切换年份：</span>
+      <div class="seg" id="ovYears"></div>
+      <span class="dim" id="ovYearHint" style="font-size:12px"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl" id="ovTbl"></table>
+    </div>
+  </div>
+
+  <!-- 分层导航 -->
+  <div class="layers" id="layers">
+    <button data-layer="where" class="on">💧 钱去哪儿了</button>
+    <button data-layer="save">✂️ 哪些能省</button>
+  </div>
+
+  <!-- ============ 第一层：钱去哪儿了 ============ -->
+  <div id="layerWhere">
+
+    <!-- 分类四粒度矩阵 -->
+    <div class="card">
+      <h2>分类矩阵 <span class="dim" style="font-size:12px;font-weight:400">行=分类，列随粒度切换</span></h2>
+      <div class="sub">点击分类名可下钻子类。同义写法已合并（食材四写法归一、房租+房租交费归一、早中晚归入餐饮）。点表头可切换排序。</div>
+      <div class="row" style="margin-bottom:12px">
+        <div class="seg" id="segGrain">
+          <button data-g="year" class="on">年</button>
+          <button data-g="quarter">季</button>
+          <button data-g="month">月</button>
+          <button data-g="week">周</button>
+        </div>
+        <span class="dim" id="grainHint" style="font-size:12.5px"></span>
+      </div>
+      <!-- 季度/月度需要明确「跨几年」以及「只看一年」，否则 6 年相加的数字无法解读 -->
+      <div class="row" id="matYearRow" style="margin-bottom:10px" hidden>
+        <span class="dim" style="font-size:12.5px">数据范围：</span>
+        <div class="seg" id="segMatYear"></div>
+        <span class="dim" id="matScopeHint" style="font-size:12.5px"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl" id="matTbl"></table>
+      </div>
+      <div class="note" id="matLegend"></div>
+      <div class="note" id="matNote"></div>
+    </div>
+
+    <!-- 子类下钻 -->
+    <div class="card" id="cardSub" hidden>
+      <h2 id="subTitle">子类下钻</h2>
+      <div class="sub" id="subSub"></div>
+      <div class="row" style="margin-bottom:12px">
+        <label class="dim" style="font-size:12.5px;display:flex;align-items:center;gap:5px">
+          <input type="checkbox" id="chkRaw"> 显示原始写法（不合并同义）
+        </label>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl" id="subTbl"></table>
+      </div>
+      <div class="note" id="subNote"></div>
+    </div>
+
+    <!-- 大额消费清单 -->
+    <div class="card">
+      <h2>🛒 大额消费清单</h2>
+      <div class="sub">回看历年买了什么大件。日常支出<b>不排除</b>，这里只是一个筛选视角。</div>
+      <div class="thr-row">
+        <span class="dim" style="font-size:13px">阈值</span>
+        <input type="range" id="thrRange" min="100" max="5000" step="50" value="200">
+        <span class="thr-val" id="thrVal">≥ ¥200</span>
+        <div class="quick" id="thrQuick">
+          <button data-v="100">100</button>
+          <button data-v="200" class="on">200</button>
+          <button data-v="500">500</button>
+          <button data-v="1000">1000</button>
+          <button data-v="2000">2000</button>
+          <button data-v="5000">5000</button>
+        </div>
+        <div class="grow"></div>
+        <div class="seg" id="segBigSort">
+          <button data-s="date" class="on">按日期</button>
+          <button data-s="amount">按金额</button>
+        </div>
+      </div>
+      <div id="bigStat" class="note" style="margin-top:0;margin-bottom:12px"></div>
+      <div id="bigList"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ 第二层：哪些能省 ============ -->
+  <div id="layerSave" hidden>
+    <div class="tabs" id="saveTabs">
+      <button data-tab="multi" class="on">① 多花的</button>
+      <button data-tab="waste">② 不该花的</button>
+      <button data-tab="total">③ 可省的</button>
+    </div>
+
+    <div id="tabMulti">
+      <div class="card">
+        <h2>笔数激增，但单价没涨</h2>
+        <div class="sub">这一类<b>靠看金额榜永远发现不了</b>——每次花得更少，但次数翻倍。节流手段是砍次数，不是砍单价。</div>
+        <div id="multiList"></div>
+      </div>
+    </div>
+
+    <div id="tabWaste" hidden>
+      <div class="card">
+        <h2>手动标记</h2>
+        <div class="sub">账单只能给线索，「该不该花」最终由你判断。标记结果会累积保存，下次打开直接读。</div>
+        <div class="row" style="margin-bottom:12px">
+          <span class="dim" style="font-size:13px">每页</span>
+          <div class="seg" id="segWastePage">
+            <button data-n="30" class="on">30</button>
+            <button data-n="60">60</button>
+            <button data-n="120">120</button>
+          </div>
+          <label class="dim" style="font-size:12.5px;display:flex;align-items:center;gap:5px">
+            <input type="checkbox" id="chkWasteHideMarked"> 隐藏已标记
+          </label>
+          <div class="grow"></div>
+          <span class="dim" id="wasteStat" style="font-size:13px"></span>
+        </div>
+        <div id="wasteList"></div>
+      </div>
+    </div>
+
+    <div id="tabTotal" hidden>
+      <div class="card">
+        <h2>年度可省总额</h2>
+        <div class="sub">三个来源合并：高频重复类 + 笔数激增类 + 你标记过的浪费。每项可自行设定削减力度。</div>
+        <div class="total-box" id="saveTotalBox"></div>
+        <div id="saveList"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="ver">v7</div>
+<script>
+/* =====================================================================
+ * 账单透视镜 · 本机账本只读分析页
+ * ---------------------------------------------------------------------
+ * 硬约束：本页只允许 localStorage.getItem 与 IndexedDB readonly 事务。
+ * 唯一允许写入的键是 analysis_cfg_v1（标记结果 / 削减力度 / 界面偏好），
+ * 且写入必须经 cfgSet() —— 它是唯一能打开写入哨兵白名单的地方。
+ *
+ * 页面目标：回答两个不同性质的问题
+ *   第一层「钱去哪儿了」= 描述性事实，由数据说话
+ *   第二层「哪些能省」   = 判断性结论，由你拍板，页面只提供线索
+ * ===================================================================== */
+
+/* ---------- 写入哨兵：把「只读」从约定变成机制 ---------- */
+const LS_SENTINEL = { allow: 0 };
+function guardStorage() {
+  const verb = (proto, name) => {
+    const orig = proto[name];
+    if (typeof orig !== 'function' || orig.__anaGuard) return;
+    const wrapped = function (...args) {
+      if (!LS_SENTINEL.allow && !window.__anaTestPermit) {
+        console.error('[账单透视镜] 违规写入已被拦截：' + name + ' → ' + args[0]);
+        return;
+      }
+      return orig.apply(this, args);
+    };
+    wrapped.__anaGuard = true;
+    proto[name] = wrapped;
+  };
+  [Storage.prototype, IDBObjectStore.prototype, IDBTransaction.prototype].forEach(p => {
+    ['setItem', 'removeItem', 'clear', 'put', 'add', 'delete'].forEach(n => verb(p, n));
+  });
+}
+function guardIndexedDB() {
+  const orig = IDBDatabase.prototype.transaction;
+  if (typeof orig !== 'function' || orig.__anaGuard) return;
+  const wrapped = function (names, mode, ...rest) {
+    if ((mode && mode !== 'readonly') && !LS_SENTINEL.allow && !window.__anaTestPermit) {
+      console.error('[账单透视镜] 违规写入已被拦截：transaction(' + mode + ')');
+      return null;
+    }
+    return orig.call(this, names, mode, ...rest);
+  };
+  wrapped.__anaGuard = true;
+  IDBDatabase.prototype.transaction = wrapped;
+}
+guardStorage();
+guardIndexedDB();
+
+/* ---------- 本工具唯一可写的键 ---------- */
+const CFG_KEY = 'analysis_cfg_v1';
+function cfgGet(k, dflt) {
+  try {
+    const s = localStorage.getItem(CFG_KEY);
+    if (s == null) return dflt;
+    const o = JSON.parse(s);
+    return o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : dflt;
+  } catch (e) { return dflt; }
+}
+function cfgSet(k, v) {
+  let cur = {};
+  try { cur = JSON.parse(localStorage.getItem(CFG_KEY) || '{}') || {}; } catch (e) { cur = {}; }
+  cur[k] = v;
+  LS_SENTINEL.allow++;
+  try { localStorage.setItem(CFG_KEY, JSON.stringify(cur)); }
+  finally { LS_SENTINEL.allow--; }
+}
+
+/* ---------- 通用小工具 ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+const money = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money0 = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+const sign = (n) => (n > 0 ? '+' : '');
+const pct = (n, d = 0) => (isFinite(n) ? (n > 0 ? '+' : '') + (n * 100).toFixed(d) + '%' : '—');
+
+/* =====================================================================
+ * 一、只读数据适配层
+ * 以下函数全部只读。任何写入需求都不该在这里实现。
+ * ===================================================================== */
+const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const dim = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function isRealDate(y, m, d) {
+  if (!(y >= 1900 && y <= 2999)) return false;
+  if (!(m >= 1 && m <= 12)) return false;
+  if (!(d >= 1 && d <= 31)) return false;
+  return d <= (m === 2 && isLeap(y) ? 29 : dim[m - 1] || 30);
+}
+
+function readLedger() {
+  return new Promise((resolve) => {
+    const out = { ok: false, records: [], openingBalance: 0, updatedAt: '', n: 0, warn: 0 };
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(out); } };
+    let req;
+    try { req = indexedDB.open('ledger-p612'); }
+    catch (e) { done(); return; }
+    req.onupgradeneeded = () => {
+      // 不传 version 时库不存在会被创建成 version=1 的空库 —— 那也是写系统状态，主动中止
+      try { if (req.transaction) req.transaction.abort(); } catch (e) {}
+    };
+    req.onerror = () => done();
+    req.onblocked = () => done();
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        if (!db.objectStoreNames || !db.objectStoreNames.contains('kv')) { try { db.close(); } catch (e) {} done(); return; }
+        const tx = db.transaction('kv', 'readonly');   // 全文件唯一一处 transaction()，模式硬编码 readonly
+        if (!tx) { try { db.close(); } catch (e) {} done(); return; }
+        const rq = tx.objectStore('kv').get('main');
+        rq.onsuccess = () => {
+          const v = rq.result;
+          if (v && Array.isArray(v.records)) {
+            out.ok = true;
+            out.openingBalance = isFinite(v.openingBalance) ? v.openingBalance : 0;
+            out.updatedAt = String(v.updatedAt || '');
+            v.records.forEach(r => {
+              if (!r || typeof r !== 'object') { out.warn++; return; }
+              const d = String(r.date || '');
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { out.warn++; return; }
+              const y = +d.slice(0, 4), m = +d.slice(5, 7), dd = +d.slice(8, 10);
+              if (!isRealDate(y, m, dd)) { out.warn++; return; }
+              const t = String(r.type || '');
+              if (t !== 'in' && t !== 'out') { out.warn++; return; }
+              let a = parseFloat(r.amount);
+              if (!isFinite(a)) { out.warn++; return; }
+              if (a < 0) { a = Math.abs(a); out.warn++; }   // 导入时符号搞反了，取绝对值
+              out.records.push({
+                id: r.id || '', date: d, type: t, amount: a,
+                category: String(r.category || ''),
+                subcategory: String(r.subcategory || ''),
+                note: String(r.note || ''),
+                account: String(r.account || '')
+              });
+              out.n++;
+            });
+          }
+          done();
+        };
+        rq.onerror = () => done();
+        tx.onerror = () => done();
+        tx.onabort = () => done();
+      } catch (e) { done(); }
+      finally { try { db.close(); } catch (e) {} }   // 防句柄泄漏
+    };
+    setTimeout(done, 4000);   // 兜底，绝不让页面卡在"读取中"
+  });
+}
+
+/* =====================================================================
+ * 二、分类归一化（页面内各写一份，不抽公共库（账本透视 ledger.html 各自独立维护））
+ * ---------------------------------------------------------------------
+ * 账本里类别存在同义异形与复合写法：
+ *   '饮食男女'/'饮食女子'、'其 他'/'其他类'、'生活消费'/'生活中の'
+ * 其中「生活中の」「文娱宠物」「缴费/交通/出行」是复合写法，真实语义藏在
+ * subcategory 里，因此必须「子分类优先」。
+ * ===================================================================== */
+function catKey(s) {
+  let t = String(s ?? '');
+  t = t.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  t = t.replace(/　/g, ' ');
+  t = t.replace(/[\s　]+/g, '');
+  return t.toLowerCase();
+}
+const CAT_MAP = {
+  '饮食男女': '餐饮', '饮食女子': '餐饮', '餐饮': '餐饮', '吃饭': '餐饮', '美食': '餐饮', '早饭': '餐饮', '中饭': '餐饮', '晚饭': '餐饮',
+  '生活消费': '生活', '生活中の': '生活', '生活': '生活',
+  '文娱宠物': '文娱', '文娱': '文娱',
+  '缴费/交通/出行': '缴费交通', '交通出行': '缴费交通', '缴费充值': '缴费交通', '缴费': '缴费交通',
+  '交通': '缴费交通', '打车': '缴费交通', '地铁': '缴费交通', '加油': '缴费交通', '油费': '缴费交通',
+  '日用杂碎': '日用', '日用': '日用', '日用品': '日用', '超市': '日用',
+  '收の入': '收入', '收入': '收入', '工资': '收入',
+  '其他': '其他', '其它': '其他', '其他类': '其他', '其他支出': '其他', '历史账单': '其他',
+  '房租': '居住', '住房': '居住', '物业': '居住', '水费': '居住', '电费': '居住', '燃气': '居住',
+  // 「房の租」：账本里把「的」写成日文「の」的又一处同义异形（同 '生活中の'、'收の入'）。
+  // 实测 22 笔，其中 12 笔 sub='房租' 已被 SUB_MAP 兜住，剩下 10 笔 sub='宾馆'
+  // 原先两层映射全部落空 → 掉进「未分类」。这里补 category 层兜底。
+  '房の租': '居住',
+  '医疗': '医疗', '看病': '医疗',
+  '娱乐': '文娱', '电影': '文娱', '游戏': '文娱', '演唱会': '文娱',
+  '服饰': '服饰', '衣服': '服饰',
+  '教育': '教育', '学费': '教育', '培训': '教育',
+  '通讯': '通讯', '话费': '通讯', '宽带': '通讯'
+};
+console.assert(Object.keys(CAT_MAP).every(k => catKey(k) === k), '[账单透视镜] CAT_MAP 的 key 必须是 catKey() 之后值');
+const SUB_MAP = {
+  '肉蔬食材': '餐饮', '肉果蔬食材': '餐饮', '食材': '餐饮', '蔬菜': '餐饮', '水果': '餐饮',
+  '家居日用': '日用', '日化护肤': '日用', '家居日常': '日用', '厨房杂用': '日用', '生活杂项': '生活',
+  '帽饰服鞋': '服饰', '数码周边': '数码', '数码产品': '数码',
+  '医疗/养生': '医疗', '养生': '医疗',
+  '电费&燃气': '居住', '电费充值': '居住', '水费充值': '居住', '房租': '居住', '房租交费': '居住',
+  '公共交通支出': '交通', '出租滴滴': '交通', '火车高铁': '交通', '火车高铁飞机': '交通', '机票': '交通',
+  '酒店住宿': '住宿', '宾馆': '住宿', '旅馆': '住宿', '民宿': '住宿', '酒店': '住宿', '话费&公交卡': '通讯', '手机话费充值': '通讯', '公交卡充值': '交通',
+  '游戏娱乐充值': '文娱', '影娱演出门票': '文娱'
+};
+const CAT_RULES = [
+  { re: /^(?!.*の).*收/, cat: '收入' },
+  { re: /充值|缴费/, cat: '缴费交通' },
+  { re: /食材|蔬菜|水果|肉|饮|食|餐|饭|吃|外卖/, cat: '餐饮' },
+  { re: /日用|杂碎|纸巾|清洁|超市|厨房/, cat: '日用' },
+  { re: /房租|物业|水费|电费|燃气|住房/, cat: '居住' },
+  { re: /交通|打车|地铁|加油|油费|车费|公交|火车|飞机|滴滴|出租/, cat: '交通' },
+  { re: /酒店|住宿|旅馆|宾馆|民宿/, cat: '住宿' },
+  { re: /医疗|看病|药|挂号|体检|养生/, cat: '医疗' },
+  { re: /服饰|衣服|鞋|帽|包|服/, cat: '服饰' },
+  { re: /数码|电子|手机|电脑/, cat: '数码' },
+  { re: /文娱|娱乐|电影|游戏|演唱|门票|宠物/, cat: '文娱' },
+  { re: /生活/, cat: '生活' },
+  { re: /教育|学费|培训|课程/, cat: '教育' },
+  { re: /通讯|话费|宽带|流量/, cat: '通讯' },
+  { re: /其他|其它/, cat: '其他' }
+];
+const UNCATEGORIZED = '未分类';
+const COMPOSITE = new Set(['生活', '文娱', '缴费交通', '其他']);
+function normCat(raw, rawSub) {
+  const ck = catKey(raw);
+  const sk = catKey(rawSub);
+  if (sk && Object.prototype.hasOwnProperty.call(SUB_MAP, sk)) return SUB_MAP[sk];
+  if (sk) for (const r of CAT_RULES) if (r.re.test(sk)) return r.cat;
+  if (!ck) return UNCATEGORIZED;
+  const mapped = Object.prototype.hasOwnProperty.call(CAT_MAP, ck) ? CAT_MAP[ck] : null;
+  if (mapped) {
+    if (COMPOSITE.has(mapped) && mapped !== '其他') return mapped;
+    return mapped;
+  }
+  for (const r of CAT_RULES) if (r.re.test(ck)) return r.cat;
+  return UNCATEGORIZED;   // 绝不用「其他」兜底
+}
+
+/* =====================================================================
+ * 三、子类别同义合并
+ * ---------------------------------------------------------------------
+ * 实测发现账本里同一件事被写成多个名字：
+ *   食材 → 肉蔬果厨 / 肉蔬食材 / 瓜果蔬菜 / 肉果蔬食材（四个写法）
+ *   房租 → 房租 / 房租交费
+ *   饭  → 早饭 / 中饭 / 晚饭（合并后归入「餐饮」大类下的一档）
+ *   日用 → 家居日用 / 日用杂碎
+ * 不合并会让"找出可压缩项"失真 —— 例如「生活/买菜 120笔→0笔」其实
+ * 只是记账写法改了（挪到了肉蔬食材），不是不花钱了。
+ * ===================================================================== */
+const SUB_MERGE = {
+  '肉蔬果厨': '食材', '肉蔬食材': '食材', '肉果蔬食材': '食材', '瓜果蔬菜': '食材',
+  '蔬菜': '食材', '水果': '食材', '食材': '食材', '食材零食': '食材',
+  '买菜': '食材', '生鲜': '食材',
+  '早饭': '一日三餐', '中饭': '一日三餐', '晚饭': '一日三餐', '一日三餐': '一日三餐',
+  '零食': '零食饮料', '饮品': '零食饮料', '饮品&零食': '零食饮料', '饮料': '零食饮料',
+  '房租': '房租', '房租交费': '房租',
+  '家居日用': '家居日用', '日用杂碎': '家居日用', '家居日常': '家居日用', '厨房杂用': '家居日用',
+  '肉果蔬': '食材'
+};
+function mergeSub(raw) {
+  const k = catKey(raw);
+  if (!k) return '';
+  return Object.prototype.hasOwnProperty.call(SUB_MERGE, k) ? SUB_MERGE[k] : String(raw);
+}
+// 合并后的子类别归到哪个大类：以合并名反查
+const MERGE_PARENT = {
+  '食材': '餐饮', '一日三餐': '餐饮', '零食饮料': '餐饮', '房租': '居住',
+  '家居日用': '日用', '生活杂项': '生活', '宠物开支': '文娱'
+};
+
+/* =====================================================================
+ * 四、粒度工具
+ * ===================================================================== */
+function quarterOf(m) { return Math.ceil(m / 3); }
+function isoWeek(ds) {
+  const [y, m, dd] = ds.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, dd));
+  const dow = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - dow);
+  const yStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil(((dt - yStart) / 86400000 + 1) / 7);
+  return dt.getUTCFullYear() + '-W' + String(wk).padStart(2, '0');
+}
+
+/* =====================================================================
+ * 五、全局状态
+ * ===================================================================== */
+const STATE = {
+  raw: [],
+  exp: [],              // 支出记录（已规范化 + 已标记分类/子类）
+  income: { n: 0, amt: 0 },   // 收入：只统计不参与计算，用于状态栏说明
+  years: [],            // 明细年列表
+  summaryYears: [],     // 汇总年列表
+  gapYears: [],         // 无记录年份
+  baselineYear: 0,
+  layer: 'where',
+  grain: 'year',
+  ovYear: 0,            // 数据总览当前年份，0 = 全部明细年
+  matYear: 0,           // 矩阵的季/月粒度当前年份，0 = 全部年份累计
+  sortKey: 'amt',
+  drillCat: null,
+  rawSub: false,
+  thr: 200,
+  bigSort: 'date',
+  saveTab: 'multi',
+  wastePageN: 30,
+  wasteHideMarked: false,
+  lastUpdatedAt: ''
+};
+const MARK = () => cfgGet('marks', {});        // { recordId: 'waste' | 'need' }
+const CUT = () => cfgGet('cuts', {});          // { subKey: 削减比例 0-100 }
+
+/* =====================================================================
+ * 六、预处理：分类、年份口径、数据集
+ * ===================================================================== */
+function preprocess(ledger) {
+  const all = ledger.records;
+  // 支出（分析只用支出；收入单独计数，仅用于状态栏说明，不参与任何金额/占比计算）
+  const outs = all.filter(r => r.type === 'out');
+  const ins = all.filter(r => r.type === 'in');
+  const inAmt = ins.reduce((s, r) => s + r.amount, 0);
+  // 按年份统计笔数，判定口径
+  const yearCount = {};
+  outs.forEach(r => {
+    const y = +r.date.slice(0, 4);
+    yearCount[y] = (yearCount[y] || 0) + 1;
+  });
+  // 全年份跨度
+  const allYears = Object.keys(yearCount).map(Number).sort((a, b) => a - b);
+  // 汇总年：笔数 ≤2（实测 2012-2018 各 1 笔）
+  const summaryYears = allYears.filter(y => yearCount[y] <= 2);
+  // 明细年：其余
+  const detailYears = allYears.filter(y => yearCount[y] > 2);
+  // 无记录年份：min..max 之间缺失的
+  const gapYears = [];
+  if (allYears.length) {
+    for (let y = allYears[0]; y <= allYears[allYears.length - 1]; y++) {
+      if (!yearCount[y]) gapYears.push(y);
+    }
+  }
+  // 基线年：明细年里支出总额最低的那年（去掉事件年干扰）？不 —— 用最近一年
+  const baselineYear = detailYears.length ? detailYears[detailYears.length - 1] : 0;
+
+  // 明细年的支出
+  const exp = outs.filter(r => detailYears.includes(+r.date.slice(0, 4)));
+
+  // 给每笔打上分类
+  exp.forEach(r => {
+    r._cat = normCat(r.category, r.subcategory);
+    r._subMerged = mergeSub(r.subcategory);
+    r._subRaw = String(r.subcategory || '').trim() || r._cat;
+    // 合并后的子类如果能确定归属大类，则用它（解决「买菜」挪到食材后归类问题）
+    if (MERGE_PARENT[r._subMerged]) r._cat = MERGE_PARENT[r._subMerged];
+    r._year = +r.date.slice(0, 4);
+    r._month = +r.date.slice(5, 7);
+    r._quarter = quarterOf(r._month);
+    r._week = isoWeek(r.date);
+  });
+
+  STATE.raw = all;
+  STATE.exp = exp;
+  STATE.years = detailYears;
+  STATE.summaryYears = summaryYears;
+  STATE.gapYears = gapYears;
+  STATE.baselineYear = baselineYear;
+  STATE.income = { n: ins.length, amt: inAmt };
+  return { total: exp.reduce((s, r) => s + r.amount, 0) };
+}
+
+/* =====================================================================
+ * 七、汇总计算
+ * ===================================================================== */
+function catSummary() {
+  const total = STATE.exp.reduce((s, r) => s + r.amount, 0);
+  const map = {};
+  STATE.exp.forEach(r => {
+    if (!map[r._cat]) map[r._cat] = { cat: r._cat, amt: 0, n: 0, days: new Set(), max: 0, years: {} };
+    const o = map[r._cat];
+    o.amt += r.amount; o.n++; o.days.add(r.date);
+    if (r.amount > o.max) o.max = r.amount;
+    o.years[r._year] = (o.years[r._year] || 0) + r.amount;
+  });
+  const arr = Object.values(map).map(o => ({
+    ...o,
+    dayCount: o.days.size,
+    perDay: o.n / o.days.size,
+    share: total ? o.amt / total : 0,
+    activeWeeks: (() => { const s = new Set(); STATE.exp.filter(r => r._cat === o.cat).forEach(r => s.add(r._week)); return s; })().size,
+    yrAmt: (() => { const v = STATE.years.map(y => o.years[y] || 0); const f = v.filter(x => x > 0); return f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0; })(),
+    yrN: (() => { const c = STATE.years.map(y => STATE.exp.filter(r => r._cat === o.cat && r._year === y).length); const f = c.filter(x => x > 0); return f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0; })(),
+    growth: (() => {
+      const cy = comparableYears();
+      if (cy.length < 2) return null;
+      const f = cy[0], l = cy[cy.length - 1];
+      const a = o.years[f] || 0, b = o.years[l] || 0;
+      return a > 0 ? (b - a) / a : null;   // null = 新增类别
+    })()
+  }));
+  const totalWeeks = (() => { const s = new Set(); STATE.exp.forEach(r => s.add(r._week)); return s.size; })();
+  arr.forEach(o => { o.weekCover = totalWeeks ? o.activeWeeks / totalWeeks : 0; });
+  return { arr, total, totalWeeks };
+}
+
+function subSummary(cat) {
+  const map = {};
+  STATE.exp.filter(r => r._cat === cat).forEach(r => {
+    const k = STATE.rawSub ? r._subRaw : (r._subMerged || r._subRaw);
+    if (!map[k]) map[k] = { sub: k, amt: 0, n: 0, max: 0, years: {} };
+    const o = map[k];
+    o.amt += r.amount; o.n++;
+    if (r.amount > o.max) o.max = r.amount;
+    o.years[r._year] = (o.years[r._year] || 0) + r.amount;
+  });
+  return Object.values(map).map(o => ({
+    ...o,
+    avg: o.amt / o.n,
+    growth: (() => {
+      const cy = comparableYears();
+      if (cy.length < 2) return null;
+      const f = cy[0], l = cy[cy.length - 1];
+      const a = o.years[f] || 0, b = o.years[l] || 0;
+      return a > 0 ? (b - a) / a : null;
+    })()
+  })).sort((a, b) => b.amt - a.amt);
+}
+
+/* 各粒度下的分组键 */
+function bucketOf(r, grain) {
+  switch (grain) {
+    case 'year': return r._year;
+    case 'quarter': return r._quarter;
+    case 'month': return r._month;
+    case 'week': return r._week;
+    default: return r._year;
+  }
+}
+
+/* =====================================================================
+ * 八、第一层渲染
+ * ===================================================================== */
+const C = { brand: '#7c6cc4', up: '#ff5d6c', down: '#1f9e5c', expense: '#f0a04b', gray: '#c9c2d8', blue: '#4f7cff' };
+
+/* ---------- 数据总览 ---------- */
+
+// 可切换年份的门槛：明细年里笔数 > 100 才算「逐笔记账有分析价值」
+const OV_MIN_N = 100;
+
+// 有资格的年份（明细年 且 支出笔数 > OV_MIN_N）
+function ovYears() {
+  const c = {};
+  STATE.exp.forEach(r => { c[r._year] = (c[r._year] || 0) + 1; });
+  return STATE.years.filter(y => (c[y] || 0) > OV_MIN_N)
+    .map(y => ({ y, n: c[y] || 0 }));
+}
+
+function renderOvYears() {
+  const ys = ovYears();
+  // 当前选择若已失效（例如新导入了数据），回落到「全部」
+  if (STATE.ovYear && !ys.some(o => o.y === STATE.ovYear)) STATE.ovYear = 0;
+
+  let h = '<button data-y="0" class="' + (STATE.ovYear ? '' : 'on') + '">全部</button>';
+  ys.forEach(o => {
+    h += `<button data-y="${o.y}" class="${STATE.ovYear === o.y ? 'on' : ''}">${o.y}<span style="opacity:.7;font-size:11.5px;margin-left:3px">${o.n}</span></button>`;
+  });
+  $('ovYears').innerHTML = h;
+
+  // 被门槛挡下的年份，明确说出来，避免「年份不见了」变成疑问
+  const c = {};
+  STATE.exp.forEach(r => { c[r._year] = (c[r._year] || 0) + 1; });
+  const blocked = STATE.years.filter(y => (c[y] || 0) <= OV_MIN_N);
+  $('ovYearHint').textContent = blocked.length
+    ? `按钮后数字是该年支出笔数；${blocked.map(y => `${y}（${c[y] || 0} 笔）`).join('、')} 不超过 ${OV_MIN_N} 笔，未提供切换`
+    : '按钮后数字是该年支出笔数';
+
+  $('ovYears').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.ovYear = +b.dataset.y;
+      renderOvYears();
+      renderOverview();
+    };
+  });
+}
+
+function renderOverview() {
+  renderOvYears();
+
+  // 按当前选择的年份取作用域
+  const scope = STATE.ovYear ? STATE.exp.filter(r => r._year === STATE.ovYear) : STATE.exp;
+  const scoped = !!STATE.ovYear;
+
+  const total = scope.reduce((s, r) => s + r.amount, 0);
+  const yr = {};
+  scope.forEach(r => { yr[r._year] = (yr[r._year] || 0) + r.amount; });
+
+  const useYears = scoped ? [STATE.ovYear] : STATE.years;
+  const y0 = useYears[0], y1 = useYears[useYears.length - 1];
+  const spans = useYears.length;
+  const perYear = total / spans;
+
+  const yrVals = useYears.map(y => yr[y] || 0);
+  const avg = yrVals.reduce((a, b) => a + b, 0) / (yrVals.length || 1);
+  const peakY = useYears[yrVals.indexOf(Math.max(...yrVals))];
+
+  const weeks = (() => { const s = new Set(); scope.forEach(r => s.add(r._week)); return s.size; })();
+  const dayCount = (() => { const s = new Set(); scope.forEach(r => s.add(r.date)); return s.size; })();
+
+  // 单年时，日均/周均要按该年真实跨度折算，否则「日均支出」会被稀释成跨年均值
+  const daySpan = scoped
+    ? (() => {
+        const ds = scope.map(r => r.date).sort();
+        return Math.round((new Date(ds[ds.length - 1]) - new Date(ds[0])) / 86400000) + 1;
+      })()
+    : 0;
+  const dayBase = scoped ? daySpan : dayCount;
+
+  let h = '';
+  h += '<thead><tr><th>指标</th><th>数值</th><th>说明</th></tr></thead><tbody>';
+  const row = (a, b, c) => `<tr><td>${a}</td><td class="num"><b>${b}</b></td><td class="dim" style="text-align:left;font-size:12.5px">${c}</td></tr>`;
+
+  if (scoped) {
+    h += row(`${STATE.ovYear} 年支出总额`, '¥' + money0(total), `${scope.length} 笔 · ${dayCount} 个记账日`);
+    h += row('月均支出', '¥' + money0(total / 12), '按该年 12 个月折算');
+    h += row('周均支出', '¥' + money0(total / (weeks || 1)), `${weeks} 个有记账的周`);
+    h += row('日均支出', '¥' + money0(total / (dayBase || 1)), scoped
+      ? `按该年首末记账日跨度 ${dayBase} 天折算（不是只除以记账日，避免淡季被拉高）`
+      : `${dayCount} 个记账日`);
+    h += row('日均笔数', (scope.length / (dayBase || 1)).toFixed(2) + ' 笔', `${scope.length} 笔 ÷ ${dayBase} 天`);
+    h += row('笔均金额', '¥' + money0(total / (scope.length || 1)), '单笔平均，识别高频小额的关键参照');
+    h += row('记账覆盖', Math.round(dayCount / (dayBase || 1) * 100) + '%', `${dayCount} 天有记账 / 全年 ${dayBase} 天`);
+    h += '</tbody>';
+    $('ovTbl').innerHTML = h;
+    $('ovSub').textContent = `当前只看 ${STATE.ovYear} 年（${scope.length} 笔支出）。切回「全部」可看 ${STATE.years[0]}–${STATE.years[STATE.years.length - 1]} 年合计。`;
+    return;
+  }
+
+  h += row('明细年支出总额', '¥' + money0(total), `${y0}–${y1} 共 ${spans} 个明细年，${STATE.exp.length} 笔`);
+  h += row('年均支出', '¥' + money0(perYear), spans > 1 ? `峰值为 ${peakY} 年（¥${money0(Math.max(...yrVals))}）` : '');
+  h += row('月均支出', '¥' + money0(total / spans / 12), '按明细年折算');
+  h += row('周均支出', '¥' + money0(total / (CS.totalWeeks || 1)), `${CS.totalWeeks} 个有记账的周`);
+  h += row('日均支出', '¥' + money0(total / (dayCount || 1)), `${dayCount} 个记账日（只算有记账的日子）`);
+  h += row('日均笔数', (STATE.exp.length / (dayCount || 1)).toFixed(2) + ' 笔', `${STATE.exp.length} 笔 ÷ ${dayCount} 天`);
+  h += row('笔均金额', '¥' + money0(total / (STATE.exp.length || 1)), '单笔平均，识别高频小额的关键参照');
+  h += '</tbody>';
+  $('ovTbl').innerHTML = h;
+
+  // 口径说明
+  const inc = STATE.income || { n: 0, amt: 0 };
+  let note = '口径：仅统计明细年（逐笔记账）。';
+  note += inc.n
+    ? ` 收入记录 ${inc.n} 条（合计 ¥${money0(inc.amt)}）已全部排除，不计入任何金额、笔数、占比与节流测算。`
+    : ' 本账本无收入记录。';
+  if (STATE.summaryYears.length) {
+    note += ` 汇总年 ${STATE.summaryYears[0]}–${STATE.summaryYears[STATE.summaryYears.length - 1]} 为各平台年度汇总数（每年仅 1 笔，合计 ¥${money0(STATE.raw.filter(r => r.type === 'out' && STATE.summaryYears.includes(+r.date.slice(0, 4))).reduce((s, r) => s + r.amount, 0))}），已排除在占比之外。`;
+  }
+  if (STATE.gapYears.length) {
+    note += ` ${STATE.gapYears.join('、')} 年无任何记录，按无记录处理。`;
+  }
+  $('ovSub').textContent = note;
+}
+
+/* ---------- 基线提示条 ---------- */
+function renderBaseline() {
+  const yr = {};
+  STATE.exp.forEach(r => { yr[r._year] = (yr[r._year] || 0) + r.amount; });
+  const vals = STATE.years.map(y => ({ y, v: yr[y] || 0 }));
+  const avg = vals.reduce((a, b) => a + b.v, 0) / (vals.length || 1);
+  const eventYears = vals.filter(o => o.v > avg * 1.2).map(o => o.y);
+  const by = STATE.baselineYear;
+  const byV = yr[by] || 0;
+
+  let html = '<b>节流基线提示：</b>';
+  if (eventYears.length) {
+    html += `${eventYears.join('、')} 年支出明显高于均值（`;
+    html += eventYears.map(y => `${y} ¥${money0(yr[y])}`).join('、');
+    html += `），主要来自搬家置办等一次性事件，<b>不应作为节流基准</b>。`;
+  } else {
+    html += '未检测到明显的事件性年份。';
+  }
+  html += `建议以 <b>${by} 年（¥${money0(byV)}）</b> 作为日常支出的参照线。`;
+  $('baseline').innerHTML = html;
+  $('baseline').hidden = false;
+}
+
+/* ---------- 分类矩阵 ---------- */
+let CS = null;   // catSummary 缓存
+
+// 矩阵当前作用域的支出总额（用于「只看某年」的范围说明）
+function scopeTotal() {
+  return STATE.exp
+    .filter(r => !STATE.matYear || r._year === STATE.matYear)
+    .reduce((s, r) => s + r.amount, 0);
+}
+
+function renderMatrix() {
+  CS = catSummary();
+  const grain = STATE.grain;
+  const total = CS.total;
+  const arrAll = CS.arr;   // 全部年份的分类清单
+  let arr = arrAll;         // 实际渲染用的清单（单年作用域下会过滤，稍后赋值）
+
+  // 收集所有桶
+  const buckets = [];
+  if (grain === 'year') buckets.push(...STATE.years);
+  else if (grain === 'quarter') buckets.push(1, 2, 3, 4);
+  else if (grain === 'month') buckets.push(...Array.from({ length: 12 }, (_, i) => i + 1));
+  else buckets.length = 0;   // 周粒度单独处理
+
+  // 月/季列默认是「历年同月相加」，数字很大且无法解读 —— 允许只看一年
+  const scopeYears = (grain === 'quarter' || grain === 'month') ? STATE.years : [];
+  if (STATE.matYear && !scopeYears.includes(STATE.matYear)) STATE.matYear = 0;
+  const multiYear = scopeYears.length > 1;
+  // 有多年份可对比时才显示范围切换
+  // 注意：.row 的 display:flex 会覆盖 hidden 属性的默认 display:none，必须显式写
+  $('matYearRow').style.display = multiYear ? 'flex' : 'none';
+  if (multiYear) {
+    let yh = '<button data-my="0" class="' + (STATE.matYear ? '' : 'on') + '">' + STATE.years[0] + '–' + STATE.years[scopeYears.length - 1] + ' 合计</button>';
+    scopeYears.forEach(y => {
+      yh += `<button data-my="${y}" class="${STATE.matYear === y ? 'on' : ''}">${y} 年</button>`;
+    });
+    $('segMatYear').innerHTML = yh;
+    $('segMatYear').querySelectorAll('button').forEach(b => {
+      b.onclick = () => { STATE.matYear = +b.dataset.my; renderMatrix(); };
+    });
+    $('matScopeHint').textContent = STATE.matYear
+      ? `只看 ${STATE.matYear} 年单年数据（该年支出 ¥${money0(scopeTotal())}）`
+      : `${scopeYears.length} 年同月（或同季）相加。想和单年比请切到某一年。`;
+  }
+
+  // 数据作用域：月/季且选了年份 → 只算那一年；否则全部明细年
+  const SCOPE = STATE.exp.filter(r => !STATE.matYear || r._year === STATE.matYear);
+  const scopeYearsUsed = STATE.matYear ? [STATE.matYear] : STATE.years;
+
+  // 按作用域重算每个分类的统计（否则切到单年后，右侧笔数/周活跃仍是 6 年口径，会误导）
+  const scopedAgg = (() => {
+    const m = {};
+    SCOPE.forEach(r => {
+      if (!m[r._cat]) m[r._cat] = { cat: r._cat, amt: 0, n: 0, days: new Set(), weeks: new Set(), max: 0 };
+      const o = m[r._cat];
+      o.amt += r.amount; o.n++; o.days.add(r.date); o.weeks.add(r._week);
+      if (r.amount > o.max) o.max = r.amount;
+    });
+    const totW = new Set(SCOPE.map(r => r._week)).size;
+    return Object.values(m).map(o => ({
+      ...o,
+      perDay: o.days.size ? o.n / o.days.size : 0,
+      activeWeeks: o.weeks.size,
+      weekCover: totW ? o.weeks.size / totW : 0,
+      scopeWeeks: totW
+    }));
+  })();
+  const S_MAP = {};
+  scopedAgg.forEach(o => { S_MAP[o.cat] = o; });
+
+  // 单年作用域：只保留该年真实出现过的分类。
+  // 否则会出现「切到 2025 年，表里却出现只存在于 2023 年的「未分类」」——
+  // 那行 12 个月全是「—」，合计还显示 2023 年的 ¥2,662，属于明确的误导。
+  if (STATE.matYear) {
+    arr = arrAll.filter(o => (S_MAP[o.cat] || {}).n > 0);
+  }
+  const SC = STATE.exp.length === SCOPE.length ? CS : { totalWeeks: (scopedAgg[0] ? scopedAgg[0].scopeWeeks : 0) };
+
+  // 预聚合
+  const agg = {};
+  arr.forEach(o => { agg[o.cat] = {}; });
+  SCOPE.forEach(r => {
+    const b = bucketOf(r, grain);
+    if (!agg[r._cat]) agg[r._cat] = {};
+    agg[r._cat][b] = (agg[r._cat][b] || 0) + r.amount;
+  });
+
+  const S = { amt: 'amt', n: 'n', growth: 'growth', week: 'weekCover' };
+  const sk = STATE.sortKey;
+  arr.sort((a, b) => {
+    if (sk === 'amt') return b.amt - a.amt;
+    if (sk === 'n') return b.n - a.n;
+    if (sk === 'week') return b.weekCover - a.weekCover;
+    if (sk === 'growth') {
+      const av = a.growth == null ? -999 : a.growth;
+      const bv = b.growth == null ? -999 : b.growth;
+      return bv - av;
+    }
+    return b.amt - a.amt;
+  });
+
+  const maxBucket = {};
+  buckets.forEach(b => { maxBucket[b] = 0; });
+  arr.forEach(o => buckets.forEach(b => { const v = agg[o.cat][b] || 0; if (v > maxBucket[b]) maxBucket[b] = v; }));
+  const maxAmt = Math.max(...arr.map(o => o.amt), 1);
+
+  let h = '<thead><tr>';
+  h += `<th class="sortable ${sk === 'amt' ? '' : ''}" data-s="amt">分类${sk === 'amt' ? '<span class="arrow">▼</span>' : ''}</th>`;
+  if (grain === 'year') {
+    buckets.forEach(b => { h += `<th>${b}</th>`; });
+    h += `<th class="sortable" data-s="amt">合计${sk === 'amt' ? '<span class="arrow">▼</span>' : ''}</th>`;
+    h += `<th>占比</th>`;
+  } else if (grain === 'week') {
+    h += '<th title="该分类在多少个不重复的周里出现过">活跃周</th><th title="活跃周 ÷ 当前范围内全部周">周覆盖</th><th title="该分类笔数 ÷ 当前范围内全部周">周均笔数</th><th title="该分类金额 ÷ 当前范围内全部周">周均金额</th>';
+  } else {
+    buckets.forEach(b => { h += `<th>${grain === 'quarter' ? 'Q' + b : b + '月'}</th>`; });
+    h += `<th class="sortable" data-s="amt">合计${sk === 'amt' ? '<span class="arrow">▼</span>' : ''}</th>`;
+    h += '<th title="该行金额最高的那一格">峰值</th>';
+  }
+  h += `<th class="sortable" data-s="n" title="当前范围内的支出笔数">笔数${sk === 'n' ? '<span class="arrow">▼</span>' : ''}</th>`;
+  h += '<th title="笔数 ÷ 该分类有记账的天数">笔/记账天</th>';
+  h += `<th class="sortable" data-s="week" title="该分类出现过的周数 ÷ 当前范围内全部周">周活跃${sk === 'week' ? '<span class="arrow">▼</span>' : ''}</th>`;
+  h += `<th class="sortable" data-s="growth" title="最后一个可比年相对第一个可比年的金额变化">首末年变化${sk === 'growth' ? '<span class="arrow">▼</span>' : ''}</th>`;
+  h += '<th title="该分类单笔支出的最大值">最大单笔</th>';
+  h += '</tr></thead><tbody>';
+
+  const gcls = (g) => g == null ? '<span class="dim">—</span>' : (g > 0 ? `<span class="pos">${pct(g)}</span>` : (g < 0 ? `<span class="neg">${pct(g)}</span>` : '<span class="dim">0%</span>'));
+
+  arr.forEach(o => {
+    const drill = STATE.drillCat === o.cat ? 'on' : '';
+    const S_ = S_MAP[o.cat] || o;   // 作用域内的统计（单年时 ≠ 全部年份）
+    h += `<tr><td class="cat-cell" data-cat="${esc(o.cat)}">${esc(o.cat)}<span class="expand-tip">${drill ? '收起' : '下钻'}</span></td>`;
+    if (grain === 'week') {
+      // 单年作用域时右侧统计必须换成该年口径，否则与表内单年数字对不上
+      const wkTotal = SC.totalWeeks || 1;
+      h += `<td class="num">${S_.activeWeeks}</td>`;
+      h += `<td class="num">${(S_.weekCover * 100).toFixed(0)}%</td>`;
+      h += `<td class="num">${(S_.n / wkTotal).toFixed(2)}</td>`;
+      h += `<td class="num">¥${money0(S_.amt / wkTotal)}</td>`;
+    } else {
+      buckets.forEach(b => {
+        const v = agg[o.cat][b] || 0;
+        if (grain === 'year') {
+          h += `<td class="num">${v > 0 ? '¥' + money0(v) : '<span class="dim">—</span>'}</td>`;
+        } else {
+          const isPk = v > 0 && v === maxBucket[b];
+          h += `<td class="num" style="${isPk ? 'color:#f0a04b;font-weight:600' : (v > 0 ? '' : 'color:#c9c2d8')}">${v > 0 ? money0(v) : '—'}</td>`;
+        }
+      });
+      const rowAmt = STATE.matYear ? S_.amt : o.amt;
+      h += `<td class="num"><div class="bar-cell"><span>¥${money0(rowAmt)}</span><span class="bar-track"><span class="bar-fill" style="width:${(rowAmt / maxAmt * 100).toFixed(1)}%"></span></span></div></td>`;
+      if (grain !== 'year') {
+        const vals = buckets.map(b => agg[o.cat][b] || 0);
+        const pk = buckets[vals.indexOf(Math.max(...vals))];
+        h += `<td class="num" style="color:#f0a04b">${grain === 'quarter' ? 'Q' + pk : pk + '月'}</td>`;
+      } else {
+        h += `<td class="num">${(o.share * 100).toFixed(1)}%</td>`;
+      }
+    }
+    h += `<td class="num">${STATE.matYear ? S_.n : o.n}</td>`;
+    h += `<td class="num">${S_.perDay.toFixed(2)}</td>`;
+    h += `<td class="num">${(S_.weekCover * 100).toFixed(0)}%</td>`;
+    h += `<td class="num">${gcls(o.growth)}</td>`;
+    h += `<td class="num">¥${money0(STATE.matYear ? S_.max : o.max)}</td>`;
+    h += '</tr>';
+  });
+  h += '</tbody>';
+  $('matTbl').innerHTML = h;
+
+  // 排序事件
+  $('matTbl').querySelectorAll('th.sortable').forEach(th => {
+    th.onclick = () => { STATE.sortKey = th.dataset.s; renderMatrix(); };
+  });
+  $('matTbl').querySelectorAll('td.cat-cell').forEach(td => {
+    td.onclick = () => {
+      STATE.drillCat = STATE.drillCat === td.dataset.cat ? null : td.dataset.cat;
+      renderMatrix();
+      renderSub();
+      $('cardSub').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+  });
+
+  // 提示：明确说清「这一屏的数字覆盖哪些年份」，这是最容易看错的地方
+  const YS = STATE.years;
+  const rangeTxt = STATE.years.length ? `${YS[0]}–${YS[YS.length - 1]}（${YS.length} 个明细年）` : '无';
+  const hints = {
+    year: `每一列是一个自然年，数字就是该年该分类的支出额。数据覆盖 ${rangeTxt}。`,
+    quarter: STATE.matYear
+      ? `只统计 ${STATE.matYear} 年。橙色格子是该列金额最高的分类。`
+      : `每一列是「所有年份的 Q1 加在一起」，所以数字是 ${YS.length} 年累计（不是单年）。要看单年请在上方切到某一年。橙色 = 该列金额最高的分类。`,
+    month: STATE.matYear
+      ? `只统计 ${STATE.matYear} 年。橙色格子是该列金额最高的分类。`
+      : `每一列是「所有年份的同月加在一起」，即 ${YS.length} 年累计（不是单年）。要看单年请在上方切到某一年。橙色 = 该列金额最高的分类。`,
+    week: STATE.matYear
+      ? `只统计 ${STATE.matYear} 年。周覆盖 = 该分类出现过的周数 ÷ 该年全部有记账的周。`
+      : `「活跃周」是 ${YS.length} 年里该分类出现过的周数（去重后约 ${CS.totalWeeks} 周），不是单年周数。周覆盖 99% 意味着这几十年里几乎每周都在花这个钱。`
+  };
+  $('grainHint').textContent = hints[grain];
+
+  // 图例：把橙色到底代表什么写死在一眼可见的地方
+  let lg = '<b>怎么读这张表：</b>';
+  lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0"><span style="display:inline-block;min-width:52px;text-align:center;background:#fdf3e6;color:#f0a04b;font-weight:600;border-radius:5px;padding:1px 6px">${money0(1234)}</span> 橙色粗体 = 该列（那个月/那个季）金额最高的分类</span>`;
+  lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0"><span style="display:inline-block;min-width:52px;text-align:center;color:#c9c2d8">—</span> 灰色 = 该月/该季没有支出</span>`;
+  lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 0 4px 0"><span style="display:inline-block;min-width:52px;text-align:center">${money0(5678)}</span> 普通数字 = 正常值</span>`;
+  lg += `<div style="margin-top:4px">合计、笔数、周活跃、最大单笔这几列${STATE.matYear ? `现在都是<b>${STATE.matYear} 年单年</b>口径` : `都是${rangeTxt} <b>合计</b>口径`}。鼠标停在列名上可看该列定义。</div>`;
+  $('matLegend').innerHTML = lg;
+
+  // 结论
+  let note = '';
+  if (grain === 'week') {
+    const top = arr.slice().sort((a, b) => b.weekCover - a.weekCover).slice(0, 3);
+    note += `周活跃最高：${top.map(o => `<b>${esc(o.cat)}</b> ${(o.weekCover * 100).toFixed(0)}%（${o.activeWeeks} 周）`).join('、')}。`;
+  } else {
+    const byAmt = arr.slice().sort((a, b) => b.amt - a.amt).slice(0, 3);
+    note += `金额最高：${byAmt.map(o => `<b>${esc(o.cat)}</b> ¥${money0(o.amt)}（${(o.share * 100).toFixed(1)}%）`).join('、')}。`;
+    const byN = arr.slice().sort((a, b) => b.n - a.n).slice(0, 3);
+    note += `笔数最多：${byN.map(o => `<b>${esc(o.cat)}</b> ${o.n} 笔`).join('、')}。`;
+    note += `<br><b>金额高和频次高完全是两批分类</b> —— 别用金额榜去找可压缩项。`;
+  }
+  if (grain === 'quarter') {
+    const qk = arr.filter(o => o.amt / total > 0.05);
+    qk.forEach(o => {
+      const vals = [1, 2, 3, 4].map(q => STATE.exp.filter(r => r._cat === o.cat && r._quarter === q).reduce((s, r) => s + r.amount, 0));
+      const t = vals.reduce((a, b) => a + b, 0);
+      const mx = Math.max(...vals);
+      if (mx / t < 0.35) return;   // 四季均匀的不提示
+      const qi = vals.indexOf(mx) + 1;
+      note += `<br><b>${esc(o.cat)}</b> 集中在 Q${qi}（${(mx / t * 100).toFixed(0)}%），属季节性支出。`;
+    });
+  }
+  $('matNote').innerHTML = note;
+}
+
+/* ---------- 子类下钻 ---------- */
+function renderSub() {
+  if (!STATE.drillCat) { $('cardSub').hidden = true; return; }
+  $('cardSub').hidden = false;
+  const cat = STATE.drillCat;
+  $('subTitle').innerHTML = `${esc(cat)} · 子类下钻`;
+  const subs = subSummary(cat);
+  const total = subs.reduce((s, o) => s + o.amt, 0);
+  const maxA = Math.max(...subs.map(o => o.amt), 1);
+  const yrs = STATE.years;
+  const f = yrs[0], l = yrs[yrs.length - 1];
+
+  $('subSub').innerHTML = (STATE.rawSub
+    ? '当前显示原始写法，未做同义合并。'
+    : '同义写法已合并。取消勾选可看到你当时的原始写法 —— 两者差异大，说明记账方式变了而非消费变了。')
+    // 下钻表是「全部年份累计」口径，与矩阵的单年作用域天然不同。
+    // 不说清楚就会像 bug：矩阵 2022 年「其他」显示 ¥62,812，
+    // 下钻里有个子类叫「其他」也是 ¥58,079，看着像对不上，其实一个是类别、一个是子类。
+    + `<br><b>本表始终是 ${yrs[0]}–${yrs[yrs.length - 1]} 年累计口径</b>，`
+    + '不受上方矩阵的年份选择影响；表尾「年份小计」一行是各子类相加，可与矩阵里该分类的年度金额对上。'
+    + '（另注意：子类名字可能与分类同名，例如分类「其他」下也有个子类叫「其他」，两者不是一回事。）';
+
+  let h = '<thead><tr><th>子类</th>';
+  yrs.forEach(y => { h += `<th>${y}</th>`; });
+  h += '<th>合计</th><th>占比</th><th>笔数</th><th>笔均</th><th>首末年变化</th><th>最大单笔</th></tr></thead><tbody>';
+
+  const byKey = {};
+  STATE.exp.filter(r => r._cat === cat).forEach(r => {
+    const k = STATE.rawSub ? r._subRaw : (r._subMerged || r._subRaw);
+    (byKey[k] = byKey[k] || {})[r._year] = ((byKey[k] || {})[r._year] || 0) + r.amount;
+  });
+
+  subs.forEach(o => {
+    h += `<tr><td>${esc(o.sub)}</td>`;
+    yrs.forEach(y => {
+      const v = (byKey[o.sub] || {})[y] || 0;
+      h += `<td class="num">${v > 0 ? '¥' + money0(v) : '<span class="dim">—</span>'}</td>`;
+    });
+    h += `<td class="num"><div class="bar-cell"><span>¥${money0(o.amt)}</span><span class="bar-track"><span class="bar-fill" style="width:${(o.amt / maxA * 100).toFixed(1)}%"></span></span></div></td>`;
+    h += `<td class="num">${(o.amt / total * 100).toFixed(1)}%</td>`;
+    h += `<td class="num">${o.n}</td>`;
+    h += `<td class="num">¥${money0(o.avg)}</td>`;
+    h += `<td class="num">${o.growth == null ? '<span class="dim">—</span>' : (o.growth > 0 ? `<span class="pos">${pct(o.growth)}</span>` : `<span class="neg">${pct(o.growth)}</span>`)}</td>`;
+    h += `<td class="num">¥${money0(o.max)}</td>`;
+    h += '</tr>';
+  });
+  h += '</tbody>';
+  // 年份小计行：让「各子类相加 = 该分类该年金额」可当场核对。
+  // 没有这一行时，用户只能拿某一行的数字去和矩阵比对，
+  // 而子类名可能与分类同名（如分类「其他」下有子类「其他」），极易误判成对不上。
+  const ySub = {};
+  yrs.forEach(y => { ySub[y] = subs.reduce((s, o) => s + (o.years[y] || 0), 0); });
+  h += '<tfoot><tr class="sub-total-row"><td><b>年份小计</b></td>';
+  yrs.forEach(y => {
+    h += `<td class="num"><b>${ySub[y] > 0 ? '¥' + money0(ySub[y]) : '<span class="dim">—</span>'}</b></td>`;
+  });
+  h += `<td class="num"><b>¥${money0(total)}</b></td><td class="num">100%</td>`
+     + `<td class="num"><b>${subs.reduce((s, o) => s + o.n, 0)}</b></td>`
+     + `<td class="num">¥${money0(total / Math.max(1, subs.reduce((s, o) => s + o.n, 0)))}</td>`
+     + '<td class="num dim">—</td>'
+     + `<td class="num"><b>¥${money0(Math.max(...subs.map(o => o.max), 0))}</b></td></tr></tfoot>`;
+  $('subTbl').innerHTML = h;
+
+  let note = `共 ${subs.length} 个子类，合计 ¥${money0(total)}。`;
+  if (!STATE.rawSub) {
+    const rawSet = new Set();
+    STATE.exp.filter(r => r._cat === cat).forEach(r => rawSet.add(r._subRaw));
+    const mergedSet = new Set(subs.map(o => o.sub));
+    if (rawSet.size > mergedSet.size) {
+      note += `<br>原始写法有 ${rawSet.size} 个，合并后 ${mergedSet.size} 个 —— 差异说明同一件事被记成了多个名字。`;
+    }
+  }
+  const top5 = subs.slice(0, 5);
+  note += `<br>金额集中：${top5.map(o => `<b>${esc(o.sub)}</b> ¥${money0(o.amt)}`).join('、')}。`;
+  $('subNote').innerHTML = note;
+}
+
+/* ---------- 大额消费清单 ---------- */
+function renderBig() {
+  const thr = STATE.thr;
+  const big = STATE.exp.filter(r => r.amount >= thr);
+  const totalBig = big.reduce((s, r) => s + r.amount, 0);
+  const totalAll = STATE.exp.reduce((s, r) => s + r.amount, 0);
+
+  $('thrVal').textContent = '≥ ¥' + money0(thr);
+  $('thrQuick').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', +b.dataset.v === thr);
+  });
+
+  $('bigStat').innerHTML =
+    `共 <b>${big.length}</b> 笔，合计 <b>¥${money0(totalBig)}</b>，占明细年总支出 <b>${(totalBig / totalAll * 100).toFixed(1)}%</b>` +
+    `（总支出 ¥${money0(totalAll)}）。日常支出未被排除，这里只是筛选视角。`;
+
+  if (!big.length) {
+    $('bigList').innerHTML = `<div class="empty"><div class="big">🔍</div>当前阈值 ¥${money0(thr)} 下没有记录<br>把阈值调低试试</div>`;
+    return;
+  }
+
+  // 按年分组
+  const byYear = {};
+  big.forEach(r => { (byYear[r._year] = byYear[r._year] || []).push(r); });
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+
+  let h = '';
+  years.forEach(y => {
+    const rs = byYear[y];
+    const s = rs.reduce((a, r) => a + r.amount, 0);
+    const sorted = STATE.bigSort === 'amount'
+      ? rs.slice().sort((a, b) => b.amount - a.amount)
+      : rs.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const top = rs.slice().sort((a, b) => b.amount - a.amount)[0];
+    const topNote = top.note || top._subMerged || top._cat;
+    h += `<div class="yr-grp" data-y="${y}">
+      <div class="yr-head">
+        <span class="caret">▶</span>
+        <span class="yr">${y}</span>
+        <span class="cnt">${rs.length} 笔</span>
+        <span class="amt">¥${money0(s)}</span>
+        <span class="top1">最大 ${money0(top.amount)} · ${esc(topNote)}</span>
+      </div>
+      <div class="yr-body">`;
+    sorted.forEach(r => {
+      h += `<div class="big-item">
+        <span class="d">${esc(r.date)}</span>
+        <span class="nt">${esc(r.note || '（无备注）')}</span>
+        <span class="c">${esc(r._cat)}${r._subMerged ? ' / ' + esc(r._subMerged) : ''}</span>
+        <span class="a">¥${money0(r.amount)}</span>
+      </div>`;
+    });
+    h += `</div></div>`;
+  });
+  $('bigList').innerHTML = h;
+
+  $('bigList').querySelectorAll('.yr-head').forEach(el => {
+    el.onclick = () => el.parentElement.classList.toggle('open');
+  });
+}
+
+/* =====================================================================
+ * 九、第二层渲染 · ① 多花的
+ * ---------------------------------------------------------------------
+ * 核心信号：笔数激增 + 单价未涨 —— 说明你在"多买"而不是"买贵"。
+ * 这类支出靠看金额榜永远发现不了（中饭 5 年只花 ¥21534，排不进前 20，
+ * 但它可能是最该砍的）。
+ * ===================================================================== */
+function subLevelAgg() {
+  // 按「合并后的子类」聚合，带逐年笔数与均单价
+  const map = {};
+  STATE.exp.forEach(r => {
+    const k = r._subMerged || r._subRaw;
+    if (!map[k]) map[k] = { sub: k, cat: r._cat, n: 0, amt: 0, years: {} };
+    const o = map[k];
+    o.n++; o.amt += r.amount;
+    o.years[r._year] = o.years[r._year] || { n: 0, amt: 0 };
+    o.years[r._year].n++; o.years[r._year].amt += r.amount;
+  });
+  return Object.values(map);
+}
+
+/* 可用于「首末年对比」的年份序列：剔除记账种类明显偏少的过渡年。
+ * 过渡年（如 2020 只有 13 个子类，而稳定年有 25~29 个）的记录分布与稳定年
+ * 不可比，拿它当基准会把「刚开始记账」误判成「消费暴涨」。
+ * 判据：种类数 ≥ 全体中位数的 70%。用相对比例而非绝对中位数 ——
+ * 记账颗粒度逐年变细，用绝对中位数会把最近几年（最该拿来对比的）全砍掉。 */
+function comparableYears() {
+  const yrs = STATE.years;
+  const kind = {};
+  STATE.exp.forEach(r => {
+    const k = r._subMerged || r._subRaw;
+    (kind[r._year] = kind[r._year] || new Set()).add(k);
+  });
+  if (!yrs.length) return [];
+  const counts = yrs.map(y => (kind[y] ? kind[y].size : 0));
+  const med = counts.slice().sort((a, b) => a - b)[Math.floor(counts.length / 2)];
+  const out = yrs.filter(y => (kind[y] ? kind[y].size : 0) >= med * 0.7);
+  return out.length >= 2 ? out : yrs;
+}
+
+function findMulti() {
+  const yrs = STATE.years;
+  if (yrs.length < 2) return [];
+  const cmpYrs = comparableYears();
+  if (cmpYrs.length < 2) return [];
+  const f = cmpYrs[0], l = cmpYrs[cmpYrs.length - 1];
+
+  return subLevelAgg().map(o => {
+    const a = o.years[f], b = o.years[l];
+    // 两端都必须有足够样本，否则是"记账方式变了"不是"消费变了"
+    if (!a || !b || a.n < 10 || b.n < 10) return null;
+    const nChg = (b.n - a.n) / a.n;
+    const pA = a.amt / a.n, pB = b.amt / b.n;
+    const pChg = pA > 0 ? (pB - pA) / pA : null;
+    // 笔数涨 ≥25% 且单价没涨（甚至降）
+    if (nChg < 0.25 || (pChg != null && pChg > 0.1)) return null;
+    const perYear = o.amt / yrs.length;
+    return {
+      sub: o.sub, cat: o.cat, n1: a.n, n2: b.n, nChg,
+      p1: pA, p2: pB, pChg, perYear, amt: o.amt, n: o.n
+    };
+  }).filter(Boolean).sort((x, y) => y.perYear * y.nChg - x.perYear * x.nChg);
+}
+
+function renderMulti() {
+  const items = findMulti();
+  if (!items.length) {
+    $('multiList').innerHTML = `<div class="empty"><div class="big">✅</div>没有检测到「笔数激增 + 单价未涨」的子类<br>（当前口径：首末年各 ≥10 笔，笔数增幅 ≥25%，单价涨幅 &lt;10%）</div>`;
+    return;
+  }
+  const cmpYrs = comparableYears();
+  const f = cmpYrs[0], l = cmpYrs[cmpYrs.length - 1];
+  let h = `<div class="note" style="margin-top:0;margin-bottom:12px">
+    识别口径：${f} 与 ${l} 各 ≥10 笔，笔数增幅 ≥25%，且均单价涨幅 &lt;10%（即不是买贵了，是买多了）。
+    「新增 / 消失」的子类不计入 —— 那些是记账写法变了，不是消费变了。<br>
+    比较年份取自 ${cmpYrs.join(' / ')}，已剔除记账种类明显偏少的过渡年，避免口径不一致导致误判。</div>`;
+  items.forEach(o => {
+    h += `<div class="save-item">
+      <div class="si-head">
+        <span class="si-name">${esc(o.sub)}</span>
+        <span class="dim" style="font-size:12.5px">${esc(o.cat)}</span>
+        <span class="flag" style="background:#fdecec;color:#c0392b">笔数 ${sign(o.nChg)}${(o.nChg * 100).toFixed(0)}%</span>
+        <span class="flag" style="background:#eaf4ee;color:#2c8e60">单价 ${o.pChg == null ? '—' : pct(o.pChg)}</span>
+      </div>
+      <div class="si-metrics">
+        <span>笔数 ${o.n1} → <b>${o.n2}</b></span>
+        <span>笔均 ¥${money0(o.p1)} → <b>¥${money0(o.p2)}</b></span>
+        <span>年均 <b>¥${money0(o.perYear)}</b></span>
+        <span>累计 ${o.n} 笔 / ¥${money0(o.amt)}</span>
+      </div>
+    </div>`;
+  });
+  $('multiList').innerHTML = h;
+}
+
+/* =====================================================================
+ * 十、第二层渲染 · ② 不该花的（手动标记）
+ * ===================================================================== */
+function recKey(r) { return r.id || (r.date + '|' + r.amount + '|' + (r.note || '') + '|' + (r.subcategory || '')); }
+
+function renderWaste() {
+  const marks = MARK();
+  const all = STATE.exp;
+  // 按金额降序，最容易判断的先出现
+  const sorted = all.slice().sort((a, b) => b.amount - a.amount);
+  const list = STATE.wasteHideMarked ? sorted.filter(r => !marks[recKey(r)]) : sorted;
+  const n = STATE.wastePageN;
+  const shown = list.slice(0, n);
+
+  const wasteRecs = all.filter(r => marks[recKey(r)] === 'waste');
+  const wSum = wasteRecs.reduce((s, r) => s + r.amount, 0);
+  const needCount = all.filter(r => marks[recKey(r)] === 'need').length;
+  $('wasteStat').innerHTML = `已标浪费 <b style="color:#c0392b">${wasteRecs.length}</b> 笔 · <b style="color:#c0392b">¥${money0(wSum)}</b>　已标正常 ${needCount} 笔`;
+
+  $('segWastePage').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.n === n));
+
+  if (!shown.length) {
+    $('wasteList').innerHTML = `<div class="empty"><div class="big">✍️</div>${all.length ? '当前没有待标记的记录' : '没有可标记的记录'}</div>`;
+    return;
+  }
+
+  let h = `<div class="note" style="margin-top:0;margin-bottom:12px">
+    按金额从高到低排列 —— 大额最容易判断。标为「确实浪费」的记录会自动进入 ③ 可省的。
+    共 ${list.length} 笔待显示${list.length > shown.length ? `，当前显示前 ${shown.length} 笔` : ''}。</div>`;
+  shown.forEach(r => {
+    const k = recKey(r);
+    const mk = marks[k];
+    h += `<div class="big-item" style="padding:10px 4px">
+      <span class="d">${esc(r.date)}</span>
+      <span class="nt">
+        <b>¥${money0(r.amount)}</b> ${esc(r.note || '（无备注）')}
+        <span class="dim" style="font-size:12px">· ${esc(r._cat)}${r._subMerged ? ' / ' + esc(r._subMerged) : ''}</span>
+      </span>
+      ${mk ? `<span class="flag ${mk === 'waste' ? 'waste' : 'need'}">${mk === 'waste' ? '确实浪费' : '正常必需'}</span>` : ''}
+      <button class="btn ${mk === 'waste' ? 'on-w' : ''}" data-id="${esc(k)}" data-m="waste">确实浪费</button>
+      <button class="btn ${mk === 'need' ? 'on-n' : ''}" data-id="${esc(k)}" data-m="need">正常必需</button>
+    </div>`;
+  });
+  $('wasteList').innerHTML = h;
+
+  $('wasteList').querySelectorAll('button[data-m]').forEach(btn => {
+    btn.onclick = () => {
+      const marks2 = MARK();
+      const id = btn.dataset.id, m = btn.dataset.m;
+      if (marks2[id] === m) delete marks2[id]; else marks2[id] = m;   // 再点一次取消
+      cfgSet('marks', marks2);
+      renderWaste();
+      renderSaveTotal();
+    };
+  });
+}
+
+/* =====================================================================
+ * 十一、第二层渲染 · ③ 可省的
+ * ---------------------------------------------------------------------
+ * 三个来源合并：高频重复类 + 笔数激增类 + 你标记过的浪费。
+ * 削减力度由你设定，页面只负责算账。
+ * ===================================================================== */
+function saveCandidates() {
+  const yrs = STATE.years;
+  const spans = yrs.length || 1;
+  const marks = MARK();
+  const out = [];
+
+  // 来源 1：高频重复类（年均 ≥50 笔且笔均 ≤¥80）
+  subLevelAgg().forEach(o => {
+    const perYearN = o.n / spans;      // 年均笔数
+    const avg = o.amt / o.n;            // 笔均金额
+    const perYearAmt = o.amt / spans;   // 年均金额
+    if (perYearN >= 50 && avg <= 80) {
+      out.push({
+        key: 'rep:' + o.sub, sub: o.sub, cat: o.cat, src: '高频重复',
+        perYear: perYearAmt, avg, amt: o.amt, n: o.n,
+        detail: `年均 ${perYearN.toFixed(0)} 笔 · 笔均 ¥${money0(avg)}`
+      });
+    }
+  });
+
+  // 来源 2：笔数激增类
+  findMulti().forEach(o => {
+    out.push({
+      key: 'mul:' + o.sub, sub: o.sub, cat: o.cat, src: '笔数激增',
+      perYear: o.perYear, avg: o.p2, amt: o.amt, n: o.n,
+      detail: `笔数 ${o.n1}→${o.n2}（${sign(o.nChg)}${(o.nChg * 100).toFixed(0)}%）· 单价 ${pct(o.pChg)}`
+    });
+  });
+
+  // 来源 3：你标记过的浪费（按子类汇总，同一子类的多笔合并为一项，避免逐条刷屏）
+  const wasteBySub = {};
+  STATE.exp.filter(r => marks[recKey(r)] === 'waste').forEach(r => {
+    const k = r._subMerged || r._cat;
+    if (!wasteBySub[k]) wasteBySub[k] = { sub: k, cat: r._cat, amt: 0, n: 0 };
+    wasteBySub[k].amt += r.amount; wasteBySub[k].n++;
+  });
+  Object.values(wasteBySub).forEach(o => {
+    out.push({
+      key: 'sub:' + o.sub, sub: o.sub, cat: o.cat, src: '已标浪费',
+      perYear: o.amt / spans, avg: o.amt / o.n, amt: o.amt, n: o.n,
+      detail: `你标记了 ${o.n} 笔`
+    });
+  });
+
+  // 同一子类可能命中多个来源 —— 必须按「子类」去重，否则同一笔钱会被重复计入可省总额。
+  // key 统一用 'sub:' + 子类名；来源只作为标签合并展示。
+  const map = {};
+  out.forEach(o => {
+    const k = 'sub:' + o.sub;
+    if (map[k]) {
+      if (!map[k].src.includes(o.src)) map[k].src += ' + ' + o.src;
+      if (o.detail && !map[k].detail.includes(o.detail)) map[k].detail += '　/　' + o.detail;
+      return;
+    }
+    map[k] = o;
+  });
+  return Object.values(map).sort((a, b) => b.perYear - a.perYear);
+}
+
+function renderSaveTotal() {
+  const cands = saveCandidates();
+  const cuts = CUT();
+  const spans = STATE.years.length || 1;
+  // 默认削减力度 30%
+  const cutOf = (k) => (isFinite(cuts[k]) ? cuts[k] : 30);
+
+  let yearSave = 0;
+  let monthSave = 0;
+  cands.forEach(o => {
+    const c = cutOf(o.key);
+    const ys = o.perYear * c / 100;
+    yearSave += ys;
+    monthSave += ys / 12;
+  });
+
+  const totalYear = STATE.exp.reduce((s, r) => s + r.amount, 0) / spans;
+  const cover = totalYear ? (yearSave / totalYear * 100) : 0;
+
+  $('saveTotalBox').innerHTML =
+    `<div class="lbl">按当前设定，一年可省</div>
+     <div class="num">¥ ${money0(yearSave)}</div>
+     <div class="hint">约合每月 ¥${money0(monthSave)}　·　占年均支出 ${cover.toFixed(1)}%（年均 ¥${money0(totalYear)}）<br>
+     这不是预测，是把 ${cands.length} 个可压缩项各按设定的削减力度相乘的结果。实际能否省下取决于你的执行。</div>`;
+
+  if (!cands.length) {
+    $('saveList').innerHTML = `<div class="empty"><div class="big">🎯</div>还没有识别到可压缩项<br>可以先到 ② 不该花的 里标几笔浪费</div>`;
+    return;
+  }
+
+  let h = '';
+  cands.forEach(o => {
+    const c = cutOf(o.key);
+    const ys = o.perYear * c / 100;
+    h += `<div class="save-item">
+      <div class="si-head">
+        <span class="si-name">${esc(o.sub)}</span>
+        <span class="dim" style="font-size:12.5px">${esc(o.cat)}</span>
+        <span class="flag" style="background:var(--brand-soft);color:var(--brand)">${esc(o.src)}</span>
+      </div>
+      <div class="si-metrics"><span>${o.detail}</span><span>年均 <b>¥${money0(o.perYear)}</b></span></div>
+      <div class="si-ctrl">
+        <span>削减</span>
+        <input type="range" min="0" max="100" step="5" value="${c}" data-key="${esc(o.key)}">
+        <span class="si-out">${c}% → 年省 ¥${money0(ys)}</span>
+      </div>
+    </div>`;
+  });
+  $('saveList').innerHTML = h;
+
+  $('saveList').querySelectorAll('input[type=range]').forEach(inp => {
+    inp.oninput = () => {
+      const cuts2 = CUT();
+      cuts2[inp.dataset.key] = +inp.value;
+      cfgSet('cuts', cuts2);
+      const o = cands.find(x => x.key === inp.dataset.key);
+      const ys = o.perYear * (+inp.value) / 100;
+      inp.parentElement.querySelector('.si-out').textContent = `${inp.value}% → 年省 ¥${money0(ys)}`;
+    };
+    inp.onchange = renderSaveTotal;
+  });
+}
+
+/* =====================================================================
+ * 十二、交互绑定
+ * ===================================================================== */
+function switchLayer(l) {
+  STATE.layer = l;
+  $('layers').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.layer === l));
+  $('layerWhere').hidden = (l !== 'where');
+  $('layerSave').hidden = (l !== 'save');
+  if (l === 'save' && STATE.saveTab === 'total') renderSaveTotal();
+}
+function switchSaveTab(t) {
+  STATE.saveTab = t;
+  $('saveTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('tabMulti').hidden = (t !== 'multi');
+  $('tabWaste').hidden = (t !== 'waste');
+  $('tabTotal').hidden = (t !== 'total');
+  if (t === 'multi') renderMulti();
+  else if (t === 'waste') renderWaste();
+  else renderSaveTotal();
+}
+
+function bindEvents() {
+  $('layers').querySelectorAll('button').forEach(b => {
+    b.onclick = () => switchLayer(b.dataset.layer);
+  });
+  $('saveTabs').querySelectorAll('button').forEach(b => {
+    b.onclick = () => switchSaveTab(b.dataset.tab);
+  });
+  $('segGrain').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.grain = b.dataset.g;
+      // 年/周粒度本身已是单年或全量口径，清掉单年选择避免残留误导
+      if (STATE.grain !== 'quarter' && STATE.grain !== 'month') STATE.matYear = 0;
+      $('segGrain').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      renderMatrix();
+    };
+  });
+  $('chkRaw').onchange = (e) => { STATE.rawSub = e.target.checked; renderSub(); };
+
+  const thr = $('thrRange');
+  thr.value = STATE.thr;
+  thr.oninput = () => {
+    STATE.thr = +thr.value;
+    cfgSet('thr', STATE.thr);
+    renderBig();
+  };
+  $('thrQuick').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.thr = +b.dataset.v;
+      cfgSet('thr', STATE.thr);
+      thr.value = STATE.thr;
+      renderBig();
+    };
+  });
+  $('segBigSort').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.bigSort = b.dataset.s;
+      $('segBigSort').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      renderBig();
+    };
+  });
+
+  $('segWastePage').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.wastePageN = +b.dataset.n;
+      renderWaste();
+    };
+  });
+  $('chkWasteHideMarked').onchange = (e) => { STATE.wasteHideMarked = e.target.checked; renderWaste(); };
+
+  $('btnReload').onclick = () => load(true);
+}
+
+/* =====================================================================
+ * 十三、数据更新检测
+ * ---------------------------------------------------------------------
+ * 用户通常在一年结束后整年导入，所以不会先导入部分年再补前一年。
+ * 但页面仍做两层保障：打开时读 updatedAt，从后台切回前台时再比一次。
+ * ===================================================================== */
+async function load(manual) {
+  const st = $('status');
+  st.className = 'status';
+  st.textContent = '正在读取账本…';
+  const led = await readLedger();
+
+  if (!led.ok || !led.n) {
+    $('cardEmpty').hidden = false;
+    ['cardOverview', 'baseline', 'layers', 'layerWhere', 'layerSave'].forEach(id => { if ($(id)) $(id).hidden = true; });
+    st.className = 'status warn';
+    st.textContent = led.ok ? `读到 0 条记录${led.warn ? `（跳过 ${led.warn} 条格式异常）` : ''}` : '未找到账本数据';
+    return;
+  }
+  $('cardEmpty').hidden = true;
+  ['cardOverview', 'layers'].forEach(id => { if ($(id)) $(id).hidden = false; });
+
+  const changed = STATE.lastUpdatedAt && led.updatedAt && led.updatedAt !== STATE.lastUpdatedAt;
+  STATE.lastUpdatedAt = led.updatedAt;
+
+  const info = preprocess(led);
+
+  if (!STATE.years.length) {
+    $('cardEmpty').hidden = false;
+    $('cardEmpty').querySelector('h2').textContent = '明细年数据不足';
+    $('cardEmpty').querySelector('.empty').innerHTML =
+      `账本里的支出记录不足，无法分析。<br>共读到 ${led.n} 条记录，其中可用于分类分析的明细年支出为 0 笔。`;
+    st.className = 'status warn';
+    st.textContent = '没有可分析的明细年支出';
+    return;
+  }
+
+  CS = catSummary();
+  renderOverview();
+  renderBaseline();
+  renderMatrix();
+  renderSub();
+  renderBig();
+  renderMulti();
+  renderSaveTotal();
+
+  const d = STATE.lastUpdatedAt ? new Date(STATE.lastUpdatedAt) : null;
+  const ds = (d && !isNaN(d)) ? d.toLocaleString('zh-CN', { hour12: false }) : '未知';
+  st.className = 'status ok';
+  //括号里写清「总条数包含收入、收入不参与分析」，避免把6927 误当成分析样本量
+  const inc = STATE.income || { n: 0, amt: 0 };
+  const incNote = inc.n
+    ? `（其中含收入 ${inc.n} 条、合计 ¥${money0(inc.amt)}，不在数据分析范围内；本页只对${STATE.exp.length} 笔支出做分析）`
+    : '（全部为支出，无收入记录）';
+  st.textContent = `已读取 ${led.n} 条记录 ${incNote} · 最后更新 ${ds}` +
+    (led.warn ? ` · 跳过 ${led.warn} 条异常` : '') +
+    (changed || manual ? ' · 已按最新账单重算' : '');
+}
+
+/* 从后台切回前台时静默重算 */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!STATE.exp.length) return;
+  readLedger().then(led => {
+    if (led.ok && led.updatedAt && STATE.lastUpdatedAt && led.updatedAt !== STATE.lastUpdatedAt) {
+      load(true);
+    }
+  });
+});
+
+/* ---------- 启动 ---------- */
+(function init() {
+  STATE.grain = cfgGet('grain', 'year');
+  STATE.sortKey = cfgGet('sortKey', 'amt');
+  STATE.thr = isFinite(cfgGet('thr', 200)) ? cfgGet('thr', 200) : 200;
+  STATE.bigSort = cfgGet('bigSort', 'date');
+  $('segGrain').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.g === STATE.grain));
+  $('segBigSort').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === STATE.bigSort));
+  bindEvents();
+  load(false);
+})();
+</script>
+</body>
+</html>
