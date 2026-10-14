@@ -127,7 +127,12 @@
    工具清单：以后要新增嵌套页面，只要在这里加一行即可。
    例： { name: '记账本', file: 'money.html', icon: '💰', desc: '日常记账' }
    对应页面文件放在与本 index.html 同目录即可（同属一个静态站点）。
+
+   hidden: true = 代码与页面都完整保留，只是不在门户显示卡片。
+   用于「功能已做好但暂时不想用」的情况：改下面 SHOW_HIDDEN 即可一键放开。
    ========================================================= */
+const SHOW_HIDDEN = false;      // ← 以后想放出隐藏工具，把这个改成 true
+
 const TOOLS = [
   { name: '轻身时光簿', file: 'weight.html', icon: '🎯', desc: '记录与查看体重趋势' },
   { name: '收支规划局', file: 'budget.html', icon: '💰', desc: '每天的开支预算与实际' },
@@ -135,6 +140,7 @@ const TOOLS = [
   { name: '清居置物箱', file: 'storage.html', icon: '🧺', desc: '室内物品整理归纳' },
   { name: '账本透视', file: 'ledger.html', icon: '📊', desc: '历史账单导入与分析' },
   { name: '账单透视镜', file: 'analysis.html', icon: '🔍', desc: '钱去哪儿了，哪些能省' },
+  { name: '随手记簿', file: 'daily.html', icon: '📝', desc: '日常一笔一笔记', hidden: true },
 ];
 
 const tools = document.getElementById('tools');
@@ -146,9 +152,10 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 20, 'weight.html': 31, 'budget.html': 17, 'storage.html': 26, 'ledger.html': 17, 'analysis.html': 7 };
+const TOOLS_VER = { 'time.html': 20, 'weight.html': 31, 'budget.html': 17, 'storage.html': 26, 'ledger.html': 17, 'analysis.html': 8, 'daily.html': 3 };
 
 TOOLS.forEach((t, i) => {
+  if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里
   const c = document.createElement('div');
   c.className = 'tool-card';
   c.innerHTML = `<div class="ico">${t.icon}</div><div class="txt"><div class="name">${t.name}</div><div class="desc">${t.desc || ''}</div></div>`;

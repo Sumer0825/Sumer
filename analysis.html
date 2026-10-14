@@ -360,7 +360,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 
 </div>
 
-<div class="ver">v7</div>
+<div class="ver">v8</div>
 <script>
 /* =====================================================================
  * 账单透视镜 · 本机账本只读分析页
@@ -1005,6 +1005,28 @@ function renderMatrix() {
   const S_MAP = {};
   scopedAgg.forEach(o => { S_MAP[o.cat] = o; });
 
+  /* ---------- 单年视图的「同比」 ----------
+   * 口径：选中年 vs 紧邻的上一年（不是可比年首年）。理由与矩阵/下钻的口径一致原则有关 ——
+   * 单年视图里其他列（合计/笔数/周活跃/最大单笔）都是那一年的数据，
+   * 若这一列还放「首末年跨 5 年」的涨幅，就会出现同一行里两种时间跨度并列的误导。
+   * 因此单年 → 环比上一年；全期 → 保持「可比年首末年变化」。
+   * 返回 null = 上一年无数据（新出现的分类），显示「—」。 */
+  const yoyCache = {};
+  function yoyOf(o) {
+    if (!STATE.matYear) return o.growth;
+    const y = STATE.matYear, p = y - 1;
+    if (yoyCache[o.cat] === undefined) {
+      let cur = 0, prev = 0;
+      for (const r of STATE.exp) {
+        if (r._cat !== o.cat) continue;
+        if (r._year === y) cur += r.amount;
+        else if (r._year === p) prev += r.amount;
+      }
+      yoyCache[o.cat] = prev > 0 ? (cur - prev) / prev : null;
+    }
+    return yoyCache[o.cat];
+  }
+
   // 单年作用域：只保留该年真实出现过的分类。
   // 否则会出现「切到 2025 年，表里却出现只存在于 2023 年的「未分类」」——
   // 那行 12 个月全是「—」，合计还显示 2023 年的 ¥2,662，属于明确的误导。
@@ -1029,9 +1051,8 @@ function renderMatrix() {
     if (sk === 'n') return b.n - a.n;
     if (sk === 'week') return b.weekCover - a.weekCover;
     if (sk === 'growth') {
-      const av = a.growth == null ? -999 : a.growth;
-      const bv = b.growth == null ? -999 : b.growth;
-      return bv - av;
+      const gv = o => (STATE.matYear ? (yoyOf(o) == null ? -999 : yoyOf(o)) : (o.growth == null ? -999 : o.growth));
+      return gv(b) - gv(a);
     }
     return b.amt - a.amt;
   });
@@ -1057,7 +1078,7 @@ function renderMatrix() {
   h += `<th class="sortable" data-s="n" title="当前范围内的支出笔数">笔数${sk === 'n' ? '<span class="arrow">▼</span>' : ''}</th>`;
   h += '<th title="笔数 ÷ 该分类有记账的天数">笔/记账天</th>';
   h += `<th class="sortable" data-s="week" title="该分类出现过的周数 ÷ 当前范围内全部周">周活跃${sk === 'week' ? '<span class="arrow">▼</span>' : ''}</th>`;
-  h += `<th class="sortable" data-s="growth" title="最后一个可比年相对第一个可比年的金额变化">首末年变化${sk === 'growth' ? '<span class="arrow">▼</span>' : ''}</th>`;
+  h += `<th class="sortable" data-s="growth" title="${STATE.matYear ? `${STATE.matYear} 年相对 ${STATE.matYear - 1} 年的金额变化（同比）` : '可比年最后一个年相对第一个年的金额变化'}">${STATE.matYear ? `${STATE.matYear} 年同比` : '首末年变化'}${sk === 'growth' ? '<span class="arrow">▼</span>' : ''}</th>`;
   h += '<th title="该分类单笔支出的最大值">最大单笔</th>';
   h += '</tr></thead><tbody>';
 
@@ -1097,7 +1118,7 @@ function renderMatrix() {
     h += `<td class="num">${STATE.matYear ? S_.n : o.n}</td>`;
     h += `<td class="num">${S_.perDay.toFixed(2)}</td>`;
     h += `<td class="num">${(S_.weekCover * 100).toFixed(0)}%</td>`;
-    h += `<td class="num">${gcls(o.growth)}</td>`;
+    h += `<td class="num">${gcls(yoyOf(o))}</td>`;
     h += `<td class="num">¥${money0(STATE.matYear ? S_.max : o.max)}</td>`;
     h += '</tr>';
   });
@@ -1139,7 +1160,10 @@ function renderMatrix() {
   lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0"><span style="display:inline-block;min-width:52px;text-align:center;background:#fdf3e6;color:#f0a04b;font-weight:600;border-radius:5px;padding:1px 6px">${money0(1234)}</span> 橙色粗体 = 该列（那个月/那个季）金额最高的分类</span>`;
   lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0"><span style="display:inline-block;min-width:52px;text-align:center;color:#c9c2d8">—</span> 灰色 = 该月/该季没有支出</span>`;
   lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 0 4px 0"><span style="display:inline-block;min-width:52px;text-align:center">${money0(5678)}</span> 普通数字 = 正常值</span>`;
-  lg += `<div style="margin-top:4px">合计、笔数、周活跃、最大单笔这几列${STATE.matYear ? `现在都是<b>${STATE.matYear} 年单年</b>口径` : `都是${rangeTxt} <b>合计</b>口径`}。鼠标停在列名上可看该列定义。</div>`;
+  lg += `<div style="margin-top:4px">合计、笔数、周活跃、最大单笔这几列${STATE.matYear ? `现在都是<b>${STATE.matYear} 年单年</b>口径` : `都是${rangeTxt} <b>合计</b>口径`}。</div>`;
+  lg += `<div style="margin-top:4px">百分比列${STATE.matYear
+      ? `是<b>同比</b>：${STATE.matYear} 年 vs ${STATE.matYear - 1} 年，与左边单年数字同一时间跨度。<span style="color:#ff5d6c">红=涨</span>（花得更多）、<span style="color:#1f9e5c">绿=跌</span>（花得更少）、<span class="dim">—</span> = ${STATE.matYear - 1} 年该分类没有支出`
+      : `是<b>首末年变化</b>：可比年最后一个年 vs 第一个年（不是逐年比）。<span style="color:#ff5d6c">红=涨</span>、<span style="color:#1f9e5c">绿=跌</span>、<span class="dim">—</span> = 首个可比年该分类没有支出`}。</div>`;
   $('matLegend').innerHTML = lg;
 
   // 结论

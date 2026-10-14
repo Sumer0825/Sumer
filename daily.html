@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>随手记簿</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="随手记簿">
+<meta name="theme-color" content="#f7f5fd">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link href="lib/flatpickr.min.css" rel="stylesheet">
+<script>
+/* 被门户 iframe 嵌入时打标记：顶部安全区交给门户顶栏，避免重复避让 */
+try { if (window.self !== window.top) document.documentElement.classList.add('in-frame'); }
+catch (e) { document.documentElement.classList.add('in-frame'); }
+</script>
+<style>
+  :root {
+    --primary: #a99bf5;
+    --primary-2: #c9bef9;
+    --primary-soft: #f0ecfe;
+    --green: #57b592;
+    --green-2: #7ed0ae;
+    --text: #4a4166;
+    --text-2: #6e6490;
+    --muted: #9a93b4;
+    --line: #e6e1f5;
+    --line-2: #ded8f2;
+    --blk: #f5f3fc;
+    --danger: #d0674f;
+    --radius: 22px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text);
+    background: url('assets/bg-daily.png') center top / cover fixed no-repeat, #f2eefa;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding-bottom: calc(30px + env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 14px; }
+
+  /* ---------- 顶部 ---------- */
+  header { padding: calc(16px + env(safe-area-inset-top)) 4px 12px; }
+  .in-frame header { padding-top: 16px; }
+  .head-row { display: flex; align-items: center; gap: 10px; }
+  .head-row h1 { font-size: 21px; font-weight: 700; letter-spacing: .4px; flex: 1; min-width: 0; }
+  .head-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .icon-btn {
+    border: 1px solid var(--line-2); background: rgba(255,255,255,.75); color: var(--text-2);
+    width: 38px; height: 38px; border-radius: 50%; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 38px;
+    transition: .15s; padding: 0;
+  }
+  .icon-btn:hover { background: #fff; color: var(--primary); }
+  .icon-btn:active { transform: scale(.92); }
+  .sync-btn {
+    border: none; background: linear-gradient(135deg, var(--green-2), var(--green));
+    color: #fff; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 20px;
+    cursor: pointer; box-shadow: 0 6px 16px rgba(87,181,146,.26); transition: .15s;
+  }
+  .sync-btn:active { transform: scale(.95); }
+  .sync-btn.off { background: #fff; color: var(--muted); border: 1px solid var(--line-2); box-shadow: none; }
+
+  /* ---------- 卡片 ---------- */
+  .card {
+    background: rgba(255,255,255,.90);
+    border: 1px solid rgba(255,255,255,.95);
+    border-radius: 28px;
+    padding: 18px;
+    box-shadow: 0 12px 32px rgba(140,128,200,.13);
+  }
+  .card + .card { margin-top: 14px; }
+
+  /* ---------- 支出/收入 切换 ---------- */
+  .type-switch { display: flex; gap: 8px; background: var(--blk); border: 1px solid var(--line); border-radius: 22px; padding: 5px; }
+  .type-switch button {
+    flex: 1; border: none; background: transparent; color: var(--muted);
+    font-size: 14.5px; font-weight: 600; padding: 10px; border-radius: 18px; cursor: pointer;
+    font-family: inherit; transition: .16s;
+  }
+  .type-switch button.on { color: #fff; box-shadow: 0 5px 14px rgba(169,155,245,.30); }
+  .type-switch button.on.exp { background: linear-gradient(135deg, var(--primary), var(--primary-2)); }
+  .type-switch button.on.inc { background: linear-gradient(135deg, var(--green-2), var(--green)); }
+
+  /* ---------- 级联两栏 ---------- */
+  .casc-label { font-size: 12px; color: var(--muted); margin: 14px 0 7px 4px; }
+  .casc { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pane {
+    background: var(--blk); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 8px; height: 248px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    /* 底部渐隐，提示还能往下滚 */
+    -webkit-mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 16px), transparent 100%);
+  }
+  .pane::-webkit-scrollbar { width: 4px; }
+  .pane::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+  .pane .ph { font-size: 11.5px; color: var(--muted); padding: 4px 8px 6px; }
+  .pane .empty { font-size: 12.5px; color: var(--muted); padding: 14px 8px; text-align: center; }
+  .opt {
+    display: block; width: 100%; text-align: left; border: 1px solid transparent;
+    background: transparent; color: var(--text-2); font-family: inherit;
+    font-size: 14px; padding: 9px 11px; border-radius: 14px; cursor: pointer;
+    transition: .13s; line-height: 1.4; word-break: break-all;
+  }
+  .opt:hover { background: rgba(255,255,255,.7); }
+  .opt.on {
+    background: #fff; border-color: #d9d2f2; color: var(--text); font-weight: 600;
+    box-shadow: 0 3px 9px rgba(140,128,200,.11);
+  }
+  .opt.on.pick { background: linear-gradient(135deg, var(--primary), var(--primary-2)); border-color: transparent; color: #fff; box-shadow: 0 4px 12px rgba(169,155,245,.28); }
+
+  /* ---------- 金额 / 日期 ---------- */
+  .amt-row { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; margin-top: 14px; }
+  .fld-box { background: var(--blk); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+  .fld-box label { font-size: 11.5px; color: var(--muted); display: block; }
+  .fld-box .big { font-size: 27px; font-weight: 700; line-height: 1.3; word-break: break-all; }
+  .fld-box input {
+    width: 100%; border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: 16px; color: var(--text); font-weight: 600; padding: 3px 0 0;
+  }
+  .fld-box input::-webkit-calendar-picker-indicator { opacity: .3; cursor: pointer; }
+  /* 日期：用 flatpickr 日历控件，点框内任意位置即弹出（与体重记录器一致），周一开头。
+     不用原生 input[type=date]：各端会渲染成 MM/DD/YYYY 或 DD.MM.YYYY，样式也压不住。 */
+  .date-wrap { position: relative; }
+  .date-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 4px;
+    font-size: 15px; font-weight: 600; color: var(--text);
+    white-space: nowrap; cursor: pointer;
+  }
+  .date-row .rel { color: var(--primary); font-size: 13.5px; flex: 0 0 auto; }
+  /* 日历图标用 CSS 画，不依赖 emoji —— 部分端会把 📅 渲染成方框 */
+  .date-row .ico {
+    margin-left: auto; flex: 0 0 15px; width: 15px; height: 14px; position: relative;
+    border: 1.4px solid currentColor; border-radius: 3px; opacity: .32;
+  }
+  .date-row .ico::before {
+    content: ''; position: absolute; left: -1.4px; right: -1.4px; top: 3px; height: 1.4px;
+    background: currentColor;
+  }
+  .date-row .ico::after {
+    content: ''; position: absolute; left: 3px; top: -3.2px; width: 1.4px; height: 5px;
+    background: currentColor; border-radius: 1px; box-shadow: 6px 0 0 currentColor;
+  }
+  .date-row.flatpickr-active { color: var(--primary); }
+
+  /* ---------- flatpickr 淡紫玻璃皮肤 ---------- */
+  .flatpickr-calendar {
+    border: 1px solid rgba(255,255,255,.95); border-radius: 22px;
+    background: #fdfcff;                    /* 不透明：半透明会把下层「金额 ¥x.xx」透上来叠字 */
+    box-shadow: 0 18px 46px rgba(120,105,190,.26); overflow: hidden;
+    font-family: inherit; font-size: 14px;
+  }
+  .flatpickr-calendar.arrowTop::before, .flatpickr-calendar.arrowTop::after { display: none; }
+  .flatpickr-calendar.arrowTop { top: -8px; }
+  .flatpickr-calendar.arrowBottom::before, .flatpickr-calendar.arrowBottom::after { display: none; }
+  .flatpickr-inner { border: none; padding: 4px; }
+  .flatpickr-months { padding: 6px 4px 2px; }
+  .flatpickr-months .flatpickr-month, .flatpickr-current-month .flatpickr-monthDropdown-months {
+    color: var(--text); background: transparent; font-size: 14.5px; font-weight: 700;
+    padding: 6px 8px; border-radius: 12px;
+  }
+  .flatpickr-current-month { font-size: 14.5px; color: var(--text); padding-top: 2px; }
+  .flatpickr-current-month input.cur-year { color: var(--text); font-weight: 700; font-size: 14.5px; }
+  .flatpickr-months .flatpickr-prev-month, .flatpickr-months .flatpickr-next-month {
+    color: var(--text-2); fill: var(--text-2); padding: 6px 9px; border-radius: 12px;
+  }
+  .flatpickr-months .flatpickr-prev-month:hover svg, .flatpickr-months .flatpickr-next-month:hover svg { fill: var(--primary); }
+  .flatpickr-weekdayContainer { padding: 2px 6px 0; }
+  .flatpickr-weekday { color: var(--muted); font-weight: 600; font-size: 11.5px; padding: 4px 0; }
+  .flatpickr-days { border: none; padding: 2px 6px 8px; }
+  .flatpickr-day {
+    border-radius: 12px; color: var(--text-2); font-size: 13.5px;
+    border: 1px solid transparent; padding: 0; height: 34px; line-height: 32px;
+  }
+  .flatpickr-day:hover { background: var(--primary-soft); border-color: transparent; color: var(--text); }
+  .flatpickr-day.today { border-color: #d9d2f2; color: var(--primary); font-weight: 700; }
+  .flatpickr-day.today:hover { background: var(--primary-soft); }
+  .flatpickr-day.selected, .flatpickr-day.selected:hover {
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    border-color: transparent; color: #fff; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(169,155,245,.34);
+  }
+  .flatpickr-day.flatpickr-disabled, .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay { color: #cdc6e0; }
+  .flatpickr-day.flatpickr-disabled:hover { background: transparent; }
+  /* 快捷条：记账场景高频"补记今天/昨天"，比翻月快得多 */
+  .fp-quick {
+    display: flex; gap: 7px; padding: 8px 10px 11px; border-top: 1px solid var(--line);
+    margin-top: 2px;
+  }
+  .fp-quick button {
+    flex: 1; border: 1px solid var(--line); background: var(--blk); color: var(--text-2);
+    font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 4px;
+    border-radius: 13px; cursor: pointer; white-space: nowrap; transition: .14s;
+  }
+  .fp-quick button:hover { background: var(--primary-soft); border-color: #d9d2f2; color: var(--text); }
+  .fp-quick button:active { transform: scale(.96); }
+  .numInputWrapper > input { border-radius: 10px; }
+  .note-box { margin-top: 12px; }
+  .note-box input {
+    width: 100%; background: var(--blk); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 13px 16px; font-family: inherit; font-size: 14.5px; color: var(--text); outline: none;
+  }
+  .note-box input::placeholder { color: #b6aecb; }
+  .note-box input:focus { border-color: #cfc6ef; background: #fff; }
+
+  /* ---------- 主按钮 ---------- */
+  .save-btn {
+    width: 100%; margin-top: 16px; border: none; border-radius: 24px; padding: 15px;
+    font-family: inherit; font-size: 16px; font-weight: 600; letter-spacing: 1px; color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    box-shadow: 0 10px 24px rgba(169,155,245,.32); cursor: pointer; transition: .15s;
+  }
+  .save-btn:active { transform: scale(.985); }
+  .save-btn.inc { background: linear-gradient(135deg, var(--green-2), var(--green)); box-shadow: 0 10px 24px rgba(87,181,146,.28); }
+  .save-btn:disabled { opacity: .45; box-shadow: none; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 9px; min-height: 18px; }
+  .hint.err { color: var(--danger); }
+
+  /* ---------- 明细列表 ---------- */
+  .list-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .list-head h2 { font-size: 15px; font-weight: 700; flex: 1; }
+  .list-head .tot { font-size: 12.5px; color: var(--muted); }
+  .item {
+    display: flex; align-items: center; gap: 11px; background: var(--blk);
+    border: 1px solid var(--line); border-radius: 18px; padding: 11px 14px;
+  }
+  .item + .item { margin-top: 8px; }
+  .item .info { flex: 1; min-width: 0; }
+  .item .l1 { font-size: 14px; color: var(--text); font-weight: 600; word-break: break-all; }
+  .item .l2 { font-size: 11.5px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+  .item .amt { font-size: 15.5px; font-weight: 700; flex: 0 0 auto; white-space: nowrap; }
+  .item .amt.exp { color: var(--text); }
+  .item .amt.inc { color: var(--green); }
+  .item .del {
+    flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: transparent; color: #c9c1de; font-size: 15px; cursor: pointer; padding: 0;
+  }
+  .item .del:hover { background: #fff; color: var(--danger); }
+  .day-head {
+    display: flex; align-items: baseline; gap: 8px; margin: 16px 0 8px;
+    font-size: 12.5px; color: var(--muted);
+  }
+  .day-head:first-child { margin-top: 0; }
+  .day-head b { font-size: 13.5px; color: var(--text-2); font-weight: 600; }
+  .day-head .ds { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 弹层 ---------- */
+  .mask {
+    position: fixed; inset: 0; background: rgba(74,65,102,.34);
+    display: none; align-items: flex-end; justify-content: center; z-index: 60;
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  }
+  .mask.show { display: flex; }
+  .sheet {
+    background: #fdfcff; width: 100%; max-width: 560px; border-radius: 28px 28px 0 0;
+    padding: 8px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 -10px 40px rgba(100,88,160,.2);
+  }
+  .sheet .grab { width: 38px; height: 4px; border-radius: 4px; background: var(--line-2); margin: 6px auto 12px; }
+  .sheet h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .sheet .desc { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+  @media (min-width: 640px) {
+    .mask { align-items: center; }
+    .sheet { border-radius: 26px; max-height: 84vh; }
+  }
+
+  .fld { margin-bottom: 12px; }
+  .fld label { font-size: 12px; color: var(--text-2); display: block; margin-bottom: 5px; font-weight: 600; }
+  .fld input[type=text], .fld input[type=password], .fld input[type=date] {
+    width: 100%; background: var(--blk); border: 1px solid var(--line); border-radius: 14px;
+    padding: 11px 13px; font-family: inherit; font-size: 14.5px; color: var(--text); outline: none;
+  }
+  .fld input:focus { border-color: #cfc6ef; background: #fff; }
+  .fld .tip { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  .fld-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    flex: 1; border: 1px solid var(--line-2); background: #fff; color: var(--text-2);
+    font-family: inherit; font-size: 14.5px; font-weight: 600; padding: 12px; border-radius: 16px; cursor: pointer;
+  }
+  .btn.pri { border: none; background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff; box-shadow: 0 6px 16px rgba(169,155,245,.28); }
+  .btn.gh { border: none; background: linear-gradient(135deg, var(--green-2), var(--green)); color: #fff; box-shadow: 0 6px 16px rgba(87,181,146,.26); }
+  .btn.danger { border: none; background: #fbeeeb; color: var(--danger); }
+  .btn:active { transform: scale(.98); }
+  .btn.block { width: 100%; margin-top: 10px; }
+  .msg { font-size: 12.5px; color: var(--text-2); margin-top: 10px; min-height: 18px; line-height: 1.5; }
+  .msg.err { color: var(--danger); }
+  .msg.ok { color: var(--green); }
+
+  /* ---------- 分类管理 ---------- */
+  .mcat { border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; background: var(--blk); }
+  .mcat + .mcat { margin-top: 10px; }
+  .mcat .mh { display: flex; align-items: center; gap: 8px; }
+  .mcat .mh b { flex: 1; font-size: 14.5px; word-break: break-all; }
+  .mcat .mh button {
+    border: none; background: #fff; color: var(--text-2); font-family: inherit; font-size: 12.5px;
+    padding: 5px 11px; border-radius: 12px; cursor: pointer;
+  }
+  .mcat .mh button:hover { color: var(--primary); }
+  .mcat .mh button.del:hover { color: var(--danger); }
+  .msub { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .msub span {
+    font-size: 12.5px; background: #fff; border: 1px solid var(--line); color: var(--text-2);
+    padding: 4px 9px; border-radius: 11px; word-break: break-all;
+  }
+  .msub span.tmp { background: var(--primary-soft); border-color: #ddd4fb; color: var(--text); }
+  .row-add { display: flex; gap: 8px; margin-top: 8px; }
+  .row-add input {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 13px;
+    padding: 9px 12px; font-family: inherit; font-size: 14px; color: var(--text); outline: none;
+  }
+  .row-add input:focus { border-color: #cfc6ef; }
+  .row-add button {
+    flex: 0 0 auto; border: none; border-radius: 13px; padding: 0 16px; font-family: inherit;
+    font-size: 13.5px; font-weight: 600; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  }
+  .row-add button.add-cat { background: #fff; color: var(--text-2); border: 1px solid var(--line-2); }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; background: var(--blk); border: 1px solid var(--line); border-radius: 18px; padding: 5px; }
+  .tabs button {
+    flex: 1; border: none; background: transparent; color: var(--muted); font-family: inherit;
+    font-size: 14px; font-weight: 600; padding: 9px; border-radius: 14px; cursor: pointer;
+  }
+  .tabs button.on { background: #fff; color: var(--text); box-shadow: 0 3px 8px rgba(140,128,200,.11); }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: calc(34px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+    background: rgba(74,65,102,.94); color: #fff; font-size: 13.5px; padding: 10px 20px; border-radius: 22px;
+    opacity: 0; pointer-events: none; transition: .24s; z-index: 90; max-width: 86vw; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,110,160,.42); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
+  @media (max-width: 400px) {
+    .casc { gap: 9px; }
+    .pane { height: 200px; padding: 6px; }
+    .opt { font-size: 13px; padding: 8px 9px; }
+    .card { padding: 15px; }
+    .fld-box .big { font-size: 23px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="head-row">
+      <div style="flex:1;min-width:0">
+        <h1>随手记簿</h1>
+        <div class="head-sub" id="head-sub">今天还没记账</div>
+      </div>
+      <button class="icon-btn" id="cat-btn" title="管理分类">⚙</button>
+      <button class="sync-btn off" id="sync-btn">☁ 同步</button>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="type-switch">
+      <button class="exp on" id="t-exp" type="button">支出</button>
+      <button class="inc" id="t-inc" type="button">收入</button>
+    </div>
+
+    <div class="casc-label">选择分类与子类</div>
+    <div class="casc">
+      <div class="pane" id="pane-cat"></div>
+      <div class="pane" id="pane-sub"></div>
+    </div>
+
+    <div class="amt-row">
+      <div class="fld-box">
+        <label>金额</label>
+        <div class="big" id="amt-view">¥ 0.00</div>
+        <input type="hidden" id="amt">
+      </div>
+      <div class="fld-box">
+        <label>日期</label>
+        <div class="date-wrap">
+          <!-- flatpickr 挂在隐藏的原生 input 上：既复用库的定位/键盘/移动端适配，
+               又完全掌控显示文字，不用被各端渲染格式绑架 -->
+          <input type="text" id="date" autocomplete="off" readonly
+                 style="position:absolute;opacity:0;pointer-events:none;height:0;padding:0;border:0;left:0;top:0;width:100%">
+          <div class="date-row" id="date-show"><span class="rel">今天 · </span>10月14日 周三<span class="ico"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <input type="text" id="note" placeholder="备注（可留空）" maxlength="60">
+    </div>
+
+    <button class="save-btn" id="save-btn">保存这一笔</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="card">
+    <div class="list-head">
+      <h2>最近记录</h2>
+      <span class="tot" id="list-tot"></span>
+    </div>
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<!-- 金额键盘 -->
+<div class="mask" id="amt-mask">
+  <div class="sheet" style="max-width:420px">
+    <div class="grab"></div>
+    <h3>输入金额</h3>
+    <div class="desc">可用数字键直接输入，或点下方按键</div>
+    <div class="fld-box" style="text-align:right">
+      <label>金额</label>
+      <div class="big" id="kb-view">0.00</div>
+    </div>
+    <div id="kb-pad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px"></div>
+    <div class="btns">
+      <button class="btn" id="kb-cancel" type="button">取消</button>
+      <button class="btn pri" id="kb-ok" type="button">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 分类管理 -->
+<div class="mask" id="cat-mask">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>管理分类</h3>
+    <div class="desc">分类是你这几年摸索出来的体系，改动只影响本工具内的选择项，不会动已经记好的账。子类名称里的 <code>|</code> 和 <code>»</code> 会原样保留。</div>
+    <div class="tabs">
+      <button class="on" id="mc-exp" type="button">支出分类</button>
+      <button id="mc-inc" type="button">收入分类</button>
+    </div>
+    <div id="mc-list"></div>
+    <div class="btns">
+      <button class="btn" id="cat-close" type="button">完成</button>
+    </div>
+    <div class="msg" id="cat-msg"></div>
+  </div>
+</div>
+
+<!-- 云端同步 -->
+<div class="mask" id="sync-mask">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>☁ 云端同步</h3>
+    <div class="desc">把账本写进你 GitHub 仓库的 <code id="sync-path-show">data/daily.xlsx</code>，换设备时配一次 Token 就能接着记。Token 只存本机浏览器。</div>
+    <div class="fld">
+      <label>Token (PAT)</label>
+      <input type="password" id="gh-token" placeholder="github_pat_… 或 ghp_…" autocomplete="off">
+      <div class="tip">需要 repo 权限。Token 存在本机浏览器，iOS 主屏幕图标是独立存储，换环境要重填一次。</div>
+    </div>
+    <div class="fld fld-row">
+      <div><label>仓库 owner</label><input type="text" id="gh-owner" placeholder="sumer0825"></div>
+      <div><label>仓库名</label><input type="text" id="gh-repo" placeholder="Sumer"></div>
+    </div>
+    <div class="fld fld-row">
+      <div><label>分支</label><input type="text" id="gh-branch" placeholder="main"></div>
+      <div><label>文件路径</label><input type="text" id="gh-path" placeholder="data/daily.xlsx"></div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="sync-close" type="button">关闭</button>
+      <button class="btn gh" id="sync-save" type="button">保存并连接</button>
+    </div>
+    <div class="msg" id="sync-msg"></div>
+    <button class="btn danger block" id="gh-disconnect" type="button" style="display:none">断开链接并清空</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/flatpickr.min.js"></script>
+<script src="lib/zh.js"></script>
+<script>
+/* =========================================================
+   随手记簿 —— 独立的日常记账小工具
+   - 只做支出 / 收入，级联两栏选分类
+   - 本地存储 + 手动确认后同步到 GitHub Excel
+   - 与历史账本、账单透视镜无任何耦合
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const SHEET = '账本';
+const COLS = ['交易类型', '日期', '分类', '子分类', '金额', '备注'];
+
+/* ---------- 默认分类（来自账单分类模板.xlsx，原样保留 | 和 »） ---------- */
+const DEF_CATS = {
+  expense: [
+    { name: '饮食女子', subs: ['早飯', '中飯', '晚飯', '买菜|水果', '飲品|零食'] },
+    { name: '生活の支出', subs: ['日杂消费', '帽饰鞋服', '数码产品', '美业&医疗&养生', '赠礼/代买（亲友）', '❗未清账暂存分类❗'] },
+    { name: '繳費&交通&出行', subs: ['充值»电费|话费|燃气|交通', '房租', '打车', '火车|高铁|飞机|交铁单'] },
+    { name: '文娛&萌寵', subs: ['影娱»演出购票|娱乐充值', '旅游支出（总支）', '咕噜の消费', '追星の消费'] },
+  ],
+  income: [
+    { name: '收の入', subs: ['工资', '福利&红包&薅羊毛', '代买转款'] },
+  ],
+};
+
+/* ---------- 存储 ---------- */
+const KEY = 'daily_recs_v1';
+const CKEY = 'daily_cats_v1';
+let RECS = [];
+let CATS = null;
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function loadCats() {
+  try {
+    const raw = localStorage.getItem(CKEY);
+    if (raw) { const o = JSON.parse(raw); if (o && Array.isArray(o.expense) && Array.isArray(o.income)) { CATS = o; return; } }
+  } catch (e) {}
+  CATS = JSON.parse(JSON.stringify(DEF_CATS));
+}
+function saveCats() { try { localStorage.setItem(CKEY, JSON.stringify(CATS)); } catch (e) {} }
+function loadRecs() {
+  try { const o = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(o)) RECS = o; } catch (e) { RECS = []; }
+}
+function saveRecs() { try { localStorage.setItem(KEY, JSON.stringify(RECS)); } catch (e) {} }
+function saveBoth() { saveRecs(); saveCats(); }
+
+/* ---------- 工具 ---------- */
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function uid() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function fmtDate(s) {
+  if (!s) return '';
+  const p = s.split('-');
+  if (p.length !== 3) return s;
+  const d = new Date(+p[0], +p[1] - 1, +p[2]);
+  const wd = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+  return `${+p[1]}月${+p[2]}日 周${wd}`;
+}
+function money(n) {
+  const v = Math.round((+n || 0) * 100) / 100;
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove('show'), 1900);
+}
+function weekOf(d) {                       // ISO 周：用于排序的周序号
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dn = (t.getDay() + 6) % 7; t.setDate(t.getDate() - dn + 3);
+  const first = new Date(t.getFullYear(), 0, 4);
+  const fdn = (first.getDay() + 6) % 7; first.setDate(first.getDate() - fdn + 3);
+  return 1 + Math.round((t - first) / 604800000);
+}
+function sortKey(r) {
+  const p = String(r.date || '').split('-').map(Number);
+  const d = p.length === 3 && !isNaN(p[0]) ? new Date(p[0], p[1] - 1, p[2]) : new Date(r.ts || 0);
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+function sortRecs() { RECS.sort((a, b) => sortKey(b) - sortKey(a) || (b.ts || 0) - (a.ts || 0)); }
+
+/* ---------- 状态 ---------- */
+const S = { type: 'expense', cat: '', sub: '', amount: 0, date: todayStr() };
+
+/* ---------- 渲染：分类两栏 ---------- */
+function renderPanes() {
+  const list = CATS[S.type] || [];
+  const pc = $('pane-cat');
+  if (!list.length) {
+    pc.innerHTML = `<div class="ph">分类</div><div class="empty">还没有分类<br>去「管理分类」加一个</div>`;
+  } else {
+    let h = '<div class="ph">分类</div>';
+    list.forEach(c => {
+      h += `<button class="opt${S.cat === c.name ? ' on' : ''}" data-cat="${esc(c.name)}" type="button">${esc(c.name)}</button>`;
+    });
+    pc.innerHTML = h;
+  }
+  // 右栏
+  const cur = list.find(c => c.name === S.cat);
+  const ps = $('pane-sub');
+  if (!cur) {
+    ps.innerHTML = `<div class="ph">子类</div><div class="empty">先在左边选一个分类</div>`;
+  } else if (!cur.subs.length) {
+    ps.innerHTML = `<div class="ph">子类</div><div class="empty">「${esc(cur.name)}」还没有子类<br>可以只记到分类，或去添加</div>`;
+  } else {
+    let h = `<div class="ph">子类 · ${esc(cur.name)}</div>`;
+    cur.subs.forEach(s => {
+      h += `<button class="opt pick${S.sub === s ? ' on' : ''}" data-sub="${esc(s)}" type="button">${esc(s)}</button>`;
+    });
+    ps.innerHTML = h;
+  }
+  pc.querySelectorAll('[data-cat]').forEach(b => {
+    b.onclick = () => {
+      const n = b.dataset.cat;
+      if (S.cat === n) { // 再点一次取消选择
+        S.cat = ''; S.sub = '';
+      } else {
+        S.cat = n;
+        const c = (CATS[S.type] || []).find(x => x.name === n);
+        S.sub = c && c.subs.length ? c.subs[0] : '';
+      }
+      renderPanes(); renderAmt();
+    };
+  });
+  ps.querySelectorAll('[data-sub]').forEach(b => {
+    b.onclick = () => { S.sub = b.dataset.sub; renderPanes(); renderAmt(); };
+  });
+}
+
+/* ---------- 渲染：金额 / 类型 / 保存按钮 ---------- */
+function renderAmt() {
+  const ok = S.cat && S.amount > 0 && S.date;
+  $('amt-view').textContent = '¥ ' + money(S.amount);
+  const btn = $('save-btn');
+  btn.disabled = !ok;
+  btn.textContent = editing ? '保存修改' : '保存这一笔';
+  btn.classList.toggle('inc', S.type === 'income');
+  let hint = '';
+  if (!S.cat) hint = '先选一个分类';
+  else if (!S.amount) hint = S.type === 'income' ? '收入金额还没填' : '金额还没填';
+  $('hint').textContent = hint;
+  $('hint').classList.toggle('err', false);
+  $('amt').value = S.amount || '';
+}
+function renderType() {
+  $('t-exp').classList.toggle('on', S.type === 'expense');
+  $('t-inc').classList.toggle('on', S.type === 'income');
+}
+function setType(t) {
+  if (S.type === t) return;
+  S.type = t; S.cat = ''; S.sub = '';
+  renderType(); renderPanes(); renderAmt();
+}
+$('t-exp').onclick = () => setType('expense');
+$('t-inc').onclick = () => setType('income');
+
+/* ---------- 金额键盘 ---------- */
+let kbBuf = '';
+function openKb() { kbBuf = S.amount ? String(S.amount) : ''; kbRender(); $('amt-mask').classList.add('show'); }
+function kbRender() {
+  const v = kbBuf === '' ? '0.00' : (kbBuf.includes('.') ? kbBuf : kbBuf);
+  $('kb-view').textContent = '¥ ' + v;
+}
+function kbKey(k) {
+  if (k === 'del') kbBuf = kbBuf.slice(0, -1);
+  else if (k === 'c') kbBuf = '';
+  else if (k === '.') { if (!kbBuf.includes('.')) kbBuf = (kbBuf || '0') + '.'; }
+  else {
+    const n = kbBuf.replace('.', '').length;
+    if (n >= 9) return;
+    if (kbBuf === '0') kbBuf = k;
+    else kbBuf += k;
+  }
+  kbRender();
+}
+function kbBuild() {
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
+  $('kb-pad').innerHTML = keys.map(k =>
+    `<button class="btn" data-k="${k}" type="button" style="padding:14px;font-size:19px">${k === 'del' ? '⌫' : k}</button>`
+  ).join('');
+  $('kb-pad').querySelectorAll('[data-k]').forEach(b => b.onclick = () => kbKey(b.dataset.k));
+}
+kbBuild();
+$('amt-view').onclick = openKb;
+$('amt-view').style.cursor = 'pointer';
+$('kb-cancel').onclick = () => $('amt-mask').classList.remove('show');
+$('kb-ok').onclick = () => {
+  const v = parseFloat(kbBuf);
+  S.amount = isNaN(v) || v < 0 ? 0 : Math.round(v * 100) / 100;
+  $('amt-mask').classList.remove('show');
+  renderAmt();
+};
+$('amt-mask').onclick = e => { if (e.target === $('amt-mask')) $('amt-mask').classList.remove('show'); };
+
+/* ---------- 日期 ---------- */
+/* flatpickr 挂在隐藏 input 上，显示文字由 date-show 自绘（不被各端日期格式绑架） */
+let fp = null;   // 挂到 window 便于调试与 E2E 断言（顶层 let 在 evaluate 里取不到）
+function renderDate() {
+  const d = S.date, t = todayStr();
+  const p = String(d).split('-');
+  const wd = p.length === 3 ? ['日','一','二','三','四','五','六'][new Date(+p[0], +p[1]-1, +p[2]).getDay()] : '';
+  const rel = d === t ? '<span class="rel">今天 · </span>' : '';
+  $('date-show').innerHTML = p.length === 3
+    ? `${rel}${+p[1]}月${+p[2]}日 周${wd}<span class="ico"></span>`
+    : `${esc(d)}<span class="ico"></span>`;
+}
+if (flatpickr && flatpickr.l10ns && flatpickr.l10ns.zh) flatpickr.l10ns.zh.firstDayOfWeek = 1;  // 周一为第一列
+fp = flatpickr('#date', {
+  locale: 'zh',
+  dateFormat: 'Y-m-d',
+  defaultDate: S.date,
+  disableMobile: true,                       // 不用移动端原生选择器，各端表现一致
+  maxDate: todayStr(),                        // 不给未来日期
+  allowInput: false,
+  onChange: () => {
+    // 不信任 onChange 的入参：flatpickr 在不同配置下会传 Date / Date[] / 字符串。
+    // 一律从 selectedDates 取，并立刻格式化成 'Y-m-d' 字符串 ——
+    // 本工具内部所有地方（sortKey / 显示 / 写 Excel）都假定 S.date 是字符串，
+    // 一旦混进 Date 实例就会静默出错。
+    const d0 = fp.selectedDates[0];
+    S.date = d0 ? flatpickr.formatDate(d0, 'Y-m-d') : todayStr();
+    renderDate();
+    renderAmt();
+  },
+  onOpen: () => {
+    $('date-show').classList.add('flatpickr-active');
+    buildFpQuick();
+  },
+  onClose: () => $('date-show').classList.remove('flatpickr-active'),
+});
+
+/* 快捷条：插到日历底部，点完即选即关 */
+function buildFpQuick() {
+  const cal = fp.calendarContainer;
+  if (!cal || cal.querySelector('.fp-quick')) return;
+  const box = document.createElement('div');
+  box.className = 'fp-quick';
+  const mk = (label, offset) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.onclick = () => {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      const s = flatpickr.formatDate(d, 'Y-m-d');
+      fp.setDate(s, true);      // triggerChange=true → 走 onChange
+      fp.close();
+    };
+    return b;
+  };
+  box.appendChild(mk('今天', 0));
+  box.appendChild(mk('昨天', -1));
+  box.appendChild(mk('前天', -2));
+  cal.appendChild(box);
+}
+window.dailyFp = fp;          // 暴露引用，便于调试与 E2E 断言
+renderDate();
+// 显示行本身也可点（隐藏 input 只有 0 宽高，单独点它唤不起日历）
+$('date-show').onclick = () => { if (fp) fp.open(); };
+
+/* ---------- 保存 / 编辑 / 删除 ---------- */
+let editing = null;
+
+function saveRec() {
+  if (!S.cat) { hintErr('先选一个分类'); return; }
+  if (!(S.amount > 0)) { hintErr('金额要大于 0'); return; }
+  if (!S.date) { hintErr('选一个日期'); return; }
+  if (editing) {
+    const r = RECS.find(x => x.id === editing);
+    if (r) { r.type = S.type; r.date = S.date; r.cat = S.cat; r.sub = S.sub; r.amount = S.amount; r.note = $('note').value.trim(); }
+    toast('已修改');
+  } else {
+    RECS.push({
+      id: uid(), type: S.type, date: S.date, cat: S.cat, sub: S.sub,
+      amount: S.amount, note: $('note').value.trim(), ts: Date.now(),
+    });
+    toast('已记下 ' + money(S.amount) + ' 元');
+  }
+  saveRecs();
+  sortRecs();
+  $('note').value = '';
+  editing = null;
+  resetForm();
+  renderAll();
+}
+function hintErr(m) { $('hint').textContent = m; $('hint').classList.add('err'); }
+function resetForm() {
+  S.amount = 0; S.sub = '';
+  const c = (CATS[S.type] || []).find(x => x.name === S.cat);
+  if (c && c.subs.length) S.sub = c.subs[0];
+  renderAmt();
+}
+function editRec(id) {
+  const r = RECS.find(x => x.id === id);
+  if (!r) return;
+  editing = id;
+  S.type = r.type; S.date = r.date; S.cat = r.cat; S.sub = r.sub; S.amount = r.amount;
+  if (fp) fp.setDate(r.date, false);
+  renderDate();
+  $('note').value = r.note || '';
+  renderType(); renderPanes(); renderAmt();
+  $('hint').textContent = '正在修改这一笔，改完点「保存修改」';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function delRec(id) {
+  const r = RECS.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm(`删除这一笔？\n\n${r.cat}${r.sub ? ' · ' + r.sub : ''}  ¥${money(r.amount)}`)) return;
+  RECS = RECS.filter(x => x.id !== id);
+  if (editing === id) { editing = null; resetForm(); }
+  saveRecs(); renderAll();
+  toast('已删除');
+}
+$('save-btn').onclick = saveRec;
+
+/* ---------- 渲染：明细 ---------- */
+function renderList() {
+  sortRecs();
+  const box = $('list');
+  const today = todayStr();
+  const tRecs = RECS.filter(r => r.date === today);
+  const tExp = tRecs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  const tInc = tRecs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const mExp = RECS.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  const mInc = RECS.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+
+  $('head-sub').textContent = tRecs.length
+    ? `今天 ${tRecs.length} 笔 · 支出 ¥${money(tExp)}${tInc > 0 ? ` · 收入 ¥${money(tInc)}` : ''}`
+    : '今天还没记账';
+  $('list-tot').textContent = RECS.length
+    ? `共 ${RECS.length} 笔 · 支出 ¥${money(mExp)} · 收入 ¥${money(mInc)}`
+    : '';
+
+  if (!RECS.length) {
+    box.innerHTML = '<div class="hint">还没有记录，上面记一笔试试</div>';
+    return;
+  }
+  const show = RECS.slice(0, 120);
+  let h = '', curD = '';
+  show.forEach(r => {
+    if (r.date !== curD) {
+      curD = r.date;
+      const de = RECS.filter(x => x.date === curD && x.type === 'expense').reduce((s, x) => s + x.amount, 0);
+      const di = RECS.filter(x => x.date === curD && x.type === 'income').reduce((s, x) => s + x.amount, 0);
+      h += `<div class="day-head"><b>${fmtDate(curD)}</b><span>${curD === today ? '今天' : ''}</span>
+        <span class="ds">${di > 0 ? `收 ¥${money(di)}　` : ''}${de > 0 ? `支 ¥${money(de)}` : ''}</span></div>`;
+    }
+    const isE = r.type === 'expense';
+    h += `<div class="item" data-id="${r.id}">
+      <div class="info">
+        <div class="l1">${esc(r.sub || r.cat)}</div>
+        <div class="l2">${isE ? '支出' : '收入'} · ${esc(r.cat)}${r.note ? ' · ' + esc(r.note) : ''}</div>
+      </div>
+      <div class="amt ${isE ? 'exp' : 'inc'}">${isE ? '−' : '+'}${money(r.amount)}</div>
+      <button class="del" data-del="${r.id}" type="button" title="删除">×</button>
+    </div>`;
+  });
+  if (RECS.length > 120) h += `<div class="hint">只显示最近 120 笔，全部 ${RECS.length} 笔都在本机并存进 Excel。</div>`;
+  box.innerHTML = h;
+  box.querySelectorAll('[data-id]').forEach(el => {
+    el.querySelector('.info').onclick = () => editRec(el.dataset.id);
+  });
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = e => { e.stopPropagation(); delRec(b.dataset.del); });
+}
+
+function renderAll() { renderType(); renderPanes(); renderAmt(); renderList(); }
+
+/* =========================================================
+   分类管理
+   ========================================================= */
+let mcType = 'expense';
+function renderMc() {
+  const list = CATS[mcType] || [];
+  let h = '';
+  if (!list.length) h = '<div class="hint">这一类还没有分类</div>';
+  list.forEach((c, ci) => {
+    h += `<div class="mcat">
+      <div class="mh">
+        <b>${esc(c.name)}</b>
+        <button data-ren="${ci}" type="button">改名</button>
+        <button class="del" data-delcat="${ci}" type="button">删分类</button>
+      </div>
+      <div class="msub">${c.subs.length ? c.subs.map((s, si) =>
+        `<span data-s="${ci}_${si}">${esc(s)} <b data-sdel="${ci}_${si}" style="cursor:pointer;color:#b3aacd;font-weight:400">×</b></span>`
+      ).join('') : '<span style="color:#b3aacd">暂无子类，可直接记到分类</span>'}</div>
+      <div class="row-add">
+        <input type="text" data-in="${ci}" placeholder="新子类名称" maxlength="30">
+        <button data-addsub="${ci}" type="button">加子类</button>
+      </div>
+    </div>`;
+  });
+  h += `<div class="row-add" style="margin-top:12px">
+    <input type="text" id="new-cat-name" placeholder="新分类名称" maxlength="20">
+    <button class="add-cat" id="add-cat" type="button">加分类</button>
+  </div>`;
+  $('mc-list').innerHTML = h;
+
+  // 事件
+  $('mc-list').querySelectorAll('[data-addsub]').forEach(b => b.onclick = () => {
+    const ci = +b.dataset.addsub;
+    const inp = $('mc-list').querySelector(`[data-in="${ci}"]`);
+    const v = (inp.value || '').trim();
+    if (!v) { catMsg('先输入子类名称', true); return; }
+    if (CATS[mcType][ci].subs.includes(v)) { catMsg('这个子类已经有了', true); return; }
+    CATS[mcType][ci].subs.push(v);
+    saveCats(); renderMc(); renderPanes();
+    catMsg(`已在「${CATS[mcType][ci].name}」下添加「${v}」`);
+  });
+  $('mc-list').querySelectorAll('[data-sdel]').forEach(b => b.onclick = () => {
+    const [ci, si] = b.dataset.sdel.split('_').map(Number);
+    const name = CATS[mcType][ci].subs[si];
+    if (!confirm(`删除子类「${name}」？\n\n已经记好的账不会受影响，只是以后不能选它。`)) return;
+    CATS[mcType][ci].subs.splice(si, 1);
+    if (S.sub === name) { S.sub = ''; renderPanes(); }
+    saveCats(); renderMc(); renderAmt();
+  });
+  $('mc-list').querySelectorAll('[data-ren]').forEach(b => b.onclick = () => {
+    const ci = +b.dataset.ren;
+    const old = CATS[mcType][ci].name;
+    const v = prompt('分类改名', old);
+    if (v == null) return;
+    const nv = v.trim();
+    if (!nv) { catMsg('名称不能为空', true); return; }
+    if (nv !== old && (CATS[mcType] || []).some(c => c.name === nv)) { catMsg('已经有同名分类了', true); return; }
+    CATS[mcType][ci].name = nv;
+    if (S.cat === old) { S.cat = nv; }
+    saveCats(); renderMc(); renderPanes();
+    catMsg(`已改名为「${nv}」`);
+  });
+  $('mc-list').querySelectorAll('[data-delcat]').forEach(b => b.onclick = () => {
+    const ci = +b.dataset.delcat;
+    const nm = CATS[mcType][ci].name;
+    const used = RECS.filter(r => r.cat === nm).length;
+    if (!confirm(`删除分类「${nm}」？\n\n会一并删掉它下面的 ${CATS[mcType][ci].subs.length} 个子类。\n已有 ${used} 笔账用到它 —— 这些账不会被删除，但之后统计不到这个分类了。`)) return;
+    CATS[mcType].splice(ci, 1);
+    if (S.cat === nm) { S.cat = ''; S.sub = ''; }
+    saveCats(); renderMc(); renderPanes(); renderAmt();
+    catMsg(`已删除「${nm}」`);
+  });
+  $('add-cat').onclick = () => {
+    const inp = $('new-cat-name');
+    const v = (inp.value || '').trim();
+    if (!v) { catMsg('先输入分类名称', true); return; }
+    if ((CATS[mcType] || []).some(c => c.name === v)) { catMsg('已经有这个分类了', true); return; }
+    CATS[mcType].push({ name: v, subs: [] });
+    saveCats(); renderMc(); renderPanes();
+    inp.value = '';
+    catMsg(`已添加分类「${v}」，现在可以给它加子类了`);
+  };
+}
+function catMsg(m, err) { const e = $('cat-msg'); e.textContent = m; e.className = 'msg' + (err ? ' err' : ''); }
+$('mc-exp').onclick = () => { mcType = 'expense'; $('mc-exp').classList.add('on'); $('mc-inc').classList.remove('on'); renderMc(); catMsg(''); };
+$('mc-inc').onclick = () => { mcType = 'income'; $('mc-inc').classList.add('on'); $('mc-exp').classList.remove('on'); renderMc(); catMsg(''); };
+$('cat-btn').onclick = () => { renderMc(); $('cat-msg').textContent = ''; $('cat-mask').classList.add('show'); };
+$('cat-close').onclick = () => $('cat-mask').classList.remove('show');
+$('cat-mask').onclick = e => { if (e.target === $('cat-mask')) $('cat-mask').classList.remove('show'); };
+
+/* =========================================================
+   GitHub Excel 同步
+   ========================================================= */
+const GH_KEY = 'daily_gh_cfg_v1';
+let GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/daily.xlsx', sha: null };
+function loadGh() { try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {} }
+function saveGh() { try { localStorage.setItem(GH_KEY, JSON.stringify({ ...GH })); } catch (e) {} }
+function ghReady() { return !!(GH.token && GH.owner && GH.repo); }
+function ghApi() { return `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`; }
+function ghHeaders() { return { 'Authorization': `Bearer ${GH.token}`, 'Accept': 'application/vnd.github+json' }; }
+function bufToB64(buf) {
+  const bytes = new Uint8Array(buf); let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64ToBuf(b64) {
+  const bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/* 记录 <-> Excel 行 */
+function recKey(r) { return [r.type, r.date, r.cat, r.sub, (+r.amount).toFixed(2), r.note || ''].join('|'); }
+function rowsToRecs(rows) {
+  const out = [];
+  rows.forEach((r, i) => {
+    if (i === 0) return;                                  // 表头
+    const [type, date, cat, sub, amt, note] = r;
+    if (!cat && !date) return;
+    const p = String(date || '').trim();
+    const ds = /^\d{4}-\d{1,2}-\d{1,2}$/.test(p)
+      ? `${p.split('-')[0]}-${String(p.split('-')[1]).padStart(2, '0')}-${String(p.split('-')[2]).padStart(2, '0')}`
+      : todayStr();
+    const v = parseFloat(String(amt == null ? '' : amt).replace(/[^\d.\-]/g, ''));
+    out.push({
+      id: uid(), type: String(type || '').trim() === '收入' ? 'income' : 'expense',
+      date: ds, cat: String(cat || '未分类').trim(), sub: String(sub || '').trim(),
+      amount: isNaN(v) ? 0 : Math.round(v * 100) / 100,
+      note: String(note || '').trim(), ts: 0, fromCloud: true,
+    });
+  });
+  return out;
+}
+function recsToRows(arr) {
+  const rows = [COLS.slice()];
+  arr.slice().sort((a, b) => sortKey(a) - sortKey(b)).forEach(r => {
+    rows.push([
+      r.type === 'income' ? '收入' : '支出',
+      r.date,
+      String(r.cat || ''),
+      String(r.sub || ''),
+      (+r.amount || 0),
+      String(r.note || ''),
+    ]);
+  });
+  return rows;
+}
+function buildXlsx(arr) {
+  const ws = XLSX.utils.aoa_to_sheet(recsToRows(arr));
+  ws['!cols'] = [{ wch: 9 }, { wch: 12 }, { wch: 18 }, { wch: 30 }, { wch: 11 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, SHEET);
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+async function ghPull() {
+  const r = await fetch(ghApi() + `?t=${Date.now()}`, { headers: ghHeaders() });
+  if (r.status === 404) return null;
+  if (r.status === 401) throw new Error('401 Token 无效或已过期');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  GH.sha = j.sha;
+  const wb = XLSX.read(b64ToBuf(j.content), { type: 'array' });
+  return rowsToRecs(XLSX.utils.sheet_to_json(wb.Sheets[SHEET] || wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }));
+}
+async function ghPush(arr, msg) {
+  if (!GH.sha) { try { await ghPull(); } catch (e) {} }   // 云端已有文件但没 sha → 先补拉
+  const body = {
+    message: msg || `随手记簿同步 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+    content: bufToB64(buildXlsx(arr)), branch: GH.branch,
+  };
+  if (GH.sha) body.sha = GH.sha;
+  let r = await fetch(ghApi(), { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if ((r.status === 409 || r.status === 422) && GH.token) {
+    try { await ghPull(); } catch (e) {}
+    if (GH.sha) body.sha = GH.sha;
+    r = await fetch(ghApi(), { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
+  if (r.status === 401) throw new Error('401 Token 无效或已过期');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  GH.sha = j.content && j.content.sha;
+  saveGh();
+  return true;
+}
+function syncMsg(m, cls) { const e = $('sync-msg'); e.textContent = m; e.className = 'msg' + (cls ? ' ' + cls : ''); }
+function refreshSyncBtn() {
+  const b = $('sync-btn');
+  b.classList.toggle('off', !ghReady());
+  b.textContent = ghReady() ? '☁ 已连接' : '☁ 同步';
+}
+async function doPull(silent) {
+  if (!ghReady()) return;
+  try {
+    const remote = await ghPull();
+    if (remote == null) {
+      if (!silent) syncMsg('云端还没有这个文件，保存任意一笔后点同步就会自动创建', '');
+      return;
+    }
+    if (!remote.length) { if (!silent) syncMsg('云端表格是空的', ''); return; }
+    const mine = new Set(RECS.map(recKey));
+    const fresh = remote.filter(r => !mine.has(recKey(r)));
+    if (fresh.length) {
+      // 同一天同分类同金额的重复项会被上面的 key 过滤掉，这里只做云端补齐
+      const seen = new Set();
+      const add = fresh.filter(r => { const k = recKey(r); if (seen.has(k)) return false; seen.add(k); return true; });
+      RECS = RECS.concat(add);
+      saveRecs();
+      renderAll();
+      if (!silent) syncMsg(`✓ 已从云端补进 ${add.length} 笔`, 'ok');
+    } else if (!silent) {
+      syncMsg(`✓ 已是最新（云端 ${remote.length} 笔，本机 ${RECS.length} 笔）`, 'ok');
+    }
+  } catch (e) {
+    const hint = /401/.test(e.message || '')
+      ? '⚠️ Token 无效或已过期。本机数据不受影响，请在下面重新填入有效 Token。'
+      : '连接 GitHub 失败：' + e.message + '（本机数据不受影响）';
+    if (!silent) syncMsg(hint, 'err');
+    console.warn('ghPull 失败:', e.message);
+  }
+}
+
+/* 上传前确认：把将要写入的内容摊给用户看 */
+function openSync() {
+  $('gh-token').value = GH.token;
+  $('gh-owner').value = GH.owner || 'sumer0825';
+  $('gh-repo').value = GH.repo || 'Sumer';
+  $('gh-branch').value = GH.branch || 'main';
+  $('gh-path').value = GH.path || 'data/daily.xlsx';
+  $('sync-path-show').textContent = GH.path || 'data/daily.xlsx';
+  $('gh-disconnect').style.display = ghReady() ? '' : 'none';
+  refreshSyncBtn();
+  syncMsg(ghReady() ? '已连接，点「同步到云端」上传' : '填 Token 后保存并连接');
+  $('sync-mask').classList.add('show');
+  const b = $('sync-save');
+  b.textContent = ghReady() ? '同步到云端' : '保存并连接';
+}
+$('sync-btn').onclick = openSync;
+$('sync-close').onclick = () => $('sync-mask').classList.remove('show');
+$('sync-mask').onclick = e => { if (e.target === $('sync-mask')) $('sync-mask').classList.remove('show'); };
+
+$('sync-save').onclick = async () => {
+  const tk = $('gh-token').value.trim();
+  if (!tk) { syncMsg('请填写 Token', 'err'); return; }
+  const wasReady = ghReady();
+  GH.token = tk;
+  GH.owner = $('gh-owner').value.trim() || 'sumer0825';
+  GH.repo = $('gh-repo').value.trim() || 'Sumer';
+  GH.branch = $('gh-branch').value.trim() || 'main';
+  GH.path = $('gh-path').value.trim() || 'data/daily.xlsx';
+  GH.sha = null;
+  saveGh();
+  refreshSyncBtn();
+
+  // 关键一步：上传前必须让用户确认
+  const n = RECS.length;
+  const expSum = RECS.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  const incSum = RECS.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const ok = confirm(
+    `确认把本机账本写入 GitHub？\n\n` +
+    `仓库：${GH.owner}/${GH.repo}\n` +
+    `分支：${GH.branch}\n` +
+    `路径：${GH.path}\n\n` +
+    `将写入 ${n} 笔\n` +
+    `支出合计 ¥${money(expSum)}\n` +
+    `收入合计 ¥${money(incSum)}\n\n` +
+    `格式：${COLS.join(' | ')}\n` +
+    `（本机也会先把云端记录补下来再写入，不会覆盖云端独有的账）`
+  );
+  if (!ok) { syncMsg('已取消上传，本机数据不变'); return; }
+
+  syncMsg('正在从云端拉取…');
+  await doPull(false);
+  syncMsg('正在写入 GitHub…');
+  try {
+    await ghPush(RECS, `随手记簿同步 ${RECS.length} 笔 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
+    sortRecs(); saveRecs(); renderAll();
+    syncMsg(`✓ 已写入 ${GH.path}（${RECS.length} 笔）`, 'ok');
+    toast('同步完成');
+    $('gh-disconnect').style.display = '';
+  } catch (e) {
+    syncMsg('写入失败：' + e.message + '（本机数据已保存，不受影响）', 'err');
+  }
+};
+
+$('gh-disconnect').onclick = async () => {
+  if (!confirm('断开 GitHub 链接？\n\n将清空：本机 Token、本机浏览器缓存的账本\n不会动：仓库里 Excel 表格已写入的数据\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
+  localStorage.removeItem(GH_KEY);
+  localStorage.removeItem(KEY);
+  RECS = [];
+  GH.token = ''; GH.sha = null;
+  $('gh-token').value = '';
+  $('gh-disconnect').style.display = 'none';
+  renderAll(); refreshSyncBtn();
+  syncMsg('已断开链接并清空 Token，本机账本已清空，仓库表格未改动', 'ok');
+  toast('已断开链接');
+};
+
+/* ---------- 初始化 ---------- */
+loadCats();
+loadRecs();
+loadGh();
+sortRecs();
+// 首次进来默认选中第一个分类，减少一次点击
+if (!S.cat && (CATS.expense || []).length) {
+  S.cat = CATS.expense[0].name;
+  const c = CATS.expense[0];
+  S.sub = c.subs.length ? c.subs[0] : '';
+}
+renderAll();
+refreshSyncBtn();
+doPull(true);   // 启动时静默拉一次云端
+
+/* iOS 键盘收起后视口残留修正 */
+(function () {
+  let h0 = 0;
+  window.addEventListener('focusout', () => {
+    const d = document.documentElement;
+    if (window.scrollY === 0 && h0 > 0) d.style.height = '';
+    setTimeout(() => {
+      h0 = document.documentElement.scrollHeight;
+      document.documentElement.style.height = 'auto';
+    }, 300);
+  });
+})();
+</script>
+<div class="ver">v3</div>
+</body>
+</html>
