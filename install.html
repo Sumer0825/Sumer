@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>安装到手机 · Planet 612</title>
+<meta name="theme-color" content="#1a1230">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #f4f6fb; --primary: #4f7cff; --text: #1f2733; --muted: #8a94a6;
+    --line: #e6eaf1; --card: #fff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 24px 16px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.65;
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 28px; }
+  .appicon {
+    width: 84px; height: 84px; border-radius: 20px; margin: 0 auto 14px;
+    box-shadow: 0 8px 24px rgba(26,18,48,.18); display: block;
+  }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  h2 { font-size: 16px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--primary);
+    color: #fff; font-size: 13px; font-weight: 700; flex: 0 0 auto;
+  }
+  ol { margin: 0; padding-left: 20px; }
+  ol li { margin-bottom: 10px; font-size: 14.5px; }
+  ol li:last-child { margin-bottom: 0; }
+  .tip {
+    font-size: 13px; color: var(--muted); background: #f7f9fd;
+    border-left: 3px solid var(--primary); border-radius: 0 8px 8px 0;
+    padding: 10px 12px; margin-top: 14px;
+  }
+  .btn-install {
+    display: none; width: 100%; padding: 15px; border: 0; border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), #7da2ff); color: #fff;
+    font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 16px;
+    font-family: inherit;
+  }
+  .btn-install:active { transform: scale(.985); }
+  .features { display: grid; gap: 10px; }
+  .feat { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+  .feat .ic { flex: 0 0 auto; font-size: 17px; line-height: 1.4; }
+  .feat b { display: block; margin-bottom: 2px; }
+  .feat span { color: var(--muted); font-size: 13px; }
+  .warn {
+    background: #fff8ec; border: 1px solid #ffe3b0; border-radius: 12px;
+    padding: 14px 16px; font-size: 13.5px; color: #7a5b16;
+  }
+  .warn b { display: block; margin-bottom: 4px; color: #8a6410; }
+  a { color: var(--primary); }
+  .back { display: block; text-align: center; margin-top: 24px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="appicon" src="assets/icon-512.png" alt="Planet 612 图标">
+    <h1>把 Planet 612 装到手机</h1>
+    <p class="sub">装上后有独立图标、全屏运行、断网也能用</p>
+  </header>
+
+  <button class="btn-install" id="btn-install">一键安装到桌面</button>
+
+  <div class="card">
+    <h2><span class="badge">i</span>iPhone / iPad（Safari）</h2>
+    <ol>
+      <li>用 <b>Safari</b> 打开这个网址（必须是 Safari，微信/Chrome 里不行）</li>
+      <li>点底部中间的<b>「分享」</b>按钮（方框加向上箭头）</li>
+      <li>下滑找到<b>「添加到主屏幕」</b></li>
+      <li>右上角点<b>「添加」</b></li>
+    </ol>
+    <div class="tip">装好后从桌面图标打开，<b>没有地址栏、没有浏览器按钮</b>，跟真 App 一样。长按桌面图标还能只跳某一个工具（体重 / 收支 / 时光 / 透视）。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">A</span>安卓（Chrome / Edge）</h2>
+    <ol>
+      <li>用 <b>Chrome</b> 打开这个网址</li>
+      <li>点右上角<b>「⋮」</b>菜单</li>
+      <li>选<b>「安装应用」</b>或<b>「添加到主屏幕」</b></li>
+      <li>确认<b>「安装」</b></li>
+    </ol>
+    <div class="tip">如果菜单里找不到「安装应用」，说明这个浏览器暂不支持 PWA 安装，换 Chrome 或 Edge 即可。</div>
+  </div>
+
+  <div class="card">
+    <h2>装上之后有什么不同</h2>
+    <div class="features">
+      <div class="feat"><span class="ic">📱</span><div><b>独立图标 + 全屏</b><span>桌面有图标，点开没有地址栏</span></div></div>
+      <div class="feat"><span class="ic">📴</span><div><b>断网也能用</b><span>地铁、电梯、没信号的地方照常记录</span></div></div>
+      <div class="feat"><span class="ic">⚡</span><div><b>秒开</b><span>直接读本地缓存，不用等网络</span></div></div>
+      <div class="feat"><span class="ic">🔒</span><div><b>数据还是你自己的</b><span>记录存在手机本地，同步仍走你自己的 GitHub</span></div></div>
+      <div class="feat"><span class="ic">🔄</span><div><b>联网自动更新</b><span>有新版本会静默拉取，不用重装</span></div></div>
+    </div>
+  </div>
+
+  <div class="warn">
+    <b>关于数据安全，说一句实话</b>
+    「安装」只是给网页加了个外壳，你的记录<strong>仍然存在手机浏览器的本地存储里</strong>，不是存在 App 里。所以：<strong>换手机、清理浏览器数据、卸载浏览器，都可能丢数据</strong>。重要数据请照常用「同步到 GitHub」备份一份。
+  </div>
+
+  <a class="back" href="index.html">← 返回工具箱</a>
+</div>
+
+<script>
+// 安卓 Chrome 会触发 beforeinstallprompt，此时给个显式按钮（iOS 不支持，只能手点分享）
+let deferredPrompt = null;
+const btn = document.getElementById('btn-install');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  btn.style.display = 'block';
+});
+
+btn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') btn.style.display = 'none';
+  deferredPrompt = null;
+});
+
+window.addEventListener('appinstalled', () => {
+  btn.style.display = 'none';
+  btn.textContent = '✓ 已安装';
+});
+
+// 已在 standalone 模式（就是从桌面图标打开的）就不再显示安装引导
+if (window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true) {
+  const t = document.querySelector('header');
+  if (t) t.querySelector('.sub').textContent = '已安装 · 断网也能用';
+}
+</script>
+</body>
+</html>

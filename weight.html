@@ -13,6 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="轻身时光簿">
 <meta name="theme-color" content="#f4f6fb">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
 <link rel="icon" type="image/png" href="assets/apple-touch-icon.png">
 <link href="lib/flatpickr.min.css" rel="stylesheet">
 <script>
@@ -67,6 +69,11 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .stat .label { font-size: 12px; color: var(--muted); }
   .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
   .stat .value small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  /* 已记录天数：常驻成就感数据，用主题蓝淡底和体重数字区分开 */
+  .stat-days { background: #f4f7ff; border-radius: 10px; padding: 6px 4px; }
+  .stat-days .label { color: var(--primary); font-weight: 600; }
+  .stat-days .value { color: var(--primary); }
+  .stat-days .value small { color: var(--primary); opacity: .75; }
   .delta-up { color: var(--danger); }
   .delta-down { color: var(--success); }
 
@@ -74,6 +81,17 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .chart-head h2 { margin-bottom: 14px; }
   .chart-hint { font-size: 12px; color: var(--muted); white-space: nowrap; opacity: .85; margin-bottom: 14px; }
   .chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; overscroll-behavior-x: contain; }
+  /* Y 轴刻度固定在左侧：grid 布局，左列不滚动，右列横向滚动 */
+  .chart-wrap { display: grid; grid-template-columns: auto 1fr; align-items: stretch; }
+  .chart-yaxis {
+    position: relative; width: 34px; flex: 0 0 auto;
+    background: var(--card); border-right: 1px solid var(--line);
+    z-index: 1;
+  }
+  .chart-yaxis span {
+    position: absolute; right: 5px; transform: translateY(-50%);
+    font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
   .chart-box { position: relative; width: max-content; min-width: 100%; }
   svg.chart { display: block; height: 220px; }
 
@@ -204,6 +222,42 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
 
+/* ===== 自我鼓励三件套 =====
+   A 顶部横幅（每天一句）· B 进度条下小字（每天一句）· C 趋势图下竖线（按数据实时回应）
+   三处同源不打架：A 给氛围、B 给陪伴、C 只在有话可说时才出声。 */
+
+/* A · 概览卡顶部横幅 */
+.cheer-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, var(--primary-soft) 0%, #eef7f1 100%);
+  border-radius: 10px; padding: 10px 13px; margin-bottom: 14px;
+}
+.cheer-banner .cheer-ico { font-size: 16px; line-height: 1; flex: 0 0 auto; }
+.cheer-banner .cheer-txt { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.45; }
+
+/* B · 进度条下方一行 */
+.cheer-mini {
+  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line);
+  font-size: 13px; color: var(--text); opacity: .78; line-height: 1.5;
+}
+
+/* C · 趋势卡下方动态回应（左侧蓝色竖线） */
+.cheer-dyn {
+  display: flex; gap: 10px; align-items: flex-start;
+  border-left: 3px solid var(--primary);
+  background: #f7f9fc; border-radius: 0 9px 9px 0;
+  padding: 10px 12px; margin-top: 12px;
+}
+.cheer-dyn .cheer-tag { font-size: 12px; color: var(--muted); margin-bottom: 3px; display: block; }
+.cheer-dyn .cheer-body { font-size: 13.5px; color: var(--text); line-height: 1.65; }
+.cheer-dyn.harsh { border-left-color: var(--danger); background: #fff5f6; }
+.cheer-dyn.good  { border-left-color: #2aa06a; background: #f2faf6; }
+
+@media (max-width: 380px) {
+  .cheer-banner .cheer-txt { font-size: 13px; }
+  .cheer-dyn .cheer-body { font-size: 13px; }
+}
+
 /* 版本角标：右下角极小字，不响应点击，用于快速分辨新旧版 */
 .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,130,145,.45); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
 /* 被门户 iframe 嵌入时：顶部安全区由门户顶栏负责，本页不再重复避让（防止标题上方出现大段空白） */
@@ -246,15 +300,21 @@ html.in-frame header { padding-top: 0; }
   <div class="col-left">
   <!-- 概览 -->
   <section class="card">
+    <div class="cheer-banner" id="cheer-a">
+      <span class="cheer-ico">🌿</span>
+      <span class="cheer-txt" id="cheer-a-txt">今天也在往前挪,没偷懒</span>
+    </div>
     <div class="stats">
       <div class="stat"><div class="label">最新体重</div><div class="value" id="s-latest">--<small>斤</small></div></div>
       <div class="stat"><div class="label">较前次</div><div class="value" id="s-delta">--</div></div>
       <div class="stat"><div class="label">初始体重</div><div class="value" id="s-first">--<small>斤</small></div></div>
       <div class="stat"><div class="label">平均</div><div class="value" id="s-avg">--<small>斤</small></div></div>
-      <div class="stat"><div class="label">距目标</div><div class="value" id="s-goal">--<small>斤</small></div></div>
-    </div>
+<div class="stat"><div class="label">距目标</div><div class="value" id="s-goal">--<small>斤</small></div></div>
+    <div class="stat stat-days"><div class="label">已记录</div><div class="value" id="s-days">--<small>天</small></div></div>
+  </div>
     <div class="goal-bar" title="距目标进度"><span id="goal-fill" style="width:0%"></span></div>
     <div class="tip" id="goal-text">未设置目标体重</div>
+    <div class="cheer-mini" id="cheer-b">秤在看着呢</div>
   </section>
 
   <!-- 添加 -->
@@ -285,7 +345,8 @@ html.in-frame header { padding-top: 0; }
   <!-- 趋势图 -->
   <section class="card">
     <div class="chart-head"><h2>体重趋势</h2><span class="chart-hint" id="chart-hint" style="display:none">↔ 左右滑动查看</span></div>
-    <div class="chart-scroll" id="chart-scroll"><div class="chart-box"><svg class="chart" id="chart" width="700" height="220"></svg></div></div>
+    <div class="chart-wrap"><div class="chart-yaxis" id="chart-yaxis"></div><div class="chart-scroll" id="chart-scroll"><div class="chart-box"><svg class="chart" id="chart" width="700" height="220"></svg></div></div></div>
+    <div id="cheer-c-slot"></div>
   </section>
   </div><!-- /col-left -->
 
@@ -567,6 +628,10 @@ function render() {
     else { gEl.innerHTML = `${fmt(K2J(diff))}<small>斤</small>`; gEl.className = 'value delta-down'; }
   }
 
+  // 已记录天数：按「自然日去重」算（同一天早/中/晚多条只算一天）
+  const days = new Set(data.map(d => d.date)).size;
+  $('s-days').innerHTML = len ? `${days}<small>天</small>` : '--';
+
   // 目标进度
   const gt = $('goal-text'), gf = $('goal-fill');
   if (goal && len) {
@@ -583,6 +648,96 @@ function render() {
 
   drawChart(data);
   renderHistory(data);
+  renderCheer(data, goal);
+}
+
+/* ===== 自我鼓励三件套 =====
+   A 横幅：每天一句（按日期取，同一天不跳句）
+   B 小字：每天一句（独立轮换，不跟 A 撞句）
+   C 动态：看真实数据回应 —— 涨了扎你、降了肯定、达标泼冷水、没数据不硬凑 */
+
+const CHEER_A = [
+  '掉秤是慢功夫,今天也别想逃', '明天秤上见真章', '你可以停,但秤不会说谎',
+  '想吃?先看看进度条', '这条曲线是你画的,别赖别人', '嘴硬的人,秤上最诚实',
+  '少一口,比跑十圈管用', '别让昨天那顿白吃', '你不是没时间,是没决心',
+  '数字不会骗你,骗人的只有秤上的肉', '想躺着瘦?没这好事', '今天偷的懒,明天秤上见',
+];
+const CHEER_B = [
+  '今天也别想逃', '秤在看着呢', '进度在涨就继续', '差一点就到了,别松手',
+  '你按自己节奏走,挺好 —— 但得走', '慢就是快,前提是得动', '记录本身没用,得动', '明天见',
+];
+/* 按日期取句：同一天固定，隔天自动换；且 A / B 撞句时 B 顺延一句，避免两处重复 */
+function daySeed() {
+  const d = new Date();
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000);
+}
+function pickCheer(list, salt) {
+  const n = list.length;
+  return list[(daySeed() * 3 + salt) % n];
+}
+function renderCheerA() {
+  const el = $('cheer-a-txt'); if (!el) return;
+  let a = pickCheer(CHEER_A, 0);
+  const b = pickCheer(CHEER_B, 1);
+  if (a === b) a = CHEER_A[(CHEER_A.indexOf(a) + 1) % CHEER_A.length];
+  el.textContent = a;
+}
+function renderCheerB() {
+  const el = $('cheer-b'); if (!el) return;
+  el.textContent = pickCheer(CHEER_B, 1);
+}
+function renderCheer(data, goal) {
+  renderCheerA(); renderCheerB();
+  const slot = $('cheer-c-slot'); if (!slot) return;
+  const len = data.length;
+  if (!len) { slot.innerHTML = ''; return; }          // 没有任何记录 → 不硬凑
+
+  const last = data[len - 1].weight;
+  const prev = len >= 2 ? data[len - 2].weight : null;
+  const first = data[0].weight;
+  const lostKg = first - last;                          // 正=已减（kg）
+  const lostJin = K2J(lostKg);
+
+  let cls = '', tag = '', body = '';
+
+  if (goal != null && Math.abs(last - goal) < 0.05) {
+    // 达标：别让骄傲把人带回去
+    cls = 'good'; tag = '目标达成';
+    body = '到了。但别得意,这个数字维持不住的人我见过太多,一周内反弹的都回来了。接下来每斤都是防守战。';
+  } else if (prev == null) {
+    // 刚开始
+    tag = '第一条记录';
+    body = '最难的不是第一斤,是第三十天。';
+  } else {
+    const dKg = last - prev;                           // 正=涨（kg）
+    const dJin = K2J(Math.abs(dKg));
+    if (dKg > 0.05) {
+      cls = 'harsh'; tag = `比上次重了 ${dJin.toFixed(1)} 斤`;
+      body = dKg >= 1
+        ? `涨了 ${dJin.toFixed(1)} 斤。不是衣服重,是你嘴没管住。今晚别吃主食,给我饿着,明天这个数字必须掉回去。`
+        : `涨了 ${dJin.toFixed(1)} 斤。这 ${dJin.toFixed(1)} 斤是你自己一口一口吃出来的,别怪秤。回去把昨晚那顿解决了,今天的水喝够,晚上站秤上看能不能把脸挣回来。`;
+    } else if (dKg < -0.05) {
+      cls = 'good'; tag = `比上次轻了 ${dJin.toFixed(1)} 斤`;
+      body = `降了 ${dJin.toFixed(1)} 斤。这就对了,说明你昨天忍住了。今天继续,别把这股劲用在庆祝上。`;
+    } else {
+      tag = '跟上一次持平';
+      body = '一点没动。你昨天吃的和今天吃的抵消了,等于白吃。想让进度动,就得让今天比昨天少一口。';
+    }
+  }
+
+  // 累计成果缀在末尾（累计减重才说；天数已在概览卡常驻，这里不重复报）
+  if (lostJin >= 1) {
+    body += (cls === 'good' && tag === '目标达成')
+      ? ` 从头到尾 ${lostJin.toFixed(1)} 斤。`
+      : ` 到现在累计 ${lostJin.toFixed(1)} 斤,别在这儿停下。`;
+  }
+
+  slot.innerHTML = `<div class="cheer-dyn ${cls}">
+      <div style="flex:1">
+        <span class="cheer-tag">${tag}</span>
+        <span class="cheer-body">${body}</span>
+      </div>
+    </div>`;
 }
 
 function drawChart(data) {
@@ -592,26 +747,31 @@ function drawChart(data) {
   if (data.length < 2) {
     svg.setAttribute('width', Math.max(200, sc ? sc.clientWidth : 700));
     svg.innerHTML = `<text x="50%" y="110" text-anchor="middle" fill="#8a94a6" font-size="14">至少记录 2 天即可显示趋势</text>`;
+    const ya0 = $('chart-yaxis'); if (ya0) ya0.innerHTML = '';   // 清掉可能残留的旧刻度
     $('chart-hint').style.display = 'none';
     return;
   }
   // 按数据量动态加宽：每点约 14px，最窄不低于容器宽（防止少量数据被拉伸）
   const step = 14;
-  const W = Math.max(sc ? sc.clientWidth : 700, Math.ceil((data.length - 1) * step) + 2 * pad + 14);
+  const YA_W = 34;                                   // 与 CSS .chart-yaxis 宽度一致
+  const W = Math.max((sc ? sc.clientWidth : 700) + YA_W, Math.ceil((data.length - 1) * step) + 2 * pad + 14 + YA_W);
   svg.setAttribute('width', W);
   const ws = data.map(d => d.weight);
   const min = Math.min(...ws), max = Math.max(...ws);
   const range = (max - min) || 1;
-  const x = i => pad + i * (W - 2*pad) / (data.length - 1);
+  const x = i => pad + YA_W + i * (W - 2*pad - YA_W) / (data.length - 1);
   const y = v => H - pad - (v - min) / range * (H - 2*pad);
 
-  // 网格 + Y 轴标签（斤）
+  // 网格 + Y 轴标签（斤）。标签渲染到左侧固定层（不随横向滚动），SVG 内只画网格线。
+  const ya = $('chart-yaxis');
+  let yaHtml = '';
   for (let i = 0; i <= 4; i++) {
     const val = min + range * i / 4;
     const yy = y(val);
-    svg.insertAdjacentHTML('beforeend', `<line x1="${pad}" y1="${yy}" x2="${W-pad}" y2="${yy}" stroke="#eef1f6"/>`);
-    svg.insertAdjacentHTML('beforeend', `<text x="4" y="${yy+4}" fill="#8a94a6" font-size="10">${fmt(K2J(val))}</text>`);
+    svg.insertAdjacentHTML('beforeend', `<line x1="${pad + YA_W}" y1="${yy}" x2="${W-pad}" y2="${yy}" stroke="#eef1f6"/>`);
+    yaHtml += `<span style="top:${yy}px">${fmt(K2J(val))}</span>`;
   }
+  if (ya) ya.innerHTML = yaHtml;
   // 折线
   let path = '';
   data.forEach((d, i) => path += (i ? 'L' : 'M') + x(i) + ' ' + y(d.weight) + ' ');
@@ -974,6 +1134,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v31</div>
+<div class="ver">v34</div>
 </body>
 </html>

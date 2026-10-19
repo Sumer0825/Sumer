@@ -1,0 +1,68 @@
+{
+  "name": "Planet 612 工具箱",
+  "short_name": "Planet612",
+  "description": "时光自撰集 · 轻身时光簿 · 收支规划局 · 清居置物箱 · 账本 · 账单透视镜 · 随手记簿 —— 纯前端离线小工具合集",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "/Planet612/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#1a1230",
+  "theme_color": "#1a1230",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["utilities", "productivity", "lifestyle", "finance"],
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "记一笔体重",
+      "short_name": "体重",
+      "url": "./weight.html",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "记一笔收支",
+      "short_name": "收支",
+      "url": "./budget.html",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "记一笔时间",
+      "short_name": "时光",
+      "url": "./time.html",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "账单透视镜",
+      "short_name": "透视",
+      "url": "./analysis.html",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
