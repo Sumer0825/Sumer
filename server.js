@@ -4,7 +4,7 @@ const path = require('path');
 
 const DIR = __dirname;
 const PORT = process.env.PORT || 3000;
-const ZIP = path.join(DIR, 'sumer-pages-v57.zip');
+const ZIP = path.join(DIR, 'sumer-pages-v59.zip');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -22,7 +22,7 @@ const MIME = {
 // 静态服务白名单：只放行工具页面与静态资源目录。
 // 原因：整目录开放会让任何放在 portal/ 下的文件（如账本备份 JSON、历史 zip）可被直接下载。
 const ALLOW_FILES = new Set([
-  'analysis.html', 'bg-preview.html', 'budget.html', 'daily.html', 'download.html', 'index.html', 'ledger.html', 'manifest.json', 'storage.html', 'time.html', 'weight.html',
+  'analysis.html', 'bg-preview.html', 'budget.html', 'daily.html', 'download.html', 'index.html', 'install.html', 'ledger.html', 'manifest.json', 'storage.html', 'time.html', 'weight.html',
   'sw.js'
 ]);
 const ALLOW_DIRS = ['assets', 'lib'];
@@ -45,7 +45,7 @@ http.createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': stat.size,
-      'Content-Disposition': 'attachment; filename="sumer-pages-v57.zip"',
+      'Content-Disposition': 'attachment; filename="sumer-pages-v59.zip"',
       'Cache-Control': 'no-store'
     });
     return fs.createReadStream(ZIP).pipe(res);
