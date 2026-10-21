@@ -6,11 +6,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>收支规划局</title>
+<title>刚需日用账</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="收支规划局">
+<meta name="apple-mobile-web-app-title" content="刚需日用账">
 <meta name="theme-color" content="#f4f6fb">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
@@ -191,6 +191,14 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   td .amt-fore { color: #a89484; font-style: italic; }
   td .amt-ok { color: var(--text); font-weight: 600; }
   .tbl-scroll { max-height: 420px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  /* 表头吸顶：滚动时锁定日期/星期/实际/预算/备注这一行
+     注意：必须用 border-collapse:separate，collapse 模式下 sticky 在 Chromium/Safari 会失效 */
+  .tbl-scroll table { border-collapse: separate; border-spacing: 0; }
+  .tbl-scroll thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--card);
+    box-shadow: inset 0 -1px 0 var(--line);   /* 底线，避免与行分隔线重叠时出现双线 */
+  }
   .del { color: var(--danger); background: none; padding: 4px 8px; font-size: 13px; border: none; cursor: pointer; }
   .del:disabled { color: #c4c9d4; cursor: not-allowed; }
   .empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 14px; }
@@ -261,7 +269,7 @@ html.in-frame .month-picker { top: 4px; }
 <body>
 <div class="wrap">
   <header>
-    <h1>💰 收支规划局</h1>
+    <h1>💰 刚需日用账</h1>
     <p>数据存储：<span id="store-mode">本机浏览器（localStorage）</span> · 可导入/导出 Excel</p>
     <div class="sync-bar">
       <span id="sync-status" class="sync-status">未连接 GitHub</span>
@@ -334,11 +342,11 @@ html.in-frame .month-picker { top: 4px; }
   </section>
 
   <!-- 记录范围说明（始终可见，提醒哪些算、哪些不算） -->
-  <div class="alert alert-info" style="margin-top:-6px">
+  <div class="alert alert-info" style="margin-top:-6px;padding-bottom:14px">
     <span class="ai">📒</span>
     <span class="at">
-      <b>本记录只涵盖：</b>每日餐饮 · 娱乐 · 非硬性日用商品购买<br>
-      <b style="opacity:.65">不计入：</b><span style="opacity:.65">房租 / 水电 / 通讯 / 交通卡 / 机票酒店 / 医疗 / 大额硬性支出等（按月固定或一次性大额，不影响日常节流判断）</span>
+      <b style="color:#ae292b;font-size:15px">本记录仅涵盖：每日餐饮等必要、固定的刚性支出</b><br>
+      <span style="display:inline-block;transform:skewX(-10deg);transform-origin:left center;padding:3px 0 7px"><b style="color:#4a5568;font-size:15px">不计入：</b><span style="color:#4a5568;font-size:15px">房租等由录入人主观认定为非刚需的支出不计入其中（相关录入金额不具备严谨记账的准确参考价值）</span></span></span>
     </span>
   </div>
 
@@ -464,18 +472,21 @@ function toast(msg) {
    budgets: 预算变更历史（append-only），{ id, month, effective_from, daily, note }
    actuals: 每日实际（按 date upsert），  { date, amount, note }
    ========================================================= */
-function emptyData() { return { meta: { version: 1, lastModified: '' }, budgets: [], actuals: [] }; }
+function emptyData() { return { meta: { version: 1, schemaVersion: 2, lastModified: '' }, budgets: [], actuals: [] }; }
 function normData(d) {
   if (!d || typeof d !== 'object') return emptyData();
   const out = emptyData();
   out.meta = Object.assign({ version: 1, lastModified: '' }, d.meta || {});
+  // v20 迁移：旧数据的 entryDate 不可信（v19 的同步/导入路径会误打「今天」戳），一次性清空
+  const legacySchema = parseInt((d.meta && d.meta.schemaVersion) || 1, 10) < 2;
   if (Array.isArray(d.budgets)) {
     out.budgets = d.budgets.filter(b => b && /^\d{4}-\d{2}$/.test(b.month || '') && /^\d{4}-\d{2}-\d{2}$/.test(b.effective_from || '') && !isNaN(parseFloat(b.daily)))
       .map((b, i) => ({ id: b.id || 'b' + (i + 1), month: b.month, effective_from: b.effective_from, daily: Math.round(parseFloat(b.daily) * 100) / 100, note: b.note || '' }));
   }
   if (Array.isArray(d.actuals)) {
     out.actuals = d.actuals.filter(a => a && /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') && !isNaN(parseFloat(a.amount)))
-      .map(a => ({ date: a.date, amount: Math.round(parseFloat(a.amount) * 100) / 100, note: a.note || '' }));
+      .map(a => ({ date: a.date, amount: Math.round(parseFloat(a.amount) * 100) / 100, note: a.note || '', entryDate: /^\d{4}-\d{2}-\d{2}$/.test(a.entryDate || '') ? a.entryDate : '' }));
+    if (legacySchema) { out.actuals.forEach(a => { a.entryDate = ''; }); out.meta.schemaVersion = 2; }
   }
   sortAll(out);
   return out;
@@ -553,9 +564,24 @@ function setBudget(month, daily, fromDate) {
 }
 function upsertActual(date, amount, note) {
   const i = DATA.actuals.findIndex(a => a.date === date);
-  if (i >= 0) DATA.actuals[i] = { date, amount, note: note || '' };
-  else DATA.actuals.push({ date, amount, note: note || '' });
+  // entryDate = 本次录入/编辑当天的本地日期，删除权限靠它判定（见 canDeleteActual）
+  const rec = { date, amount, note: note || '', entryDate: todayStr() };
+  if (i >= 0) DATA.actuals[i] = rec;
+  else DATA.actuals.push(rec);
   sortAll(DATA);
+}
+/* 删除权限判定（用户规则）：
+   · 日期 > 今天（未来）→ 禁
+   · entryDate === 今天 → 允许（哪怕录的是历史日期，当天补录当天可删）
+   · entryDate 早于今天（已过录入当天）→ 禁
+   · 无 entryDate（历史存量 / 从 GitHub 同步回来的）→ 禁
+   返回 { ok, why } */
+function canDeleteActual(a, today) {
+  const t = today || todayStr();
+  if (a.date > t) return { ok: false, why: '未来日期的记录不可删除' };
+  if (a.entryDate === t) return { ok: true };
+  if (!a.entryDate) return { ok: false, why: '历史记录，无录入日期，不可删除' };
+  return { ok: false, why: `该记录于 ${a.entryDate} 录入，已过当天不可删除` };
 }
 
 /* =========================================================
@@ -573,7 +599,7 @@ function xlDate(v) {
   return m ? `${m[1]}-${pad(+m[2])}-${pad(+m[3])}` : s;
 }
 function dataToRows(d) {
-  const rows = [['日期', '日预算', '实际花费', '备注']];
+  const rows = [['日期', '日预算', '实际花费', '备注', '录入日']];
   const today = todayStr();
   const months = [...new Set(d.budgets.map(b => b.month))].sort();
   months.forEach(month => {
@@ -584,13 +610,13 @@ function dataToRows(d) {
       const daily = dailyAt(day, d.budgets);
       const rec = d.actuals.find(a => a.date === day);
       if (daily == null && !rec) continue;                      // 两者都无 → 跳过
-      rows.push([day, daily == null ? '' : daily, rec ? rec.amount : '', rec ? (rec.note || '') : '']);
+      rows.push([day, daily == null ? '' : daily, rec ? rec.amount : '', rec ? (rec.note || '') : '', rec ? (rec.entryDate || '') : '']);
       wrote = true;
     }
     // 未来月（整月都在未来）或本月尚未开始：预算段无处落脚 → 写在月初一行，备注标注
     if (!wrote) {
       d.budgets.filter(b => b.month === month).forEach(b => {
-        rows.push([b.effective_from, b.daily, '', '预算设定']);
+        rows.push([b.effective_from, b.daily, '', '预算设定', '']);
       });
     }
   });
@@ -598,7 +624,7 @@ function dataToRows(d) {
   d.actuals.forEach(a => {
     if (a.date > today) return;
     if (rows.some(r => r[0] === a.date)) return;
-    rows.push([a.date, '', a.amount, a.note || '']);
+    rows.push([a.date, '', a.amount, a.note || '', a.entryDate || '']);
   });
   const head = rows[0];
   const body = rows.slice(1).sort((x, y) => x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0);
@@ -614,7 +640,10 @@ function rowsToData(rows) {
     const daily = parseFloat(r[1]);
     if (!isNaN(daily)) dailyByDate[date] = Math.round(daily * 100) / 100;
     const amt = parseFloat(r[2]);
-    if (!isNaN(amt)) out.actuals.push({ date, amount: Math.round(amt * 100) / 100, note: r[3] == null ? '' : String(r[3]).trim() });
+    if (!isNaN(amt)) {
+      const ed = xlDate(r[4]);   // 第 5 列「录入日」：没有就留空（视为历史数据，不可删）
+      out.actuals.push({ date, amount: Math.round(amt * 100) / 100, note: r[3] == null ? '' : String(r[3]).trim(), entryDate: /^\d{4}-\d{2}-\d{2}$/.test(ed) ? ed : '' });
+    }
   }
   // 把逐日 baseline 折叠回「预算变更记录」：同月内 daily 变化才追加一条
   const dates = Object.keys(dailyByDate).sort();
@@ -688,7 +717,7 @@ async function ghPush(d) {
   const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`;
   // 云端已有文件但本地没拿到 sha（如刚配完 token / 部署过种子文件后未 pull）→ 先补拉，避免 422
   if (!GH.sha) await ghFetchSha();
-  const body = { message: '更新收支规划局 ' + todayStr(), content: bufToB64(buildXlsx(d)), branch: GH.branch };
+  const body = { message: '更新刚需日用账 ' + todayStr(), content: bufToB64(buildXlsx(d)), branch: GH.branch };
   if (GH.sha) body.sha = GH.sha;
   let r = await fetch(url, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   // sha 缺失/过期（422/409）→ 重拉指纹再试一次
@@ -1017,15 +1046,16 @@ function renderHistory() {
     const d = parseYmd(a.date);
     const dl = dailyAt(a.date, DATA.budgets);
     const over = dl != null && a.amount > dl;
+    const chk = monthEditable ? canDeleteActual(a, today) : { ok: false, why: '该月已结清，不可修改' };
     html += `<tr>
       <td>${a.date.slice(5)}</td>
       <td class="note">${WEEKDAY[d.getDay()]}</td>
       <td class="num"><span class="${over ? 'amt-over' : 'amt-ok'}">${money(a.amount)}</span></td>
       <td class="num note">${dl == null ? '--' : money(dl)}</td>
       <td class="note">${a.note || ''}</td>
-      <td style="text-align:right">${monthEditable
+      <td style="text-align:right">${chk.ok
         ? `<button class="del" data-date="${a.date}">删除</button>`
-        : `<button class="del" disabled title="该月已结清，不可修改">删除</button>`}</td>
+        : `<button class="del" disabled title="${chk.why}">删除</button>`}</td>
     </tr>`;
   });
   html += '</tbody></table></div>';
@@ -1033,6 +1063,10 @@ function renderHistory() {
 
   box.querySelectorAll('.del:not([disabled])').forEach(b => b.onclick = () => {
     const date = b.dataset.date;
+    // 双保险：点击瞬间用最新 today 再校验一次（防跨天/绕过）
+    const rec = DATA.actuals.find(a => a.date === date);
+    const chk2 = rec ? canDeleteActual(rec, todayStr()) : { ok: false, why: '记录不存在' };
+    if (!chk2.ok) { toast('✗ ' + chk2.why); return; }
     if (!confirm(`删除 ${date} 的记录？`)) return;
     DATA.actuals = DATA.actuals.filter(a => a.date !== date);
     persist(DATA).then(() => toast(`✓ 已删除 ${date} 的记录`));
@@ -1227,7 +1261,7 @@ $('export-btn').onclick = () => {
   const blob = new Blob([buildXlsx(DATA)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '收支规划局-' + todayStr() + '.xlsx';
+  a.download = '刚需日用账-' + todayStr() + '.xlsx';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
@@ -1368,6 +1402,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v18</div>
+<div class="ver">v29</div>
 </body>
 </html>

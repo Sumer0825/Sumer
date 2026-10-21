@@ -1,7 +1,7 @@
 /* Planet 612 Service Worker
  * 目标：iOS 主屏幕（standalone）模式下，联网时永远加载最新版，断网时可用缓存兜底。
  * 发版时把 CACHE 版本号 +1（与 index.html 的 TOOLS_VER 同步升），activate 自动清旧缓存。 */
-const CACHE = 'p612-v95';
+const CACHE = 'p612-v106';
 const CORE = ['./', './index.html', './time.html', './weight.html', './budget.html', './storage.html', './ledger.html', './analysis.html', './daily.html', './manifest.json',
   './assets/icon-192.png', './assets/icon-512.png', './assets/icon-192-maskable.png', './assets/icon-512-maskable.png', './assets/apple-touch-icon.png',
   './assets/bg-storage.png', './assets/bg-budget.png', './assets/bg-weight.png', './assets/bg-time.png', './assets/bg-ledger.png', './assets/bg-analysis.png', './assets/bg-daily.png'];

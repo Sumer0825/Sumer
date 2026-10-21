@@ -140,7 +140,7 @@ const SHOW_HIDDEN = false;      // ← 以后想放出隐藏工具，把这个�
 
 const TOOLS = [
   { name: '轻身时光簿', file: 'weight.html', icon: '🎯', desc: '记录与查看体重趋势' },
-  { name: '收支规划局', file: 'budget.html', icon: '💰', desc: '每天的开支预算与实际' },
+  { name: '刚需日用账', file: 'budget.html', icon: '💰', desc: '追踪每日底线刚需开销' },
   { name: '时光自撰集', file: 'time.html', icon: '⏳', desc: '愿无岁月可回头' },
   { name: '清居置物箱', file: 'storage.html', icon: '🧺', desc: '室内物品整理归纳' },
   { name: '账本透视', file: 'ledger.html', icon: '📊', desc: '历史账单导入与分析' },
@@ -157,7 +157,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 20, 'weight.html': 34, 'budget.html': 18, 'storage.html': 26, 'ledger.html': 17, 'analysis.html': 8, 'daily.html': 3 };
+const TOOLS_VER = { 'time.html': 20, 'weight.html': 34, 'budget.html': 29, 'storage.html': 26, 'ledger.html': 17, 'analysis.html': 8, 'daily.html': 3 };
 
 TOOLS.forEach((t, i) => {
   if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里
