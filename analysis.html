@@ -39,7 +39,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
     background:
       linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.66) 100%),
-      url('assets/bg-analysis.png') center / cover no-repeat;
+      url('assets/bg-ledger.png') center top / auto repeat;
     color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
   }
   header { padding: 26px 24px 4px; max-width: 1240px; margin: 0 auto; }
@@ -118,15 +118,48 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .neg { color: var(--down); }    /* 跌 */
   .dim { color: var(--muted); }
 
-  /* 季度/月度色块 */
-  .mini-bar { display: flex; gap: 3px; align-items: flex-end; height: 42px; }
-  .mini-bar i { flex: 1; background: var(--brand-soft); border-radius: 2px 2px 0 0; min-height: 2px; }
-  .mini-bar i.pk { background: var(--expense); }
+  /* ===== 周度账观（独立图层专用样式） ===== */
+  .wk-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .wk-kpi { background: #faf9fd; border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; }
+  .wk-kpi .k { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .wk-kpi .v { font-size: 19px; font-weight: 700; letter-spacing: -.3px; }
+  .wk-kpi .x { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .wk-kpi .v.pos { color: var(--down); }
+  .wk-kpi .v.neg { color: var(--up); }
+  /* 周结余柱：零轴上下的正负双色条 */
+  /* 发散柱图：基线在中间，正结余向上（绿）、负结余向下（红），一眼看出「哪几周在超支」 */
+  .wk-chart { display: flex; align-items: stretch; gap: 2px; height: 168px; padding: 10px 0 10px;
+              margin-bottom: 8px; position: relative; }
+  .wk-chart::before { content: ''; position: absolute; left: 0; right: 0; top: 50%;
+                      border-top: 1px solid var(--line); z-index: 0; }
+  .wk-col { flex: 1 0 7px; position: relative; min-width: 7px; }
+  .wk-col .bar { position: absolute; left: 0; right: 0; min-height: 2px; }
+  .wk-col .bar.p { bottom: 50%; background: var(--down); border-radius: 2px 2px 0 0; }
+  .wk-col .bar.n { top: 50%; background: var(--up); border-radius: 0 0 2px 2px; }
+  /* 轴标签与柱同步横向滚动；周数多时自动稀疏（JS 决定 label 的 visibility） */
+  .wk-axis { display: flex; gap: 2px; margin-bottom: 18px; overflow-x: auto;
+             border-top: 0; scrollbar-width: none; }
+  .wk-axis::-webkit-scrollbar { display: none; }
+  .wk-axis span { flex: 1 0 7px; min-width: 7px; font-size: 10px; color: var(--muted); text-align: center; }
+  /* 图表与轴共用一个滚动容器，靠 JS 同步 scrollLeft */
+  .wk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .wk-scroll::-webkit-scrollbar { height: 5px; }
+  .wk-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+  .wk-yearrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .wk-yearrow .dim { font-size: 12.5px; }
+  .wk-note { background: var(--brand-soft); border-radius: 10px; padding: 12px 14px; font-size: 12.8px; color: #4a4370; line-height: 1.75; }
+  .wk-note b { color: var(--brand); }
+  td.t-neg { color: var(--up); }
+  td.t-pos { color: var(--down); }
 
-  /* 标记行 */
+  /* 季度/月度色块 */
+
+  /* 标记行 —— 四类：家庭采购(刚需/蓝) · 个人置物(个人/紫) · 冲动消费(该省/红) · 其他(兜底/灰) */
   .flag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
-  .flag.waste { background: #fdecec; color: #c0392b; }
-  .flag.need { background: #eaf4ee; color: #2c8e60; }
+  .flag.family { background: #eaf1fd; color: #3a6ea5; }
+  .flag.personal { background: #efeaf8; color: #6b5bab; }
+  .flag.impulse { background: #fdecec; color: #c0392b; }
+  .flag.other { background: #f0f0f3; color: #6d6d75; }
 
   /* 大额清单 */
   .thr-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -135,6 +168,31 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .quick { display: flex; gap: 5px; flex-wrap: wrap; }
   .quick button { border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 8px; padding: 5px 11px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
   .quick button.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+
+  /* 高消费区：标记类型筛选 + 分页器 */
+  .sub-total-row td { background: #fbfaff; font-weight: 600; border-top: 1px solid var(--line); }
+
+  .wstat { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .wstat .wstat-item {
+    border: 1px solid transparent; background: none; border-radius: 8px;
+    padding: 3px 9px; font-size: 13px; cursor: pointer; font-family: inherit;
+    white-space: nowrap; transition: background .15s, border-color .15s;
+  }
+  .wstat .wstat-item:hover { background: #f6f3fe; border-color: var(--line); }
+  .wstat .wstat-item.on { background: var(--brand-soft); border-color: var(--brand); font-weight: 600; }
+  .wstat .wstat-item.zero { opacity: .45; cursor: default; }
+  .wstat .wstat-item.zero:hover { background: none; border-color: transparent; }
+
+  .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 16px 0 4px; }
+  .pager button {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    border-radius: 8px; padding: 6px 13px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .pager button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+  .pager button:disabled { opacity: .38; cursor: not-allowed; }
+  .pager .pg-info { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pager .pg-info b { color: var(--ink); }
+  .pager .pg-jump { width: 62px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; font-family: inherit; text-align: center; }
 
   .yr-grp { border: 1px solid var(--line); border-radius: 11px; margin-bottom: 8px; overflow: hidden; }
   .yr-head { display: flex; align-items: center; gap: 12px; padding: 11px 14px; cursor: pointer; background: #fbfaff; flex-wrap: wrap; }
@@ -168,8 +226,49 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 
   .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 6px 13px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
   .btn:hover { border-color: var(--brand); color: var(--brand); }
-  .btn.on-w { background: #fdecec; border-color: #e8a9a4; color: #c0392b; font-weight: 600; }
-  .btn.on-n { background: #eaf4ee; border-color: #9fcdb3; color: #2c8e60; font-weight: 600; }
+  /* 分类标记按钮的选中态（四类） */
+  .btn.on-family { background: #eaf1fd; border-color: #a8c4e8; color: #3a6ea5; font-weight: 600; }
+  .btn.on-personal { background: #efeaf8; border-color: #c2b5e4; color: #6b5bab; font-weight: 600; }
+  .btn.on-impulse { background: #fdecec; border-color: #e8a9a4; color: #c0392b; font-weight: 600; }
+  .btn.on-other { background: #f0f0f3; border-color: #c9c9d1; color: #6d6d75; font-weight: 600; }
+  /* 标记同步面板：内嵌在「高消费」区里，就地展开/收起，不新增标签页 */
+  .sync-card { margin: 0 0 14px; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 12px;
+               background: #fafbfe; animation: syncIn .18s ease-out; }
+  @keyframes syncIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .sync-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .sync-title { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+  .sync-head .mk-close { margin-left: auto; font-size: 12px; padding: 4px 10px; }
+  .sync-card .field { flex: 1 1 140px; min-width: 0; }
+  .sync-card .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .sync-card .field input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px;
+                            font-size: 13px; font-family: inherit; background: #fbfcfe; color: var(--ink); }
+  .sync-card .field input:focus { border-color: var(--brand); background: #fff; outline: none; }
+  .sync-card .row { margin-bottom: 10px; }
+  .sync-msg { font-size: 12.5px; color: var(--muted); }
+  .sync-msg.ok { color: #2c8e60; }
+  .sync-msg.err { color: #c0392b; }
+
+  /* 标记保护：密码门 */
+  .mask { display: none; position: fixed; inset: 0; z-index: 99;
+          background: rgba(40,32,64,.42); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+          align-items: center; justify-content: center; padding: 20px; }
+  .mask.show { display: flex; }
+  .pwbox { background: #fff; border-radius: var(--radius); padding: 20px;
+           width: min(360px, 100%); box-shadow: 0 20px 50px rgba(40,32,64,.3); }
+  .pwbox h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 5px; }
+  .pwbox .tip { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 13px; }
+  .pwbox input[type=password], .pwbox input[type=text] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 15px; font-family: inherit; background: #fbfcfe; color: var(--ink); outline: none; }
+  .pwbox input:focus { border-color: var(--brand); background: #fff; }
+  .pwbox .pw-err { color: #c0392b; font-size: 12px; min-height: 17px; text-align: center; margin: 7px 0 2px; }
+  .pwbox .btns { display: flex; gap: 10px; margin-top: 12px; }
+  .pwbox .btns .btn { flex: 1; padding: 9px 13px; font-size: 13px; }
+  .pwbox .btns .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+  .pwbox .btns .btn.primary:hover { color: #fff; opacity: .92; }
+  .pwrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pwrow .btn { flex: 0 0 auto; }
+
 
   .total-box { background: linear-gradient(135deg, var(--brand) 0%, #9b8bd8 100%); color: #fff; border-radius: 13px; padding: 18px 20px; margin: 14px 0 6px; }
   .total-box .lbl { font-size: 12.5px; opacity: .9; }
@@ -192,6 +291,10 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     h1 { font-size: 20px; }
     .thr-row input[type=range] { width: 100%; }
     .bar-track { width: 46px; }
+    /* 四个分类按钮 + 日期 + 金额 + 徽章，窄屏收紧一点才不会挤成两行 */
+    .big-item { gap: 6px; }
+    .big-item .btn { padding: 5px 9px; font-size: 12px; }
+    .big-item .d { min-width: 74px; }
   }
 </style>
 </head>
@@ -199,7 +302,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 <header>
   <h1>账单透视镜<span class="tag">只读</span></h1>
   <p class="subtitle">看清钱去了哪儿，并找出那些多花、不该花、可以省下来的部分</p>
-  <p class="readonly-note">本页<b>只读</b>本机账本数据，不会新增、修改或删除任何账单。数据源：账本透视 <b>IndexedDB · ledger-p612</b>。唯一可保存的是本页自己的偏好设置（键 <b>analysis_cfg_v1</b>）。</p>
+  <p class="readonly-note">本页<b>只读</b>本机账本数据，不会新增、修改或删除任何账单。数据源：历年收支簿 <b>IndexedDB · ledger-p612</b>。本机可保存的只有本页自己的偏好设置（键 <b>analysis_cfg_v1</b>）与可选的 GitHub 同步配置（键 <b>analysis_gh_cfg_v1</b>）；若开启同步，也<b>只写仓库里的 <code>data/analysis-marks.json</code> 标记文件</b>，绝不碰你的账单文件 <code>data/ledger.json</code>。</p>
   <div class="bar">
     <span class="status" id="status">正在读取账本…</span>
     <button class="btn" id="btnReload">重新读取</button>
@@ -211,10 +314,10 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   <!-- 空态 -->
   <div class="card" id="cardEmpty" hidden>
     <h2>没有读到账本数据</h2>
-    <div class="sub">本页需要账本透视里的本机账单。请先在账本透视导入或录入数据。</div>
+    <div class="sub">本页需要历年收支簿里的本机账单。请先在历年收支簿导入或录入数据。</div>
     <div class="empty">
       <div class="big">📭</div>
-      读到的记录数为 0<br>若账本透视里明明有数据，请确认导入时选择了<b>合并追加</b>，并检查浏览器是否为无痕模式
+      读到的记录数为 0<br>若历年收支簿里明明有数据，请确认导入时选择了<b>合并追加</b>，并检查浏览器是否为无痕模式
     </div>
   </div>
 
@@ -239,6 +342,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   <div class="layers" id="layers">
     <button data-layer="where" class="on">💧 钱去哪儿了</button>
     <button data-layer="save">✂️ 哪些能省</button>
+    <button data-layer="week">📅 周度账观</button>
   </div>
 
   <!-- ============ 第一层：钱去哪儿了 ============ -->
@@ -317,7 +421,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   <div id="layerSave" hidden>
     <div class="tabs" id="saveTabs">
       <button data-tab="multi" class="on">① 多花的</button>
-      <button data-tab="waste">② 不该花的</button>
+      <button data-tab="waste">② 高消费</button>
       <button data-tab="total">③ 可省的</button>
     </div>
 
@@ -330,9 +434,97 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     </div>
 
     <div id="tabWaste" hidden>
-      <div class="card">
-        <h2>手动标记</h2>
-        <div class="sub">账单只能给线索，「该不该花」最终由你判断。标记结果会累积保存，下次打开直接读。</div>
+      <div class="card" id="wasteCard">
+        <h2>高消费 <span class="dim" style="font-size:12px;font-weight:400">「家庭采购 / 个人置物 / 冲动消费 / 其他」</span></h2>
+        <div class="sub">账单只能给线索，「这笔钱该怎么归」最终由你判断。<b>家庭采购</b>=家里要用的（柴米油盐日用品，刚需）·<b>个人置物</b>=给自己买的（衣服数码，能省但要权衡）·<b>冲动消费</b>=买完就后悔的（最该省）·<b>其他</b>=暂时不属于上面三类（房租、还款、学费等刚性支出）。分类结果会累积保存，下次打开直接读。</div>
+        <div class="row" style="margin-bottom:12px">
+          <button class="btn" id="mk-toggle" aria-expanded="false" aria-controls="markSyncCard">☁️ 标记同步（多设备）</button>
+          <button class="btn" id="mk-lock" aria-expanded="false" aria-controls="markLockCard">🔒 标记保护</button>
+          <span class="dim" id="mk-state" style="font-size:12.5px"></span>
+        </div>
+
+        <!-- 标记保护面板：就地展开在「高消费」区内部 -->
+        <div class="sync-card" id="markLockCard" style="display:none">
+          <div class="sync-head">
+            <span class="sync-title">🔒 标记保护</span>
+            <button class="btn mk-close" id="mk-lock-close" title="收起此面板" aria-label="收起标记保护面板">✕ 收起</button>
+          </div>
+          <div class="sub">设置密码后，<b>取消分类</b>或<b>更改分类</b>需要输入密码，防止误点把已经想清楚的判断改掉。首次分类不受影响。</div>
+          <div class="row" id="mk-lock-set-row">
+            <div class="field"><label>设置密码（至少 4 位）</label><input type="password" id="mk-lock-pw" placeholder="••••••" autocomplete="new-password"></div>
+            <div class="field"><label>再输一次</label><input type="password" id="mk-lock-pw2" placeholder="••••••" autocomplete="new-password"></div>
+            <button class="btn" id="mk-lock-save">启用保护</button>
+          </div>
+          <div class="row" id="mk-lock-on-row" style="display:none">
+            <span class="dim" id="mk-lock-state" style="font-size:12.5px"></span>
+            <div class="grow"></div>
+            <button class="btn" id="mk-lock-change">修改密码</button>
+            <button class="btn" id="mk-lock-off">关闭保护</button>
+          </div>
+          <!-- 改密码用的输入区：点「修改密码」后展开（复用同一套输入框） -->
+          <div class="row" id="mk-lock-chg-row" style="display:none">
+            <div class="field"><label>新密码（至少 4 位）</label><input type="password" id="mk-lock-cpw" placeholder="••••••" autocomplete="new-password"></div>
+            <div class="field"><label>再输一次</label><input type="password" id="mk-lock-cpw2" placeholder="••••••" autocomplete="new-password"></div>
+            <button class="btn" id="mk-lock-csave">保存新密码</button>
+            <button class="btn" id="mk-lock-cancel">取消</button>
+          </div>
+          <div class="row" style="margin-bottom:0">
+            <span class="sync-msg" id="mk-lock-msg"></span>
+          </div>
+          <div class="note" style="margin-top:12px">💡 密码只在本机以<b>加盐哈希</b>形式保存（不明文存储），换设备需各自设置。忘记密码可用应急密码 <code>870825</code> 解除。</div>
+        </div>
+
+        <!-- 标记云端同步面板：就地展开在「高消费」区内部，不新增任何标签页 -->
+        <div class="sync-card" id="markSyncCard" style="display:none">
+          <div class="sync-head">
+            <span class="sync-title">☁️ GitHub 同步配置</span>
+            <button class="btn mk-close" id="mk-close" title="收起此面板" aria-label="收起标记同步面板">✕ 收起</button>
+          </div>
+          <div class="sub">「家庭采购 / 个人置物 / 冲动消费 / 其他」的分类结果默认只存在这台设备的浏览器里，换一台设备就看不到。填一次 GitHub Token 后，标记会写入仓库里的独立文件 <code id="markSyncPath">data/analysis-marks.json</code>，所有设备共享。<b>Token 只存本机浏览器</b>，不上传到任何服务器。</div>
+          <div class="row">
+            <div class="field"><label>Token (PAT)</label><input type="password" id="mk-token" placeholder="ghp_… / github_pat_…" autocomplete="off"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>仓库 owner</label><input type="text" id="mk-owner" placeholder="sumer0825"></div>
+            <div class="field"><label>仓库名</label><input type="text" id="mk-repo" placeholder="Sumer"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>分支</label><input type="text" id="mk-branch" placeholder="main"></div>
+            <div class="field"><label>标记文件路径</label><input type="text" id="mk-path" placeholder="data/analysis-marks.json"></div>
+          </div>
+          <div class="row">
+            <label class="dim" style="font-size:12.5px;display:flex;align-items:center;gap:5px">
+              <input type="checkbox" id="mk-auto" checked> 标记后自动上传
+            </label>
+            <div class="grow"></div>
+            <button class="btn" id="mk-save">保存配置</button>
+            <button class="btn" id="mk-pull">⬇️ 从云端拉取</button>
+            <button class="btn" id="mk-push">⬆️ 上传到云端</button>
+            <button class="btn" id="mk-disconnect">断开</button>
+          </div>
+          <div class="row" style="margin-bottom:0">
+            <span class="sync-msg" id="markSyncMsg"></span>
+          </div>
+          <div class="note" style="margin-top:12px">💡 同一份标记在多设备间按<b>内容指纹</b>（日期+类型+金额+分类+子类+备注）匹配，所以哪怕两台设备各自导入过账单、记录编号不同也能对上。<b>只写标记文件，不会碰你的 <code>data/ledger.json</code> 账单文件。</b></div>
+        </div>
+
+        <div class="thr-row" style="margin-bottom:12px">
+          <span class="dim" style="font-size:13px">金额门槛</span>
+          <input type="range" id="wasteMinRange" min="0" max="5000" step="50" value="200">
+          <span class="thr-val" id="wasteMinVal">≥ ¥200</span>
+          <div class="quick" id="wasteMinQuick">
+            <button data-v="0">全部</button>
+            <button data-v="100">100</button>
+            <button data-v="200" class="on">200</button>
+            <button data-v="500">500</button>
+            <button data-v="1000">1000</button>
+            <button data-v="2000">2000</button>
+            <button data-v="5000">5000</button>
+          </div>
+          <span class="dim" id="wasteMinHint" style="font-size:12.5px"></span>
+          <button class="btn" id="wasteMinFollow" style="display:none" title="恢复为跟着「大额消费清单」的阈值走">↩ 跟随大额清单</button>
+        </div>
+
         <div class="row" style="margin-bottom:12px">
           <span class="dim" style="font-size:13px">每页</span>
           <div class="seg" id="segWastePage">
@@ -343,33 +535,84 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
           <label class="dim" style="font-size:12.5px;display:flex;align-items:center;gap:5px">
             <input type="checkbox" id="chkWasteHideMarked"> 隐藏已标记
           </label>
+          <label class="dim" style="font-size:12.5px;display:flex;align-items:center;gap:5px"
+                 title="只列出你标记过的记录，方便回头查询已分类的账">
+            <input type="checkbox" id="chkWasteOnlyMarked"> 仅显示已标记
+          </label>
           <div class="grow"></div>
-          <span class="dim" id="wasteStat" style="font-size:13px"></span>
+          <span class="dim" style="font-size:13px">分类：</span>
+          <span class="wstat" id="wasteStat" style="font-size:13px"></span>
         </div>
+
+        <!-- 标记类型筛选：勾了「仅显示已标记」后才出现。按类型挑出那一类，
+             避免「其他 57 笔」这类大数字里翻找。点上方统计的某一类也能直接跳到这里。 -->
+        <div class="row" id="wasteTypeRow" style="margin-bottom:12px;display:none;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="dim" style="font-size:13px">只看</span>
+          <div class="quick" id="wasteTypeQuick">
+            <button data-t="" class="on">全部已标记</button>
+            <button data-t="family">家庭采购</button>
+            <button data-t="personal">个人置物</button>
+            <button data-t="impulse">冲动消费</button>
+            <button data-t="other">其他</button>
+          </div>
+          <span class="dim" id="wasteTypeHint" style="font-size:12.5px"></span>
+        </div>
+
         <div id="wasteList"></div>
+        <div class="pager" id="wastePager"></div>
       </div>
     </div>
 
     <div id="tabTotal" hidden>
       <div class="card">
         <h2>年度可省总额</h2>
-        <div class="sub">三个来源合并：高频重复类 + 笔数激增类 + 你标记过的浪费。每项可自行设定削减力度。</div>
+        <div class="sub">三个来源合并：高频重复类 + 笔数激增类 + 你分类过的「个人置物 / 冲动消费」（家庭采购是刚需、「其他」是房租还款这类刚性支出，都不计入）。每项可自行设定削减力度。</div>
         <div class="total-box" id="saveTotalBox"></div>
         <div id="saveList"></div>
       </div>
     </div>
   </div>
 
+  <!-- ============ 第三层：周度账观（独立数据源，不参与分类分析） ============ -->
+  <div id="layerWeek" hidden>
+    <div class="card">
+      <h2>周度账观 <span class="dim" style="font-size:12px;font-weight:400">按周聚合的收支节奏</span></h2>
+      <div class="sub">数据源与上面两层<strong>同一个账本明细</strong>，只是换一个聚合维度：按周看收支节奏。<strong>支出</strong>部分的口径、统计逻辑与前两层完全一致；<strong>收入</strong>在本层会计入（要看「哪一周没进账」），而上面两层只看支出 —— 这是有意不同。分类矩阵 / 哪些能省两层的分析口径<strong>未做任何改动</strong>。</div>
+      <div id="weekBody"></div>
+    </div>
+  </div>
+
 </div>
 
-<div class="ver">v8</div>
+<div class="ver">v23</div>
+
+<!-- 标记保护：密码门 -->
+<div class="mask" id="mk-pw-mask">
+  <div class="pwbox">
+    <h3>🔒 需要密码</h3>
+    <div class="tip" id="mk-pw-tip">此操作会修改已有标记，请输入密码继续。</div>
+    <input type="password" id="mk-pw-input" placeholder="••••••" autocomplete="current-password">
+    <div class="pw-err" id="mk-pw-err"></div>
+    <div class="btns">
+      <button class="btn" id="mk-pw-cancel">取消</button>
+      <button class="btn primary" id="mk-pw-ok">确认</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =====================================================================
  * 账单透视镜 · 本机账本只读分析页
  * ---------------------------------------------------------------------
  * 硬约束：本页只允许 localStorage.getItem 与 IndexedDB readonly 事务。
- * 唯一允许写入的键是 analysis_cfg_v1（标记结果 / 削减力度 / 界面偏好），
- * 且写入必须经 cfgSet() —— 它是唯一能打开写入哨兵白名单的地方。
+ * 本机可写的键只有两个：
+ *   analysis_cfg_v1      —— 标记结果 / 削减力度 / 界面偏好 / 标记保护密码的加盐哈希
+ *                            （必须经 cfgSet()）
+ *   analysis_gh_cfg_v1   —— GitHub 同步配置（Token 等，必须经 saveGhCfg()）
+ * 二者都经哨兵白名单，除此之外任何写入一律拦截。
+ * 对外：可选地把「高消费」区的分类结果（及标记保护状态，同样只存哈希）写进仓库的
+ *       data/analysis-marks.json，这是本页**唯一**的对外写入，
+ *       且绝不触碰 data/ledger.json（账单）。
  *
  * 页面目标：回答两个不同性质的问题
  *   第一层「钱去哪儿了」= 描述性事实，由数据说话
@@ -431,13 +674,151 @@ function cfgSet(k, v) {
   finally { LS_SENTINEL.allow--; }
 }
 
+/* =====================================================================
+ * 标记保护（密码门）
+ * ---------------------------------------------------------------------
+ * 需求：「标记之后再点一次就能取消」—— 误点就把已经想清楚的判断改掉了。
+ * 做法：给「取消标记 / 更改标记」加一道密码。
+ *
+ * 边界（三条）：
+ *   1. **首次标记不要密码** —— 没标记过的东西直接标，否则根本没法开始用。
+ *   2. **密码不明文存**：随机盐 + SHA-256 迭代 3000 轮，只存哈希和盐。
+ *   3. **应急通道**：遗忘密码时可用应急密码 870825 解除（与其它工具一致），
+ *      避免用户把自己锁死、标记永远改不了。
+ *
+ * 用纯 JS 实现 SHA-256 而非 crypto.subtle：subtle 只在 https / localhost
+ * 下可用，本页可能跑在 file:// 或 http 局域网里，纯 JS 到处都能跑。
+ * ===================================================================== */
+const SHA256_K = new Uint32Array([
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+function sha256Hex(msg) {
+  const bytes = new TextEncoder().encode(String(msg));
+  const l = bytes.length;
+  const total = ((l + 9 + 63) >> 6) << 6;
+  const buf = new Uint8Array(total);
+  buf.set(bytes); buf[l] = 0x80;
+  const dv = new DataView(buf.buffer);
+  const bits = l * 8;
+  dv.setUint32(total - 8, Math.floor(bits / 4294967296));
+  dv.setUint32(total - 4, bits >>> 0);
+  const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const w = new Uint32Array(64);
+  for (let off = 0; off < total; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const a = w[i-15], b = w[i-2];
+      const s0 = ((a>>>7)|(a<<25)) ^ ((a>>>18)|(a<<14)) ^ (a>>>3);
+      const s1 = ((b>>>17)|(b<<15)) ^ ((b>>>19)|(b<<13)) ^ (b>>>10);
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;
+    }
+    let a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = ((e>>>6)|(e<<26)) ^ ((e>>>11)|(e<<21)) ^ ((e>>>25)|(e<<7));
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + SHA256_K[i] + w[i]) | 0;
+      const S0 = ((a>>>2)|(a<<30)) ^ ((a>>>13)|(a<<19)) ^ ((a>>>22)|(a<<10));
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) | 0;
+      h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0;
+    H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+  }
+  let out = '';
+  for (let i = 0; i < 8; i++) out += (H[i] >>> 0).toString(16).padStart(8, '0');
+  return out;
+}
+const PW_KEY = 'markLock';               // { s: 盐, h: 哈希, t: 时间戳 }  —— h 为空表示「未启用/已关闭」
+const PW_ITER = 3000;
+const PW_EMERGENCY = '870825';        // 应急密码：与 time/budget/weight 保持一致
+/* 保护状态：{s, h, t}
+ *   h 非空 = 保护已启用，h 即加盐迭代哈希（明文不落盘）
+ *   h 为空 = 未启用或已关闭；t 仍然保留，**关闭这个动作也要能跨设备传播**，
+ *            否则 A 设备关了保护、B 设备还开着，两边状态长期不一致。 */
+const pwState = () => {
+  const o = cfgGet(PW_KEY, null);
+  return (o && typeof o === 'object') ? o : { s: '', h: '', t: 0 };
+};
+const pwOn = () => !!pwState().h;
+function pwSalt() {
+  const a = new Uint8Array(16);
+  (window.crypto || window.msCrypto).getRandomValues(a);
+  return Array.from(a).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+/* 加盐 + 迭代哈希：明文密码不落盘 */
+function pwDigest(pw, salt) {
+  let h = sha256Hex(salt + '|' + pw);
+  for (let i = 1; i < PW_ITER; i++) h = sha256Hex(h);
+  return h;
+}
+function pwSet(pw) {
+  const s = pwSalt();
+  cfgSet(PW_KEY, { s, h: pwDigest(pw, s), t: Date.now() });
+}
+function pwClear() {
+  // 保留 t（时间戳），让「关闭」也能覆盖其它设备上的旧状态
+  const cur = pwState();
+  cfgSet(PW_KEY, { s: '', h: '', t: Date.now() });
+}
+/* 合并保护状态：时间戳新的赢（与标记同一套规则） */
+function mergeLock(local, remote) {
+  const l = (local && typeof local === 'object') ? local : { s: '', h: '', t: 0 };
+  const r = (remote && typeof remote === 'object') ? remote : null;
+  if (!r) return l;
+  if (!r.h && !r.t) return l;                    // 云端没有保护信息 → 保留本机
+  return ((+r.t) || 0) > ((+l.t) || 0) ? r : l;
+}
+/* 校验密码：应急密码恒通过（防锁死） */
+function pwCheck(pw) {
+  const st = pwState();
+  if (!st.h) return true;
+  if (pw === PW_EMERGENCY) return true;
+  return pwDigest(pw, st.s) === st.h;
+}
+/* 密码门弹窗：返回一个 Promise<boolean> */
+function askMarkPassword(tip) {
+  return new Promise(resolve => {
+    const mask = $('mk-pw-mask'), input = $('mk-pw-input'), err = $('mk-pw-err');
+    if (tip) $('mk-pw-tip').innerHTML = tip;
+    input.value = ''; err.textContent = '';
+    mask.classList.add('show');
+    setTimeout(() => input.focus(), 60);
+    const close = v => {
+      mask.classList.remove('show');
+      $('mk-pw-ok').onclick = $('mk-pw-cancel').onclick = mask.onclick = input.onkeydown = null;
+      resolve(v);
+    };
+    $('mk-pw-cancel').onclick = () => close(false);
+    mask.onclick = e => { if (e.target === mask) close(false); };
+    $('mk-pw-ok').onclick = () => {
+      if (pwCheck(input.value)) close(true);
+      else { err.textContent = '密码不对，请重试'; input.select(); }
+    };
+    input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('mk-pw-ok').click(); } };
+  });
+}
+
 /* ---------- 通用小工具 ---------- */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
 const money = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money0 = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+
+/* 明细年门槛：一个自然年的支出笔数必须 **大于** 此值，才计入账单透视分析。
+ * 低于等于此值的年份视为「年度汇总笔」（各平台导出的汇总数）并被排除 ——
+ * 这类年份通常只有 1 笔，混进来会让同比、占比、平均单价全部失真。 */
+const DETAIL_MIN = 100;
 const sign = (n) => (n > 0 ? '+' : '');
-const pct = (n, d = 0) => (isFinite(n) ? (n > 0 ? '+' : '') + (n * 100).toFixed(d) + '%' : '—');
+// 注意：isFinite(null) === true，所以必须显式排除 null/undefined ——
+// 否则 pct(null) 会算出 "0%"（看起来像「没变化」），而正确答案是「—」（没有可比数据）。
+const pct = (n, d = 0) => (n == null || !isFinite(n) ? '—' : (n > 0 ? '+' : '') + (n * 100).toFixed(d) + '%');
 
 /* =====================================================================
  * 一、只读数据适配层
@@ -513,7 +894,7 @@ function readLedger() {
 }
 
 /* =====================================================================
- * 二、分类归一化（页面内各写一份，不抽公共库（账本透视 ledger.html 各自独立维护））
+ * 二、分类归一化（页面内各写一份，不抽公共库（历年收支簿 ledger.html 各自独立维护））
  * ---------------------------------------------------------------------
  * 账本里类别存在同义异形与复合写法：
  *   '饮食男女'/'饮食女子'、'其 他'/'其他类'、'生活消费'/'生活中の'
@@ -657,13 +1038,19 @@ const STATE = {
   drillCat: null,
   rawSub: false,
   thr: 200,
+  wasteMin: null,        // 高消费区的金额门槛；null = 跟随大额清单阈值 STATE.thr
   bigSort: 'date',
   saveTab: 'multi',
   wastePageN: 30,
   wasteHideMarked: false,
-  lastUpdatedAt: ''
+  wasteOnlyMarked: false,
+  wasteType: '',        // 高消费区的标记类型筛选：'' = 全部已标记；'family'/'personal'/'impulse'/'other' = 只看那一类
+  wastePage: 1,         // 高消费区当前页码（1 起）
+  lastUpdatedAt: '',
+  wkYear: 0,             // 周度账观当前选中的自然年（0 = 自动取最近一个合格年）
 };
-const MARK = () => cfgGet('marks', {});        // { recordId: 'waste' | 'need' }
+const MARK_RAW = () => cfgGet('marks', {});    // 原始存储（清洗前，purge / 迁移用）
+const MARK = () => normMarks(MARK_RAW());      // 归一后的标记（键已统一、旧值已丢弃）
 const CUT = () => cfgGet('cuts', {});          // { subKey: 削减比例 0-100 }
 
 /* =====================================================================
@@ -683,10 +1070,11 @@ function preprocess(ledger) {
   });
   // 全年份跨度
   const allYears = Object.keys(yearCount).map(Number).sort((a, b) => a - b);
-  // 汇总年：笔数 ≤2（实测 2012-2018 各 1 笔）
-  const summaryYears = allYears.filter(y => yearCount[y] <= 2);
+  // 汇总年：笔数 ≤ DETAIL_MIN（默认 100）—— 各平台导出的年度汇总会挤进来，
+  // 只有 1 笔的年份（如 2012-2018 各 1 笔）若混进来会严重扭曲同比/占比
+  const summaryYears = allYears.filter(y => yearCount[y] <= DETAIL_MIN);
   // 明细年：其余
-  const detailYears = allYears.filter(y => yearCount[y] > 2);
+  const detailYears = allYears.filter(y => yearCount[y] > DETAIL_MIN);
   // 无记录年份：min..max 之间缺失的
   const gapYears = [];
   if (allYears.length) {
@@ -711,6 +1099,11 @@ function preprocess(ledger) {
     r._month = +r.date.slice(5, 7);
     r._quarter = quarterOf(r._month);
     r._week = isoWeek(r.date);
+    // **预计算指纹** —— recKey() 要做 6 段字符串拼接 + 正则替换，
+    // 而 renderWaste() 里 pool/list/byType/shown 四轮过滤各调一次 markOf(marks, recKey(r))，
+    // 6912 条记录下拖一次滑块要算上万次指纹，input 事件按帧触发 → 明显掉帧。
+    // 账单内容不变时指纹不变，所以算一次缓存起来即可。
+    r._key = recKey(r);
   });
 
   STATE.raw = all;
@@ -882,10 +1275,12 @@ function renderOverview() {
       : `${dayCount} 个记账日`);
     h += row('日均笔数', (scope.length / (dayBase || 1)).toFixed(2) + ' 笔', `${scope.length} 笔 ÷ ${dayBase} 天`);
     h += row('笔均金额', '¥' + money0(total / (scope.length || 1)), '单笔平均，识别高频小额的关键参照');
-    h += row('记账覆盖', Math.round(dayCount / (dayBase || 1) * 100) + '%', `${dayCount} 天有记账 / 全年 ${dayBase} 天`);
+    h += row('记账覆盖', Math.round(dayCount / (dayBase || 1) * 100) + '%', `${dayCount} 天有记账 / 该年首末记账日跨度 ${dayBase} 天`);
     h += '</tbody>';
     $('ovTbl').innerHTML = h;
-    $('ovSub').textContent = `当前只看 ${STATE.ovYear} 年（${scope.length} 笔支出）。切回「全部」可看 ${STATE.years[0]}–${STATE.years[STATE.years.length - 1]} 年合计。`;
+    // 单年视图**也要保留口径说明** —— 汇总年/无记录年/收入排除这些信息
+    // 在这里被整段覆盖掉的话，用户恰好在最需要判断口径的时候信息最少。
+    $('ovSub').textContent = `当前只看 ${STATE.ovYear} 年（${scope.length} 笔支出）。切回「全部」可看 ${STATE.years[0]}–${STATE.years[STATE.years.length - 1]} 年合计。` + ovScopeNote();
     return;
   }
 
@@ -899,19 +1294,36 @@ function renderOverview() {
   h += '</tbody>';
   $('ovTbl').innerHTML = h;
 
-  // 口径说明
+  // 口径说明（单年视图和全部视图共用同一段，只是前面多一句「当前只看 X 年」）
   const inc = STATE.income || { n: 0, amt: 0 };
   let note = '口径：仅统计明细年（逐笔记账）。';
   note += inc.n
     ? ` 收入记录 ${inc.n} 条（合计 ¥${money0(inc.amt)}）已全部排除，不计入任何金额、笔数、占比与节流测算。`
     : ' 本账本无收入记录。';
   if (STATE.summaryYears.length) {
-    note += ` 汇总年 ${STATE.summaryYears[0]}–${STATE.summaryYears[STATE.summaryYears.length - 1]} 为各平台年度汇总数（每年仅 1 笔，合计 ¥${money0(STATE.raw.filter(r => r.type === 'out' && STATE.summaryYears.includes(+r.date.slice(0, 4))).reduce((s, r) => s + r.amount, 0))}），已排除在占比之外。`;
+    const sy = STATE.summaryYears;
+    note += ` 汇总年 ${sy.join('、')} 每年支出笔数不超过 ${DETAIL_MIN} 笔（多为各平台导出的年度汇总数，常常只有 1 笔，合计 ¥${money0(STATE.raw.filter(r => r.type === 'out' && sy.includes(+r.date.slice(0, 4))).reduce((s, r) => s + r.amount, 0))}），已排除在占比之外。`;
   }
   if (STATE.gapYears.length) {
     note += ` ${STATE.gapYears.join('、')} 年无任何记录，按无记录处理。`;
   }
   $('ovSub').textContent = note;
+}
+
+/* 口径说明段（抽出来给单年视图复用 —— 别让「切到单年」把口径信息整段吞掉） */
+function ovScopeNote() {
+  const inc = STATE.income || { n: 0, amt: 0 };
+  let note = inc.n
+    ? ` 收入记录 ${inc.n} 条（合计 ¥${money0(inc.amt)}）已全部排除，不计入任何金额、笔数、占比与节流测算。`
+    : ' 本账本无收入记录。';
+  if (STATE.summaryYears.length) {
+    const sy = STATE.summaryYears;
+    note += ` 汇总年 ${sy.join('、')} 每年支出笔数不超过 ${DETAIL_MIN} 笔（多为各平台导出的年度汇总数，常常只有 1 笔，合计 ¥${money0(STATE.raw.filter(r => r.type === 'out' && sy.includes(+r.date.slice(0, 4))).reduce((s, r) => s + r.amount, 0))}），已排除在占比之外。`;
+  }
+  if (STATE.gapYears.length) {
+    note += ` ${STATE.gapYears.join('、')} 年无任何记录，按无记录处理。`;
+  }
+  return note;
 }
 
 /* ---------- 基线提示条 ---------- */
@@ -975,7 +1387,14 @@ function renderMatrix() {
     });
     $('segMatYear').innerHTML = yh;
     $('segMatYear').querySelectorAll('button').forEach(b => {
-      b.onclick = () => { STATE.matYear = +b.dataset.my; renderMatrix(); };
+      b.onclick = () => {
+        STATE.matYear = +b.dataset.my;
+        // 换年后原下钻的分类可能该年没出现 → 矩阵里没那行了，下钻卡片却还开着，
+        // 用户找不到入口关掉。直接收起。
+        STATE.drillCat = null;
+        renderMatrix();
+        renderSub();
+      };
     });
     $('matScopeHint').textContent = STATE.matYear
       ? `只看 ${STATE.matYear} 年单年数据（该年支出 ¥${money0(scopeTotal())}）`
@@ -1075,7 +1494,10 @@ function renderMatrix() {
   } else {
     buckets.forEach(b => { h += `<th>${grain === 'quarter' ? 'Q' + b : b + '月'}</th>`; });
     h += `<th class="sortable" data-s="amt">合计${sk === 'amt' ? '<span class="arrow">▼</span>' : ''}</th>`;
-    h += '<th title="该行金额最高的那一格">峰值</th>';
+    // 年粒度下这一列是**占比**（该分类占总支出的百分比），不是「峰值」
+    h += grain === 'year'
+      ? '<th title="该分类占总支出的百分比">占比</th>'
+      : '<th title="该行金额最高的那一格">峰值</th>';
   }
   h += `<th class="sortable" data-s="n" title="当前范围内的支出笔数">笔数${sk === 'n' ? '<span class="arrow">▼</span>' : ''}</th>`;
   h += '<th title="笔数 ÷ 该分类有记账的天数">笔/记账天</th>';
@@ -1163,9 +1585,16 @@ function renderMatrix() {
   lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0"><span style="display:inline-block;min-width:52px;text-align:center;color:#c9c2d8">—</span> 灰色 = 该月/该季没有支出</span>`;
   lg += `<span style="display:inline-flex;align-items:center;gap:5px;margin:0 0 4px 0"><span style="display:inline-block;min-width:52px;text-align:center">${money0(5678)}</span> 普通数字 = 正常值</span>`;
   lg += `<div style="margin-top:4px">合计、笔数、周活跃、最大单笔这几列${STATE.matYear ? `现在都是<b>${STATE.matYear} 年单年</b>口径` : `都是${rangeTxt} <b>合计</b>口径`}。</div>`;
-  lg += `<div style="margin-top:4px">百分比列${STATE.matYear
+  // 百分比列的含义**按粒度不同**：
+  //   年粒度 → 「峰值」那一列是**占比**（该分类占总支出的百分比），不是涨跌
+  //   季/月粒度 → 最后一列才是涨跌
+  if (grain === 'year') {
+    lg += `<div style="margin-top:4px">「占比」列是<b>该分类占总支出的百分比</b>。<span style="color:#ff5d6c">红=涨</span>、<span style="color:#1f9e5c">绿=跌</span> 只出现在最右边的「首末年变化」列。</div>`;
+  } else {
+    lg += `<div style="margin-top:4px">百分比列${STATE.matYear
       ? `是<b>同比</b>：${STATE.matYear} 年 vs ${STATE.matYear - 1} 年，与左边单年数字同一时间跨度。<span style="color:#ff5d6c">红=涨</span>（花得更多）、<span style="color:#1f9e5c">绿=跌</span>（花得更少）、<span class="dim">—</span> = ${STATE.matYear - 1} 年该分类没有支出`
       : `是<b>首末年变化</b>：可比年最后一个年 vs 第一个年（不是逐年比）。<span style="color:#ff5d6c">红=涨</span>、<span style="color:#1f9e5c">绿=跌</span>、<span class="dim">—</span> = 首个可比年该分类没有支出`}。</div>`;
+  }
   $('matLegend').innerHTML = lg;
 
   // 结论
@@ -1174,10 +1603,18 @@ function renderMatrix() {
     const top = arr.slice().sort((a, b) => b.weekCover - a.weekCover).slice(0, 3);
     note += `周活跃最高：${top.map(o => `<b>${esc(o.cat)}</b> ${(o.weekCover * 100).toFixed(0)}%（${o.activeWeeks} 周）`).join('、')}。`;
   } else {
-    const byAmt = arr.slice().sort((a, b) => b.amt - a.amt).slice(0, 3);
-    note += `金额最高：${byAmt.map(o => `<b>${esc(o.cat)}</b> ¥${money0(o.amt)}（${(o.share * 100).toFixed(1)}%）`).join('、')}。`;
-    const byN = arr.slice().sort((a, b) => b.n - a.n).slice(0, 3);
-    note += `笔数最多：${byN.map(o => `<b>${esc(o.cat)}</b> ${o.n} 笔`).join('、')}。`;
+    // 单年作用域时，结论必须用该年口径（S_），否则表格说 2025 年、结论说六年累计。
+    // S_MAP 里的对象没有 share 字段，占比要现算（作用域内总额为分母）。
+    const scopedTotal = scopedAgg.reduce((s, o) => s + o.amt, 0) || 1;
+    const pick = (o) => {
+      const S_ = S_MAP[o.cat] || o;
+      const share = STATE.matYear ? (S_.amt / scopedTotal) : o.share;
+      return { o, amt: S_.amt, n: S_.n, share };
+    };
+    const byAmt = arr.map(pick).sort((a, b) => b.amt - a.amt).slice(0, 3);
+    note += `金额最高：${byAmt.map(x => `<b>${esc(x.o.cat)}</b> ¥${money0(x.amt)}（${(x.share * 100).toFixed(1)}%）`).join('、')}。`;
+    const byN = arr.map(pick).sort((a, b) => b.n - a.n).slice(0, 3);
+    note += `笔数最多：${byN.map(x => `<b>${esc(x.o.cat)}</b> ${x.n} 笔`).join('、')}。`;
     note += `<br><b>金额高和频次高完全是两批分类</b> —— 别用金额榜去找可压缩项。`;
   }
   if (grain === 'quarter') {
@@ -1428,66 +1865,760 @@ function renderMulti() {
 }
 
 /* =====================================================================
- * 十、第二层渲染 · ② 不该花的（手动标记）
+ * 十、第二层渲染 · ② 高消费（家庭采购 / 个人置物 / 冲动消费 / 其他）
  * ===================================================================== */
-function recKey(r) { return r.id || (r.date + '|' + r.amount + '|' + (r.note || '') + '|' + (r.subcategory || '')); }
+/* 记录指纹：**跨设备一致的标记键**
+ * 旧实现用本机 uid()，A 设备标记的键在 B 设备根本不存在 —— 同步无从谈起。
+ * 改为「内容指纹」= 日期|类型|金额|分类|子类|备注：只要两台设备装的是同一份账单，
+ * 指纹必然相同（账单本身已经通过 data/ledger.json 同步到 GitHub 了）。
+ * 注意：完全相同的两笔消费（同日同额同类同备注）会共用一个指纹，标记会一起生效。 */
+/* 指纹归一化：把 CR / CRLF 统一成 LF。
+ * **起因（真踩过的坑）**：账单备注里可能带换行（Excel 单元格内换行，导入后是 \r\n 或 \r），
+ * 而标记键要塞进 HTML 的 data-id 属性 —— **浏览器解析属性值时会按 HTML 规范
+ * 把 CR 和 CRLF 一律规范化成 LF**。于是「写进存储的键」与「读出来算的键」不是同一个字符串：
+ * 标记确实存进了 localStorage / 云端，但页面渲染时按原始 \r 版本的键去查 —— 查不到，
+ * 于是表现为「点一下提示已经标记过，但页面上一个标记都没有」。
+ * 统一成 LF 后：① 写入侧（浏览器不再改动 LF）与读取侧天然一致；
+ * ② 与已有云端数据兼容 —— 当年的键就是被浏览器规范化成 LF 后写出去的，形态完全对得上，
+ *    所以历史上「存了但看不见」的标记会自动复活，不用重新标一遍。 */
+function normKeyPart(s) {
+  return String(s == null ? '' : s).replace(/\r\n?/g, '\n');
+}
+function recKey(r) {
+  // 预计算过的直接用缓存（preprocess 里已算好）—— 见那里的性能说明
+  if (r._key) return r._key;
+  return [r.date, r.type, (+r.amount).toFixed(2), r.category, r.subcategory, r.note]
+    .map(x => normKeyPart(x)).join('|');
+}
+/* 旧版标记键（本机 uid 或 旧复合串），仅用于一次性迁移 */
+function legacyKey(r) { return r.id || (r.date + '|' + r.amount + '|' + (r.note || '') + '|' + (r.subcategory || '')); }
+
+/* 由指纹反查本机记录的备注 —— 密码门的提示文案要用（让用户知道在改哪一条） */
+function r_note(key) {
+  const hit = (STATE.exp || []).find(r => recKey(r) === key);
+  if (!hit) return '（记录已不在本机账本中）';
+  return `${hit.date} ¥${money0(hit.amount)} ${hit.note || '（无备注）'}`;
+}
+
+/* ---------- 分类标记：家庭采购 / 个人置物 / 冲动消费 / 其他 ----------
+ * 存储值用短 key（family / personal / impulse），显示用中文全称。
+ * 旧的 'waste' / 'need' 两类**已废弃且不再识别**（用户选择全部清空重来），
+ * 所以 markOf 遇到旧值一律当作「未标记」—— 否则界面上会出现无法归类的幽灵状态。 */
+const MARK_TYPES = [
+  { v: 'family',   label: '家庭采购', desc: '家里要用的（柴米油盐日用品，刚需）', cls: 'family',   color: '#3a6ea5', bg: '#eaf1fd', bd: '#a8c4e8' },
+  { v: 'personal', label: '个人置物', desc: '给自己买的（衣服数码，能省但要权衡）', cls: 'personal', color: '#6b5bab', bg: '#efeaf8', bd: '#c2b5e4' },
+  { v: 'impulse',  label: '冲动消费', desc: '买完就后悔的（最该省）',           cls: 'impulse',  color: '#c0392b', bg: '#fdecec', bd: '#e8a9a4' },
+  { v: 'other',    label: '其他',     desc: '暂时不属于上面三类（房租、还款、学费等刚性支出）', cls: 'other', color: '#6d6d75', bg: '#f0f0f3', bd: '#c9c9d1' },
+];
+const MARK_TYPE = { family: MARK_TYPES[0], personal: MARK_TYPES[1], impulse: MARK_TYPES[2], other: MARK_TYPES[3] };
+const MARK_VALUES = MARK_TYPES.map(t => t.v);
+/* 计入「③ 可省的」的类别：个人置物 + 冲动消费。
+ * 家庭采购是刚需、「其他」是兜底（房租/还款/学费这类刚性支出），两者都不该算成"能省"——
+ * 算进去年可省额会虚高，用户拖一下削减滑块就以为真的能省下钱。 */
+const SAVE_TYPES = ['personal', 'impulse'];
+const markLabel = (v) => (MARK_TYPE[v] ? MARK_TYPE[v].label : '');
+const markDesc = (v) => (MARK_TYPE[v] ? MARK_TYPE[v].desc : '');
+
+/* 标记读取：兼容三种存法 —— 新对象 {v,t} / 旧字符串 / 无 */
+function markOf(marks, key) {
+  const x = marks ? marks[key] : null;
+  if (x == null) return '';
+  let v = (typeof x === 'string') ? x : (x.v || '');
+  // 旧两类值已废弃：当作未标记
+  if (v && MARK_VALUES.indexOf(v) < 0) return '';
+  return v;
+}
+function markTs(marks, key) {
+  const x = marks ? marks[key] : null;
+  if (x == null) return 0;
+  if (typeof x === 'string') return 0;           // 旧标记没有时间戳
+  return (+x.t) || 0;
+}
+/* 统一成 {key:{v,t}}
+ * **顺带丢弃旧两类值**（'waste' / 'need'）：用户选择「全部清空重来」，
+ * 所以旧分类一律不保留。这里直接不写入 out —— 本机和云端都会自动清干净，
+ * 不需要额外的迁移步骤，也不会把无法归类的幽灵状态带进统计。
+ * **同时把键本身归一**（CR/CRLF → LF）：见上面 normKeyPart 的说明。
+ * 必要性：老版本迁移（migrateLegacyMarks）曾用未归一的 recKey 写过键，
+ * 那种键与现在算出来的键对不上，标记会「存了但看不见」。
+ * 归一后两种形态自动合并成同一个键 —— 历史标记直接复活，不用重新标。
+ * 两条键归一后撞在一起时，保留**时间戳新的**那条（与云端合并规则一致）。 */
+function normMarks(marks) {
+  const out = {};
+  Object.keys(marks || {}).forEach(k => {
+    const x = marks[k];
+    let v, t;
+    if (typeof x === 'string') { v = x; t = 0; }
+    else if (x && typeof x === 'object') { v = (x.v == null ? null : x.v); t = (+x.t) || 0; }
+    else return;
+    if (v !== null && MARK_VALUES.indexOf(v) < 0) return;   // 旧值 / 非法值 → 丢弃
+    const nk = normKeyPart(k);
+    const prev = out[nk];
+    if (prev && prev.t >= t) return;                         // 已有更新的 → 保留更新的
+    out[nk] = { v: v, t: t };
+  });
+  return out;
+}
+/* ---------- 清理已废弃的旧标记值（v14→v16：确实浪费/正常必需 → 现在的四类） ----------
+ * 旧两类值已废弃，新口径不迁移、直接丢弃。这里把存储里的非法值真正删掉，
+ * 免得旧键一直躺在 localStorage / 云端文件里干扰同步。
+ * 同时把**键归一后的结果落盘**（CR/CRLF → LF）：否则历史上用未归一键写下的标记
+ * 会一直以「存了但读不出来」的形态躺在存储里。 */
+function purgeInvalidMarks() {
+  const raw = MARK_RAW();
+  if (!raw || !Object.keys(raw).length) return 0;
+  const clean = normMarks(raw);
+  const before = Object.keys(raw).length, after = Object.keys(clean).length;
+  // 条数没变不代表没变 —— 键可能被归一了（形态变了、条数一样），这也要落盘
+  const keyChanged = Object.keys(raw).some(k => !(k in clean));
+  if (after === before && !keyChanged) return 0;
+  cfgSet('marks', clean);
+  return Math.max(before - after, 0);
+}
+
+/* 合并两台设备的标记：时间戳新的赢（t 相同则保留本机） */
+function mergeMarks(local, remote) {
+  const out = normMarks(local);
+  const rem = normMarks(remote);
+  Object.keys(rem).forEach(k => {
+    const r = rem[k];
+    const l = out[k];
+    if (!l) { out[k] = r; return; }
+    if (((+r.t) || 0) > ((+l.t) || 0)) out[k] = r;
+  });
+  return out;
+}
+
+/* 翻页后把高消费区列表顶到视野里 —— 否则停在页面中部会以为没换页 */
+function scrollToWasteTop() {
+  const el = $('wasteList');
+  if (!el) return;
+  const y = el.getBoundingClientRect().top + window.pageYOffset - 70;
+  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+}
+
+/* rAF 节流的高消费区渲染 —— 拖动滑块时一帧只算一次 */
+let _wasteRaf = 0;
+function scheduleWasteRender() {
+  if (_wasteRaf) return;
+  _wasteRaf = requestAnimationFrame(() => {
+    _wasteRaf = 0;
+    renderWaste();
+  });
+}
 
 function renderWaste() {
   const marks = MARK();
   const all = STATE.exp;
-  // 按金额降序，最容易判断的先出现
-  const sorted = all.slice().sort((a, b) => b.amount - a.amount);
-  const list = STATE.wasteHideMarked ? sorted.filter(r => !marks[recKey(r)]) : sorted;
+  // 按金额降序，最容易判断的先出现。
+  // **排序结果缓存** —— 6912 条每次 input 都重排一遍是拖动卡顿的主因，
+  // 而 STATE.exp 只在重新读账本时才变，所以按引用缓存即可。
+  if (STATE._wasteSortedRef !== all) {
+    STATE._wasteSortedRef = all;
+    STATE._wasteSorted = all.slice().sort((a, b) => b.amount - a.amount);
+  }
+  const sorted = STATE._wasteSorted;
+  // 金额门槛：默认跟随「大额消费清单」的阈值（wasteMin === null 表示跟随）。
+  // 这样两处口径永远一致；用户在本区单独调过就独立，点了「↩ 跟随大额清单」可恢复。
+  const min = (STATE.wasteMin === null || STATE.wasteMin === undefined) ? STATE.thr : STATE.wasteMin;
+  // **一次遍历算完所有要用的东西** —— 以前 pool/list/byType/shown 四轮过滤各调一次
+  // markOf(marks, recKey(r))，等于把整张账单的标记查了四遍（6912 条 × 4）。
+  // 拖动金额门槛滑块时 input 按帧触发，卡顿很明显。现在一趟搞定。
+  const byType = {};
+  MARK_TYPES.forEach(t => { byType[t.v] = { n: 0, amt: 0 }; });
+  const pool = [];
+  const list = [];
+  let belowN = 0;    // 门槛以下、且还没标记的笔数（说明文字用）
+  sorted.forEach(r => {
+    const v = markOf(marks, recKey(r));
+    // 门槛只筛「未标记」的记录 —— 已标记的即使低于门槛也要露出来，
+    // 否则用户标错了就再也点不回去改（等于被门槛锁死）。
+    if (min > 0 && r.amount < min) {
+      if (!v) { belowN++; return; }
+    }
+    pool.push(r);
+    // 四类统计：门槛后的可见集口径（全局概览，不随勾选变化）
+    if (v && byType[v]) { byType[v].n++; byType[v].amt += r.amount; }
+    // 列表过滤：三种互斥模式 —— 都不勾=全部 / 隐藏已标记=只留未标记 / 仅显示已标记=只留已标记
+    if (STATE.wasteOnlyMarked) {
+      if (!v) return;
+    } else if (STATE.wasteHideMarked) {
+      if (v) return;
+    }
+    // 标记类型筛选（在「仅显示已标记」之上再细分一层）：
+    // 点了统计里的「其他 57 笔」或类型按钮后，只剩那一类 —— 免得在一堆标记里翻找。
+    if (STATE.wasteType && v !== STATE.wasteType) return;
+    list.push(r);
+  });
+  // ---- 分页 ----
+  // 之前是 list.slice(0, n) 硬截断，超出部分直接丢且没有翻页入口 —— 数据多时根本看不到。
   const n = STATE.wastePageN;
-  const shown = list.slice(0, n);
+  const pages = Math.max(1, Math.ceil(list.length / n));
+  if (STATE.wastePage > pages) STATE.wastePage = pages;   // 标记被取消后当前页可能越界 → 收回
+  if (STATE.wastePage < 1) STATE.wastePage = 1;
+  const start = (STATE.wastePage - 1) * n;
+  const shown = list.slice(start, start + n);
 
-  const wasteRecs = all.filter(r => marks[recKey(r)] === 'waste');
-  const wSum = wasteRecs.reduce((s, r) => s + r.amount, 0);
-  const needCount = all.filter(r => marks[recKey(r)] === 'need').length;
-  $('wasteStat').innerHTML = `已标浪费 <b style="color:#c0392b">${wasteRecs.length}</b> 笔 · <b style="color:#c0392b">¥${money0(wSum)}</b>　已标正常 ${needCount} 笔`;
+  const nMarkedAll = MARK_TYPES.reduce((s, t) => s + byType[t.v].n, 0);
+  // 统计项做成**可点**：点某一类 → 下面列表直接只列那一类，省得手动翻。
+  $('wasteStat').innerHTML = MARK_TYPES.map(t => {
+    const s = byType[t.v];
+    const on = STATE.wasteType === t.v;
+    if (!s.n) {
+      return `<button class="wstat-item zero" data-t="${t.v}" style="color:${t.color}" title="「${t.label}」当前没有已标记的记录">${t.label} 0</button>`;
+    }
+    return `<button class="wstat-item ${on ? 'on' : ''}" data-t="${t.v}" style="color:${t.color}" title="点击只看「${t.label}」的 ${s.n} 笔">${t.label} <b>${s.n}</b> 笔 · <b>¥${money0(s.amt)}</b></button>`;
+  }).join('');
+  // 统计项的事件绑定必须紧跟渲染 —— 列表为空时下面会提前 return，
+  // 如果绑定写在后面，「其他 12 笔」这种可点的统计项就成了死按钮。
+  $('wasteStat').querySelectorAll('.wstat-item[data-t]').forEach(b => {
+    b.onclick = () => {
+      const t = b.dataset.t;
+      if (!t) return;
+      // 0 笔的那类不响应（点了也是空的）
+      if (!byType[t] || !byType[t].n) return;
+      // 点类型筛选 → 自动切到「仅显示已标记」模式，
+      // 否则「隐藏已标记」会把这一类全滤掉，点了个寂寞。
+      const cur = STATE.wasteType === t;
+      STATE.wasteType = cur ? '' : t;
+      if (STATE.wasteType) {
+        STATE.wasteOnlyMarked = true;
+        STATE.wasteHideMarked = false;
+      }
+      STATE.wastePage = 1;
+      renderWaste();
+    };
+  });
 
   $('segWastePage').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.n === n));
+  // 两个勾选框的显示状态与 STATE 保持一致（互斥逻辑在 onchange 里处理）
+  $('chkWasteHideMarked').checked = !!STATE.wasteHideMarked;
+  $('chkWasteOnlyMarked').checked = !!STATE.wasteOnlyMarked;
+
+  // 门槛控件同步（滑块 / 快捷档 / 跟随提示）
+  const following = (STATE.wasteMin === null || STATE.wasteMin === undefined);
+  $('wasteMinRange').value = min > 0 ? min : 0;
+  $('wasteMinVal').textContent = min > 0 ? '≥ ¥' + money0(min) : '全部';
+  $('wasteMinQuick').querySelectorAll('button').forEach(b => {
+    const v = +b.dataset.v;
+    b.classList.toggle('on', min > 0 ? v === min : v === 0);
+  });
+  $('wasteMinHint').innerHTML = following
+    ? `跟随「大额消费清单」阈值（¥${money0(STATE.thr)}）`
+    : `已单独设定${min > 0 ? `（≥ ¥${money0(min)}）` : '（全部）'}`;
+  $('wasteMinFollow').style.display = following ? 'none' : '';
+
+  // ---- 类型筛选行：只在「仅显示已标记」时出现（没勾就没必要按类型筛）----
+  const typeRow = $('wasteTypeRow');
+  const showTypeRow = !!STATE.wasteOnlyMarked;
+  typeRow.style.display = showTypeRow ? 'flex' : 'none';
+  $('wasteTypeQuick').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', (b.dataset.t || '') === (STATE.wasteType || ''));
+  });
+  const tObj = MARK_TYPE[STATE.wasteType];
+  $('wasteTypeHint').innerHTML = STATE.wasteType && tObj
+    ? `正在只看「<b>${tObj.label}</b>」这一类，共 <b>${list.length}</b> 笔`
+    : `共 <b>${list.length}</b> 笔已标记记录`;
 
   if (!shown.length) {
-    $('wasteList').innerHTML = `<div class="empty"><div class="big">✍️</div>${all.length ? '当前没有待标记的记录' : '没有可标记的记录'}</div>`;
+    let why;
+    if (STATE.wasteType && tObj) {
+      // 类型筛完是空的 —— 区分「这一类确实没有」和「被门槛挡住了」
+      const hasAny = pool.some(r => markOf(marks, recKey(r)) === STATE.wasteType);
+      why = hasAny
+        ? `「${tObj.label}」的记录当前不在可见范围<br>把「金额门槛」调到 0（全部）看看`
+        : `还没有标记过「${tObj.label}」的记录<br>先在下面标几笔，再回来查`;
+    } else if (STATE.wasteOnlyMarked) {
+      why = (all.length ? '你还没有标记过任何记录<br>先在下面标几笔，再回来查' : '没有可分类的记录');
+    } else if (min > 0 && !pool.length) {
+      why = `当前门槛 ≥ ¥${money0(min)} 下没有记录<br>把「金额门槛」调到 0（全部）看看`;
+    } else {
+      why = (all.length ? '当前没有待分类的记录' : '没有可分类的记录');
+    }
+    $('wasteList').innerHTML = `<div class="empty"><div class="big">✍️</div>${why}</div>`;
+    $('wastePager').innerHTML = '';
     return;
   }
 
+  // 过滤模式说明：都不勾=全部 / 隐藏已标记 / 仅显示已标记
+  const modeTxt = STATE.wasteOnlyMarked
+    ? '只看<b>已标记</b>的记录，'
+    : (STATE.wasteHideMarked ? '只看<b>未标记</b>的记录，' : '');
+  const typeTxt = (STATE.wasteType && tObj) ? `只看「<b>${tObj.label}</b>」，` : '';
   let h = `<div class="note" style="margin-top:0;margin-bottom:12px">
-    按金额从高到低排列 —— 大额最容易判断。标为「确实浪费」的记录会自动进入 ③ 可省的。
-    共 ${list.length} 笔待显示${list.length > shown.length ? `，当前显示前 ${shown.length} 笔` : ''}。</div>`;
+    按金额从高到低排列 —— 大额最容易判断。标为<b>个人置物</b>或<b>冲动消费</b>的记录会自动进入 ③ 可省的（家庭采购是刚需、「其他」是刚性支出，都不计入）。<br>
+    ${min > 0 ? `只看 <b>≥ ¥${money0(min)}</b> 的记录，` : '不设金额门槛，'}${modeTxt}${typeTxt}共 <b>${list.length}</b> 笔${pages > 1 ? `，第 <b>${STATE.wastePage}</b>/${pages} 页` : ''}。${belowN ? `门槛以下还有 ${belowN} 笔未标记，调到「全部」可一并查看。` : ''}</div>`;
+  // 指纹**不走 HTML 属性**。
+  // 原因：data-id 的值要经过浏览器 HTML 解析，CR / CRLF 会被规范成 LF，
+  // 属性里来回一趟指纹就可能变形（详见上面 normKeyPart 的说明）。
+  // 所以这里只传下标 idx，真正的键放在 keyList 里，onclick 时再取。
+  const keyList = [];
   shown.forEach(r => {
     const k = recKey(r);
-    const mk = marks[k];
+    const idx = keyList.push(k) - 1;
+    const mk = markOf(marks, k);
     h += `<div class="big-item" style="padding:10px 4px">
       <span class="d">${esc(r.date)}</span>
       <span class="nt">
         <b>¥${money0(r.amount)}</b> ${esc(r.note || '（无备注）')}
         <span class="dim" style="font-size:12px">· ${esc(r._cat)}${r._subMerged ? ' / ' + esc(r._subMerged) : ''}</span>
       </span>
-      ${mk ? `<span class="flag ${mk === 'waste' ? 'waste' : 'need'}">${mk === 'waste' ? '确实浪费' : '正常必需'}</span>` : ''}
-      <button class="btn ${mk === 'waste' ? 'on-w' : ''}" data-id="${esc(k)}" data-m="waste">确实浪费</button>
-      <button class="btn ${mk === 'need' ? 'on-n' : ''}" data-id="${esc(k)}" data-m="need">正常必需</button>
+      ${mk ? `<span class="flag ${MARK_TYPE[mk].cls}">${MARK_TYPE[mk].label}</span>` : ''}
+      ${MARK_TYPES.map(t => `<button class="btn ${mk === t.v ? 'on-' + t.cls : ''}" data-i="${idx}" data-m="${t.v}" title="${esc(t.desc)}">${t.label}</button>`).join('')}
     </div>`;
   });
   $('wasteList').innerHTML = h;
 
+  // ---- 分页器 ----
+  // 只有一页时不用占地方；有几页就给出「上一页 / 页码 / 下一页」，还能直接跳页。
+  let pg = '';
+  if (pages > 1) {
+    pg = `<button data-act="first" ${STATE.wastePage === 1 ? 'disabled' : ''} title="回到第一页">« 首页</button>
+      <button data-act="prev" ${STATE.wastePage === 1 ? 'disabled' : ''}>‹ 上一页</button>
+      <span class="pg-info">第 <b>${STATE.wastePage}</b> / ${pages} 页 · 共 <b>${list.length}</b> 笔（第 ${start + 1}–${start + shown.length} 笔）</span>
+      <button data-act="next" ${STATE.wastePage === pages ? 'disabled' : ''}>下一页 ›</button>
+      <button data-act="last" ${STATE.wastePage === pages ? 'disabled' : ''} title="到最后一页">末页 »</button>
+      <input class="pg-jump" id="wastePgJump" type="number" min="1" max="${pages}" placeholder="跳页" title="输入页码后回车">`;
+  } else {
+    pg = `<span class="pg-info">共 <b>${list.length}</b> 笔，一页显示完</span>`;
+  }
+  $('wastePager').innerHTML = pg;
+  $('wastePager').querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = () => {
+      const a = b.dataset.act;
+      let p = STATE.wastePage;
+      if (a === 'first') p = 1;
+      else if (a === 'prev') p = STATE.wastePage - 1;
+      else if (a === 'next') p = STATE.wastePage + 1;
+      else if (a === 'last') p = pages;
+      if (!p || p === STATE.wastePage || p < 1 || p > pages) return;
+      STATE.wastePage = p;
+      renderWaste();
+      scrollToWasteTop();
+    };
+  });
+  const jump = $('wastePgJump');
+  if (jump) {
+    jump.onkeydown = (e) => {
+      if (e.key !== 'Enter') return;
+      let p = parseInt(jump.value, 10);
+      if (!p || p < 1) p = 1;
+      if (p > pages) p = pages;
+      STATE.wastePage = p;
+      renderWaste();
+      scrollToWasteTop();
+    };
+  }
+
+  // ---- 统计项点击：只看那一类 ----
+  // （绑定已在统计条渲染后立即完成 —— 列表为空时也要能点）
+
   $('wasteList').querySelectorAll('button[data-m]').forEach(btn => {
-    btn.onclick = () => {
-      const marks2 = MARK();
-      const id = btn.dataset.id, m = btn.dataset.m;
-      if (marks2[id] === m) delete marks2[id]; else marks2[id] = m;   // 再点一次取消
-      cfgSet('marks', marks2);
+    btn.onclick = async () => {
+      const marks2 = normMarks(MARK());
+      const m = btn.dataset.m;
+      const id = keyList[+btn.dataset.i];
+      if (id == null) return;
+      const cur = markOf(marks2, id);
+      // 再点一次同一个 = 取消分类。写 v:null 墓碑（而不是删键），
+      // 否则「取消」这个动作没法同步到别的设备 —— 对方会保留旧分类。
+      const next = (cur === m ? null : m);
+      // 密码门：**只在「修改已有分类」时要求密码**。
+      //   首次分类（cur 为空）不要密码 —— 否则第一次用就得先设密码，太劝退。
+      //   取消分类 / 从一类改成另一类都要密码 —— 这才是「想清楚后别乱改」。
+      if (pwOn() && cur) {
+        const tip = next === null
+          ? `将<b>取消</b>这条分类（${esc(r_note(id, marks2))}）。<br>请输入密码继续。`
+          : `将把这条分类从「${markLabel(cur)}」<br>改为「${markLabel(m)}」。<br>请输入密码继续。`;
+        const ok = await askMarkPassword(tip);
+        if (!ok) return;                 // 取消或输错 → 什么都不改
+      }
+      // 密码通过后重新读一次标记，避免等待期间状态被别处改掉
+      const marks3 = normMarks(MARK());
+      marks3[id] = { v: next, t: Date.now() };
+      cfgSet('marks', marks3);
       renderWaste();
       renderSaveTotal();
+      scheduleMarkPush();          // 有 GitHub 配置时自动推云
     };
   });
 }
 
 /* =====================================================================
+ * 十·五、标记云端同步（GitHub）
+ * ---------------------------------------------------------------------
+ * 需求：A 设备分类「家庭采购 / 个人置物 / 冲动消费 / 其他」，B 设备也要看得到。
+ * 现状：标记只存本机 localStorage（analysis_cfg_v1.marks），换设备必然丢失。
+ *
+ * 做法：把标记写进仓库里一个**独立文件** data/analysis-marks.json。
+ *
+ * 三条硬边界（一个都不能破）：
+ *   1. **只写自己的标记文件**，绝不碰 data/ledger.json —— 那是历年收支簿的职责，
+ *      本页对账单是严格只读的，越界就等于篡改账单。
+ *   2. **Token 只存本机浏览器**，不上传到任何服务器（本页全程直连 GitHub API）。
+ *   3. 本机账单为准：拉下来的标记只按「指纹」匹配本机记录，匹配不上的直接丢弃，
+ *      绝不用云端数据改动本机账单。
+ *
+ * 冲突处理：每条标记带毫秒时间戳，合并时**新的赢**；平手保留本机。
+ * 「取消标记」写 v:null 墓碑，这样取消动作本身也能跨设备传播。
+ * ===================================================================== */
+const GH_KEY = 'analysis_gh_cfg_v1';
+let GH = (() => { try { return JSON.parse(localStorage.getItem(GH_KEY) || 'null') || {}; } catch (_) { return {}; } })();
+GH = Object.assign({ token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/analysis-marks.json', sha: null, auto: true }, GH);
+/* 读出来也要过白名单 —— 旧配置里可能已经存了危险路径（比如 data/ledger.json），
+ * 光在「保存」时拦不够：只要 GH.path 危险，自动上传就会直接覆盖账本原件。 */
+GH.path = (function () {
+  const SAFE = { 'data/analysis-marks.json': 1, 'data/analysis-marks-v2.json': 1, 'data/marks.json': 1 };
+  return SAFE[GH.path] ? GH.path : 'data/analysis-marks.json';
+})();
+const ghReady = () => !!(GH.token && GH.owner && GH.repo && !/^YOUR|^ghp_xxxx/i.test(GH.token));
+const GH_HDR = (extra) => Object.assign({
+  'Authorization': 'Bearer ' + GH.token,
+  'Accept': 'application/vnd.github+json'
+}, extra || {});
+const b64d = (s) => decodeURIComponent(escape(atob(String(s || '').replace(/\n/g, ''))));
+const b64e = (s) => btoa(unescape(encodeURIComponent(s)));
+const marksApi = () => `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
+
+function setSyncMsg(msg, cls) {
+  const el = $('markSyncMsg');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'sync-msg' + (cls === 'ok' ? ' ok' : cls === 'err' ? ' err' : '');
+}
+/* 读云端标记文件 → {sha, marks}；文件不存在返回 null（不报错） */
+async function ghPullMarks() {
+  const url = `${marksApi()}?ref=${encodeURIComponent(GH.branch)}&t=${Date.now()}`;
+  const res = await fetch(url, { headers: GH_HDR() });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('GitHub API ' + res.status);
+  const j = await res.json();
+  let obj = null;
+  if (j.content && j.encoding === 'base64') {
+    try { obj = JSON.parse(b64d(j.content)); } catch (e) { obj = null; }
+  }
+  return { sha: j.sha || null, marks: normMarks(obj && obj.marks), lock: (obj && obj.lock) || null };
+}
+/* 写云端标记文件
+ * 注意：lock 字段存的是**加盐哈希**（不是明文密码），跟 marks 一样随同步走，
+ * 这样 B 设备拉下来也有保护，不会出现「A 有密码、B 随便改」的漏洞。 */
+async function ghPushMarks(marks, lock) {
+  const body = {
+    message: '更新账单透视标记 ' + new Date().toISOString().slice(0, 16).replace('T', ' '),
+    content: b64e(JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), marks: marks, lock: lock || null }, null, 2)),
+    branch: GH.branch
+  };
+  if (GH.sha) body.sha = GH.sha;
+  const res = await fetch(marksApi(), {
+    method: 'PUT', headers: GH_HDR({ 'Content-Type': 'application/json' }), body: JSON.stringify(body)
+  });
+  if (res.status === 422 && GH.sha) {   // sha 过期 → 重拉一次再写
+    GH.sha = null;
+    const m = await ghPullMarks();
+    if (m) GH.sha = m.sha;
+    return ghPushMarks(marks, lock);
+  }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.message || ('GitHub API ' + res.status));
+  }
+  const j = await res.json();
+  GH.sha = (j.content && j.content.sha) || null;
+  saveGhCfg();
+  return true;
+}
+function saveGhCfg() {
+  LS_SENTINEL.allow++;
+  try { localStorage.setItem(GH_KEY, JSON.stringify(GH)); }
+  finally { LS_SENTINEL.allow--; }
+}
+/* 拉云端 → 合并进本机 → 存本机。返回合并后的标记数 */
+async function pullMarksFromCloud(silent) {
+  if (!ghReady()) return 0;
+  const r = await ghPullMarks();
+  if (!r) { if (!silent) setSyncMsg('云端还没有标记文件，标记后会自动创建', 'err'); return 0; }
+  GH.sha = r.sha; saveGhCfg();
+  const before = JSON.stringify(normMarks(MARK()));
+  const merged = mergeMarks(MARK(), r.marks);
+  const changed = before !== JSON.stringify(merged);
+  cfgSet('marks', merged);
+  // 保护状态也跟着合并：云端有更新的 lock 就采用（可能是别的设备启用了保护）
+  const lockBefore = JSON.stringify(pwState());
+  const lockMerged = mergeLock(pwState(), r.lock);
+  if (JSON.stringify(lockMerged) !== lockBefore) {
+    cfgSet(PW_KEY, lockMerged);
+    refreshMarkLockUI();
+  }
+  if (changed) { renderWaste(); renderSaveTotal(); }
+  if (!silent) setSyncMsg(changed ? `✓ 已从云端合并 ${Object.keys(r.marks).length} 条标记` : '✓ 云端标记已是最新', 'ok');
+  return Object.keys(merged).length;
+}
+/* 推本机 → 云端。
+ * 必须是「先拉后推」的 read-modify-write：直接拿本机全量覆盖，
+ * 会把别的设备刚标的标记冲掉（云端是共享的，本机只是其中一份）。
+ * 流程：拉云端 → 与本机合并（时间戳新的赢）→ 写回本机 → 推云端。 */
+async function pushMarksToCloud(silent) {
+  if (!ghReady()) { if (!silent) setSyncMsg('请先填写 Token 并保存配置', 'err'); return false; }
+  // 1) 先拉云端，把别人新增的标记并进来
+  const r = await ghPullMarks();
+  let lock = pwState();
+  if (r) {
+    GH.sha = r.sha;
+    const merged = mergeMarks(MARK(), r.marks);
+    cfgSet('marks', merged);
+    // 保护状态同样合并后再推，避免把别的设备刚启用的保护覆盖掉
+    lock = mergeLock(pwState(), r.lock);
+    if (JSON.stringify(lock) !== JSON.stringify(pwState())) {
+      cfgSet(PW_KEY, lock);
+      refreshMarkLockUI();
+    }
+  }
+  // 2) 再推本机（全量，此时已含云端内容）
+  const marks = normMarks(MARK());
+  await ghPushMarks(marks, lock);
+  if (!silent) setSyncMsg(`✓ 已上传 ${Object.keys(marks).length} 条标记到 ${GH.path}`, 'ok');
+  return true;
+}
+/* 标记后自动推云（去抖 1.2s，连点多次只推一次） */
+let markPushTimer = null;
+function scheduleMarkPush() {
+  if (!ghReady() || !GH.auto) return;
+  if (markPushTimer) clearTimeout(markPushTimer);
+  markPushTimer = setTimeout(async () => {
+    markPushTimer = null;
+    try { await pushMarksToCloud(true); setSyncMsg(`✓ 已自动同步到云端 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok'); }
+    catch (e) { setSyncMsg('自动同步失败：' + e.message, 'err'); }
+  }, 1200);
+}
+
+/* ---------- 旧版标记键迁移（一次性） ----------
+ * 老版本用本机 uid() 当键，现在改成内容指纹。首次打开时把旧键的标记
+ * 按「旧键 → 指纹」重写一遍，保留用户已有的判断成果。 */
+function migrateLegacyMarks() {
+  const raw = MARK();
+  if (!raw || !Object.keys(raw).length) return false;
+  const oldKeys = Object.keys(raw).filter(k => !(k.indexOf('|') >= 0 && k.split('|').length === 6));
+  if (!oldKeys.length) return false;
+  const byLegacy = {};
+  STATE.exp.forEach(r => { byLegacy[legacyKey(r)] = r; });
+  const out = normMarks(raw);
+  let n = 0;
+  oldKeys.forEach(k => {
+    const r = byLegacy[k];
+    if (!r) return;                      // 找不到对应记录（明细年门槛把它排除了）→ 丢弃
+    const nk = recKey(r);
+    if (!out[nk]) { out[nk] = { v: markOf(raw, k), t: 0 }; n++; }
+    delete out[k];
+  });
+  cfgSet('marks', out);
+  return n > 0;
+}
+
+/* ---------- 同步面板交互 ---------- */
+function refreshMarkSyncUI() {
+  const on = ghReady();
+  const st = $('mk-state');
+  if (st) st.textContent = on ? `已连接：${GH.owner}/${GH.repo} · ${GH.path}${GH.auto ? ' · 自动上传已开' : ''}` : '未配置 Token（标记仅存本机）';
+  const card = $('markSyncCard');
+  if (card && !card.dataset.userOpen) card.style.display = 'none';   // 首次默认收起；用户手动展开后不再自动收起
+  const tg = $('mk-toggle');
+  if (tg) {   // 入口按钮文案始终反映当前状态
+    const isOpen = card && card.style.display !== 'none';
+    tg.textContent = isOpen ? '☁️ 收起同步面板' : '☁️ 标记同步（多设备）';
+    tg.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+  $('mk-token').value = GH.token || '';
+  $('mk-owner').value = GH.owner || 'sumer0825';
+  $('mk-repo').value = GH.repo || 'Sumer';
+  $('mk-branch').value = GH.branch || 'main';
+  $('mk-path').value = GH.path || 'data/analysis-marks.json';
+  $('mk-auto').checked = GH.auto !== false;
+  const p = $('markSyncPath');
+  if (p) p.textContent = GH.path || 'data/analysis-marks.json';
+}
+/* 统一开关：入口按钮与面板内的「✕ 收起」都走这里，
+ * 保证按钮文案、aria-expanded、面板显隐三者永远一致。 */
+function setMarkSyncOpen(open) {
+  const c = $('markSyncCard');
+  const t = $('mk-toggle');
+  c.style.display = open ? '' : 'none';
+  c.dataset.userOpen = open ? '1' : '';
+  if (t) {
+    t.textContent = open ? '☁️ 收起同步面板' : '☁️ 标记同步（多设备）';
+    t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  if (open) refreshMarkSyncUI();
+}
+$('mk-toggle').onclick = () => setMarkSyncOpen($('markSyncCard').style.display === 'none');
+$('mk-close').onclick = () => {
+  setMarkSyncOpen(false);
+  $('mk-toggle').focus();     // 焦点回到入口按钮，键盘用户不会「丢失焦点」
+};
+
+/* ---------- 标记保护面板交互 ---------- */
+function refreshMarkLockUI() {
+  const on = pwOn();
+  const setRow = $('mk-lock-set-row'), onRow = $('mk-lock-on-row');
+  if (setRow) setRow.style.display = on ? 'none' : '';
+  if (onRow) onRow.style.display = on ? '' : 'none';
+  // 保护没启用时，改密码区不该露出来
+  if (!on) {
+    const chg = $('mk-lock-chg-row');
+    if (chg) chg.style.display = 'none';
+  }
+  const st = $('mk-lock-state');
+  if (st) st.textContent = '🔒 保护已启用：取消标记、更改标记需要输入密码';
+  const tg = $('mk-lock');
+  const card = $('markLockCard');
+  if (tg && card) {
+    const isOpen = card.style.display !== 'none';
+    tg.textContent = isOpen ? '🔓 收起保护面板' : (on ? '🔒 标记保护（已启用）' : '🔒 标记保护');
+    tg.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+}
+function setMarkLockOpen(open) {
+  const c = $('markLockCard');
+  const t = $('mk-lock');
+  c.style.display = open ? '' : 'none';
+  c.dataset.userOpen = open ? '1' : '';
+  if (t) t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  refreshMarkLockUI();
+}
+function setLockMsg(msg, cls) {
+  const el = $('mk-lock-msg');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'sync-msg' + (cls === 'ok' ? ' ok' : cls === 'err' ? ' err' : '');
+}
+$('mk-lock').onclick = () => setMarkLockOpen($('markLockCard').style.display === 'none');
+$('mk-lock-close').onclick = () => {
+  setMarkLockOpen(false);
+  $('mk-lock').focus();
+};
+/* 启用 / 修改密码 */
+async function doSetMarkPassword() {
+  const p1 = $('mk-lock-pw').value, p2 = $('mk-lock-pw2').value;
+  if (!p1 || p1.length < 4) { setLockMsg('密码至少 4 位', 'err'); return; }
+  if (p1 !== p2) { setLockMsg('两次输入不一致', 'err'); return; }
+  if (pwOn()) {
+    // 改密码要先验旧密码（应急密码同样有效）
+    const ok = await askMarkPassword('修改密码需要先验证当前密码。');
+    if (!ok) { setLockMsg('已取消修改', 'err'); return; }
+  }
+  pwSet(p1);
+  $('mk-lock-pw').value = ''; $('mk-lock-pw2').value = '';
+  refreshMarkLockUI();
+  setLockMsg('✓ 保护已启用：取消标记、更改标记需输入密码', 'ok');
+  scheduleMarkPush();          // 保护状态随标记一起同步到云端
+}
+$('mk-lock-save').onclick = doSetMarkPassword;
+$('mk-lock-pw2').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); doSetMarkPassword(); } };
+$('mk-lock-pw').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('mk-lock-pw2').focus(); } };
+/* 修改密码：展开改密码输入区（原先这个按钮没绑事件，点了毫无反应） */
+$('mk-lock-change').onclick = () => {
+  const chg = $('mk-lock-chg-row');
+  if (!chg) return;
+  const show = chg.style.display === 'none';
+  chg.style.display = show ? '' : 'none';
+  if (show) {
+    $('mk-lock-cpw').value = ''; $('mk-lock-cpw2').value = '';
+    setLockMsg('请输入新密码（会先验证当前密码）', '');
+    $('mk-lock-cpw').focus();
+  }
+};
+$('mk-lock-cancel').onclick = () => {
+  const chg = $('mk-lock-chg-row');
+  if (chg) chg.style.display = 'none';
+  setLockMsg('', '');
+};
+$('mk-lock-csave').onclick = async () => {
+  const p1 = $('mk-lock-cpw').value, p2 = $('mk-lock-cpw2').value;
+  if (!p1 || p1.length < 4) { setLockMsg('密码至少 4 位', 'err'); return; }
+  if (p1 !== p2) { setLockMsg('两次输入不一致', 'err'); return; }
+  // 改密码要先验旧密码（应急密码同样有效）
+  const ok = await askMarkPassword('修改密码需要先验证当前密码。');
+  if (!ok) { setLockMsg('已取消修改', 'err'); return; }
+  pwSet(p1);
+  $('mk-lock-cpw').value = ''; $('mk-lock-cpw2').value = '';
+  const chg = $('mk-lock-chg-row');
+  if (chg) chg.style.display = 'none';
+  setLockMsg('✓ 密码已更新', 'ok');
+  scheduleMarkPush();          // 保护状态随标记一起同步到云端
+};
+$('mk-lock-cpw2').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('mk-lock-csave').click(); } };
+$('mk-lock-cpw').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('mk-lock-cpw2').focus(); } };
+/* 关闭保护：需要当前密码，防止别人随手关掉 */
+$('mk-lock-off').onclick = async () => {
+  const ok = await askMarkPassword('关闭保护需要先验证当前密码。');
+  if (!ok) { setLockMsg('已取消关闭', 'err'); return; }
+  pwClear();
+  refreshMarkLockUI();
+  setLockMsg('✓ 保护已关闭：取消标记、更改标记不再需要密码', 'ok');
+  scheduleMarkPush();          // 「关闭保护」也要同步出去
+};
+/* 标记文件路径**白名单校验**。
+ * 为什么必须锁死：本页面对用户的承诺是「只写标记文件，绝不碰 data/ledger.json 账单原件」。
+ * 而路径输入框原本是自由的 —— 填 `data/ledger.json` 就能让 PUT 覆盖账本原件，
+ * 账单数据（云端那份，唯一的备份）会被整个替换成几十字节的 marks JSON，**不可逆丢失**。
+ * GitHub contents API 本身限制在仓库内（`../` 逃不出去），但仓库内任意文件都能被覆盖。
+ * 所以这里只允许「data/ 目录下的 .json 文件」，且**明确排除**账单/其它工具的数据文件。 */
+const SAFE_MARK_PATHS = {
+  'data/analysis-marks.json': 1,
+  'data/analysis-marks-v2.json': 1,
+  'data/marks.json': 1,
+};
+function sanitizeMarkPath(p) {
+  const v = String(p || '').trim();
+  if (SAFE_MARK_PATHS[v]) return v;
+  return 'data/analysis-marks.json';
+}
+$('mk-save').onclick = () => {
+  const wantPath = $('mk-path').value.trim() || 'data/analysis-marks.json';
+  const safePath = sanitizeMarkPath(wantPath);
+  if (safePath !== wantPath) {
+    // 明确告知用户被拦下了，别静默改写让他以为生效了
+    setSyncMsg(`⚠️ 路径「${wantPath}」不安全，已改用 ${safePath}` +
+      `（只能写 data/ 目录下的标记文件，绝不能碰账单原件 data/ledger.json）`, 'err');
+    $('mk-path').value = safePath;
+  }
+  GH = {
+    token: $('mk-token').value.trim(),
+    owner: $('mk-owner').value.trim() || 'sumer0825',
+    repo: $('mk-repo').value.trim() || 'Sumer',
+    branch: $('mk-branch').value.trim() || 'main',
+    path: safePath,
+    sha: null, auto: $('mk-auto').checked
+  };
+  saveGhCfg();
+  refreshMarkSyncUI();
+  if (!ghReady()) { setSyncMsg('请填写 Token（需对仓库有 contents 读写权限）', 'err'); return; }
+  setSyncMsg('已保存，正在测试连接…');
+  pullMarksFromCloud(false)
+    .then(() => pushMarksToCloud(false))
+    .catch(e => setSyncMsg('连接失败：' + e.message, 'err'));
+};
+$('mk-pull').onclick = () => {
+  if (!ghReady()) { setSyncMsg('请先填写 Token 并保存配置', 'err'); return; }
+  setSyncMsg('正在从云端拉取…');
+  pullMarksFromCloud(false).catch(e => setSyncMsg('拉取失败：' + e.message, 'err'));
+};
+$('mk-push').onclick = () => {
+  if (!ghReady()) { setSyncMsg('请先填写 Token 并保存配置', 'err'); return; }
+  setSyncMsg('正在上传…');
+  pushMarksToCloud(false).catch(e => setSyncMsg('上传失败：' + e.message, 'err'));
+};
+$('mk-disconnect').onclick = () => {
+  if (!confirm('确定断开？\n\n将清空：本机保存的 Token（标记数据本身保留在本机）\n不会动：仓库里的 ' + (GH.path || '标记文件') + '\n\n之后标记只存这台设备。')) return;
+  GH = { token: '', owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path, sha: null, auto: false };
+  saveGhCfg();
+  refreshMarkSyncUI();
+  setSyncMsg('已断开，标记回到「仅本机」模式');
+};
+
+/* =====================================================================
  * 十一、第二层渲染 · ③ 可省的
  * ---------------------------------------------------------------------
- * 三个来源合并：高频重复类 + 笔数激增类 + 你标记过的浪费。
+ * 三个来源合并：高频重复类 + 笔数激增类 + 你分类过的「个人置物 / 冲动消费」。
  * 削减力度由你设定，页面只负责算账。
  * ===================================================================== */
 function saveCandidates() {
@@ -1519,18 +2650,26 @@ function saveCandidates() {
     });
   });
 
-  // 来源 3：你标记过的浪费（按子类汇总，同一子类的多笔合并为一项，避免逐条刷屏）
+  // 来源 3：你在「② 高消费」里分类过的「个人置物 / 冲动消费」（other 已被 SAVE_TYPES 排除）
+  // （家庭采购是家里刚需，不计入可省 —— 只有真正"可以少花"的两类才算）
+  // 按子类汇总，同一子类的多笔合并为一项，避免逐条刷屏。
   const wasteBySub = {};
-  STATE.exp.filter(r => marks[recKey(r)] === 'waste').forEach(r => {
+  STATE.exp.filter(r => SAVE_TYPES.indexOf(markOf(marks, recKey(r))) >= 0).forEach(r => {
     const k = r._subMerged || r._cat;
-    if (!wasteBySub[k]) wasteBySub[k] = { sub: k, cat: r._cat, amt: 0, n: 0 };
+    if (!wasteBySub[k]) wasteBySub[k] = { sub: k, cat: r._cat, amt: 0, n: 0, types: {} };
     wasteBySub[k].amt += r.amount; wasteBySub[k].n++;
+    const tv = markOf(marks, recKey(r));
+    wasteBySub[k].types[tv] = (wasteBySub[k].types[tv] || 0) + 1;
   });
   Object.values(wasteBySub).forEach(o => {
+    // 来源标签带上具体类别：已标个人置物 / 已标冲动消费 / 已标个人置物+冲动消费
+    const tks = Object.keys(o.types);
+    const src = tks.length > 1 ? '已标个人置物+冲动消费' : (tks[0] === 'impulse' ? '已标冲动消费' : '已标个人置物');
+    const tdesc = tks.map(t => `${markLabel(t)} ${o.types[t]} 笔`).join(' · ');
     out.push({
-      key: 'sub:' + o.sub, sub: o.sub, cat: o.cat, src: '已标浪费',
+      key: 'sub:' + o.sub, sub: o.sub, cat: o.cat, src: src,
       perYear: o.amt / spans, avg: o.amt / o.n, amt: o.amt, n: o.n,
-      detail: `你标记了 ${o.n} 笔`
+      detail: `你分类了 ${o.n} 笔（${tdesc}）`
     });
   });
 
@@ -1575,7 +2714,7 @@ function renderSaveTotal() {
      这不是预测，是把 ${cands.length} 个可压缩项各按设定的削减力度相乘的结果。实际能否省下取决于你的执行。</div>`;
 
   if (!cands.length) {
-    $('saveList').innerHTML = `<div class="empty"><div class="big">🎯</div>还没有识别到可压缩项<br>可以先到 ② 不该花的 里标几笔浪费</div>`;
+    $('saveList').innerHTML = `<div class="empty"><div class="big">🎯</div>还没有识别到可压缩项<br>可以先到 ② 高消费 里标几笔「个人置物」或「冲动消费」</div>`;
     return;
   }
 
@@ -1613,6 +2752,202 @@ function renderSaveTotal() {
 }
 
 /* =====================================================================
+ * 周度账观（第三层）
+ * ---------------------------------------------------------------------
+ * 数据源：同一个账本明细（IndexedDB 'ledger-p612' / kv.main），不引入任何外部数据文件。
+ *
+ * 口径说明（别和前两层混淆）：
+ *   前两层（钱去哪儿了 / 哪些能省）**只看支出**，收入被明确排除；
+ *   本层要回答「哪一周节奏出了问题」，所以**收入也算进来**（累计收入、零进账周）——
+ *   这是有意不同，不是算错。支出部分的口径与前两层完全一致。
+ *   本层用 STATE.raw（含所有年份），年份选择器会把不满足明细年门槛的年份挡掉。
+ * ===================================================================== */
+function weekBuckets() {
+  // 从 STATE.raw（全部账本记录）按 ISO 周聚合，与前两层同源
+  const map = new Map();
+  STATE.raw.forEach(r => {
+    if (!r || !r.date || !isFinite(+r.amount)) return;
+    const wk = isoWeek(r.date);
+    if (!wk) return;
+    let b = map.get(wk);
+    if (!b) {
+      // 该周首日（周一）作为区间起点
+      const [y, m, d] = r.date.split('-').map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      const dow = dt.getUTCDay() || 7;
+      dt.setUTCDate(dt.getUTCDate() - (dow - 1));
+      b = { key: wk, start: dt.toISOString().slice(0, 10), inc: 0, exp: 0, n: 0 };
+      map.set(wk, b);
+    }
+    if (r.type === 'in') b.inc += +r.amount;
+    else if (r.type === 'out') b.exp += +r.amount;
+    b.n++;
+  });
+  const D = [...map.values()].sort((a, b) => a.key < b.key ? -1 : 1);
+  D.forEach(b => { b.bal = Math.round((b.inc - b.exp) * 100) / 100; });
+  return D;
+}
+
+function renderWeek() {
+  const box = $('weekBody');
+  if (!box) return;
+
+  if (!STATE.raw.length) {
+    box.innerHTML = `<div class="dim" style="padding:18px 0;font-size:13.5px">账本里还没有记录，导入后这里会按周展示收支节奏。</div>`;
+    return;
+  }
+
+  const ALL = weekBuckets();
+  if (!ALL.length) {
+    box.innerHTML = `<div class="dim" style="padding:18px 0;font-size:13.5px">账本记录缺少可用日期，无法按周汇总。</div>`;
+    return;
+  }
+
+  // ---- 年份集合（供筛选器用）。与前两层同一份明细年口径（DETAIL_MIN 门槛）----
+  const yearCount = {};
+  STATE.raw.forEach(r => {
+    if (r && r.type === 'out' && r.date) {
+      const y = +r.date.slice(0, 4);
+      if (y) yearCount[y] = (yearCount[y] || 0) + 1;
+    }
+  });
+  const allYears = Object.keys(yearCount).map(Number).sort((a, b) => a - b);
+  // 排除每年仅 1 笔（或笔数≤ DETAIL_MIN）的汇总年：这类年份混进来只会是噪声
+  const usableYears = allYears.filter(y => yearCount[y] > DETAIL_MIN);
+
+  // 当前选择：优先明细年；若明细年为空则退回全部有记录的年（并给出提示）
+  const POOL = usableYears.length ? usableYears : allYears;
+  if (STATE.wkYear && !POOL.includes(STATE.wkYear)) STATE.wkYear = POOL[POOL.length - 1];
+  if (!STATE.wkYear) STATE.wkYear = POOL[POOL.length - 1];
+
+  // ISO 周跨年：把 2026-W01 归到起始日所在的自然年，避免"某年只有 2 周"
+  const D = ALL.filter(w => +w.start.slice(0, 4) === STATE.wkYear);
+
+  if (!D.length) {
+    box.innerHTML = `<div class="dim" style="padding:18px 0;font-size:13.5px">${STATE.wkYear} 年没有可展示的周记录。</div>`;
+    return;
+  }
+
+  const ti = D.reduce((s, w) => s + w.inc, 0);
+  const te = D.reduce((s, w) => s + w.exp, 0);
+  const tb = Math.round((ti - te) * 100) / 100;
+  const avgI = ti / D.length, avgE = te / D.length;
+  const negW = D.filter(w => w.bal < 0).length;
+  // 结余恰好为 0 的周既不算正也不算负 —— 表格里那行不着色，KPI 也要跟它一致，
+  // 否则「为正 N 周」会比表格里的绿色行数多，看着像两处算得不一样。
+  const posW = D.filter(w => w.bal > 0).length;
+  const zeroW = D.length - negW - posW;
+  const zeroInc = D.filter(w => !(w.inc > 0));
+  const span = `${D[0].start} ~ ${D[D.length - 1].start}`;
+  const maxAbs = D.reduce((m, w) => Math.max(m, Math.abs(w.bal)), 0) || 1;
+
+  const topExp = D.slice().sort((a, b) => b.exp - a.exp).slice(0, 3);
+  const topNeg = D.slice().sort((a, b) => a.bal - b.bal).slice(0, 3);
+  const m2 = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+
+  // 周结余柱：基线居中的发散柱（绿=结余为正向上，红=结余为负向下），按绝对值缩放
+  const HALF = 66;   // 单侧最大高度(px)
+  const bars = D.map(w => {
+    const h = Math.max(2, Math.round(Math.abs(w.bal) / maxAbs * HALF));
+    return `<div class="wk-col" title="${w.key}（${w.start} 起）｜收入 ¥${money(w.inc)}　支出 ¥${money(w.exp)}　结余 ¥${money(w.bal)}　${w.n} 笔">` +
+      `<div class="bar ${w.bal >= 0 ? 'p' : 'n'}" style="height:${h}px"></div></div>`;
+  }).join('');
+  // 轴标签：单年最多 53 周，仍需稀疏才不至于糊成一团 —— 每 5 周一个标签（整 10 周高亮）
+  const step = D.length > 40 ? 5 : D.length > 20 ? 4 : 2;
+  const axis = D.map((w, i) => {
+    const wk = w.key.split('-W')[1];
+    const show = (i % step === 0);
+    const strong = (i % (step * 2) === 0);
+    return `<span style="${show ? '' : 'visibility:hidden;'}font-weight:${strong ? 600 : 400};font-size:${strong ? 10.5 : 10}px">${wk}</span>`;
+  }).join('');
+
+  const rows = D.slice().reverse().map(w => {
+    const cls = w.bal > 0 ? 't-pos' : w.bal < 0 ? 't-neg' : '';
+    const ratio = avgE > 0 ? (w.exp / avgE * 100) : 0;
+    return `<tr>
+      <td>${w.key.replace('-W', ' 年第 ')} 周</td>
+      <td style="text-align:left" class="dim">${w.start.slice(5).replace('-', '/')} 起</td>
+      <td class="${w.inc > 0 ? 't-pos' : 'dim'}">${w.inc > 0 ? '¥' + money(w.inc) : '—'}</td>
+      <td>¥${money(w.exp)}</td>
+      <td>${ratio > 0 ? `<span class="dim">${Math.round(ratio)}%</span>` : ''}</td>
+      <td class="${cls}" style="font-weight:600">${w.bal >= 0 ? '+' : '−'}${money(Math.abs(w.bal))}</td>
+    </tr>`;
+  }).join('');
+
+  const topExpLine = arr => arr.map(w => `${w.key}（¥${money(w.exp)}）`).join('、');
+  const topNegLine = arr => arr.map(w => `${w.key}（¥${money(w.bal)}）`).join('、');
+  const zeroLine = zeroInc.slice(0, 6).map(w => w.key).join('、');
+
+  // 年份筛选按钮（只列合格年，标明被排除的数量）
+  const yBtns = POOL.map(y => {
+    const n = yearCount[y];
+    const bad = n <= DETAIL_MIN;
+    return `<button data-wy="${y}" class="${y === STATE.wkYear ? 'on' : ''}" title="${bad ? `仅 ${n} 笔，低于 ${DETAIL_MIN} 笔门槛` : `支出 ${n} 笔`}">${y}${bad ? ' ⚠' : ''}</button>`;
+  }).join('');
+
+  const warnBar = usableYears.length ? '' :
+    `<div class="wk-note" style="margin-bottom:14px;background:#fff4f4">
+      ⚠️ 没有一年达到「支出笔数 &gt; ${DETAIL_MIN} 笔」门槛，已退化为按<strong>全部有记录的年份</strong>展示。
+    </div>`;
+
+  box.innerHTML = `
+    ${warnBar}
+    <div class="wk-yearrow">
+      <span class="dim">选择年份：</span>
+      <div class="seg" id="segWkYear">${yBtns}</div>
+      <span class="dim">${usableYears.length
+        ? `已排除 ${allYears.length - usableYears.length} 个笔数不足 ${DETAIL_MIN} 笔的汇总年`
+        : `共 ${allYears.length} 个年份`}</span>
+    </div>
+
+    <div class="wk-kpis">
+      <div class="wk-kpi"><div class="k">${STATE.wkYear} 年周数</div><div class="v">${D.length}</div>
+        <div class="x">${span} 起</div></div>
+      <div class="wk-kpi"><div class="k">累计收入</div><div class="v pos">¥${money(ti)}</div>
+        <div class="x">周均 ¥${money(avgI)}</div></div>
+      <div class="wk-kpi"><div class="k">累计支出</div><div class="v">¥${money(te)}</div>
+        <div class="x">周均 ¥${money(avgE)}</div></div>
+      <div class="wk-kpi"><div class="k">累计结余</div><div class="v ${m2(tb)}">${tb >= 0 ? '+' : '−'}${money(Math.abs(tb))}</div>
+        <div class="x">${tb >= 0 ? '整体为正' : '整体为负'}</div></div>
+      <div class="wk-kpi"><div class="k">结余为负周</div><div class="v ${negW ? 'neg' : ''}">${negW}</div>
+        <div class="x">为正 ${posW} 周${zeroW ? ` · 持平 ${zeroW} 周` : ''} · 占比 ${Math.round(negW / D.length * 100)}%</div></div>
+      <div class="wk-kpi"><div class="k">零收入周</div><div class="v ${zeroInc.length ? 'neg' : ''}">${zeroInc.length}</div>
+        <div class="x">完全没有进账的周</div></div>
+    </div>
+
+    <div class="sub" style="margin-bottom:10px">周结余走势 <span class="dim">（绿=结余为正，红=结余为负，柱高按绝对值缩放；柱下为 ISO 周序号，横向可滚动）</span></div>
+    <div class="wk-scroll" id="wkScroll">
+      <div class="wk-chart">${bars}</div>
+      <div class="wk-axis" id="wkAxis">${axis}</div>
+    </div>
+
+    <div class="wk-note" style="margin-bottom:18px">
+      <b>读到的几件事：</b><br>
+      · 支出峰值 —— ${topExpLine(topExp)}；最深的亏空在 ${topNegLine(topNeg)}。<br>
+      · ${zeroInc.length} 周完全没有进账${zeroLine ? `（${zeroLine}${zeroInc.length > 6 ? ' 等' : ''}）` : ''}，这些周的支出全部由往期结余承担，是现金流最紧的地方。<br>
+      · ${negW} / ${D.length} 周结余为负${negW / D.length > 0.6 ? '，超六成周都在动用存量' : ''}。
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>周</th><th style="text-align:left">起始</th>
+          <th>收入</th><th>支出</th><th>相对周均</th><th>结余</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="sub" style="margin-top:10px">仅显示 ${STATE.wkYear} 年 · 表格按周倒序（最新在上）。「相对周均」= 该周支出 ÷ 该年周均支出 × 100%。周序号为 ISO 周（周一为一周之始），归属到该周周一所在的自然年。</div>`;
+
+  // 年份切换
+  const seg = $('segWkYear');
+  if (seg) seg.querySelectorAll('button').forEach(b => {
+    b.onclick = () => { STATE.wkYear = +b.dataset.wy; renderWeek(); };
+  });
+  // 图表与轴共用同一滚动容器，天然对齐，无需 JS 同步
+}
+
+/* =====================================================================
  * 十二、交互绑定
  * ===================================================================== */
 function switchLayer(l) {
@@ -1620,7 +2955,10 @@ function switchLayer(l) {
   $('layers').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.layer === l));
   $('layerWhere').hidden = (l !== 'where');
   $('layerSave').hidden = (l !== 'save');
+  $('layerWeek').hidden = (l !== 'week');
   if (l === 'save' && STATE.saveTab === 'total') renderSaveTotal();
+  // 周度层与前两层同源，改的是聚合维度，不需要单独加载数据
+  if (l === 'week') renderWeek();
 }
 function switchSaveTab(t) {
   STATE.saveTab = t;
@@ -1629,7 +2967,7 @@ function switchSaveTab(t) {
   $('tabWaste').hidden = (t !== 'waste');
   $('tabTotal').hidden = (t !== 'total');
   if (t === 'multi') renderMulti();
-  else if (t === 'waste') renderWaste();
+  else if (t === 'waste') { renderWaste(); refreshMarkLockUI(); }
   else renderSaveTotal();
 }
 
@@ -1645,8 +2983,13 @@ function bindEvents() {
       STATE.grain = b.dataset.g;
       // 年/周粒度本身已是单年或全量口径，清掉单年选择避免残留误导
       if (STATE.grain !== 'quarter' && STATE.grain !== 'month') STATE.matYear = 0;
+      // 换粒度后原来下钻的分类在新作用域里可能根本不存在 ——
+      // 那时矩阵里找不到对应行，用户就没有任何入口把下钻卡片关掉了。
+      // 所以这里直接收起下钻（renderSub 会重画）。
+      STATE.drillCat = null;
       $('segGrain').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
       renderMatrix();
+      renderSub();
     };
   });
   $('chkRaw').onchange = (e) => { STATE.rawSub = e.target.checked; renderSub(); };
@@ -1657,6 +3000,8 @@ function bindEvents() {
     STATE.thr = +thr.value;
     cfgSet('thr', STATE.thr);
     renderBig();
+    // 高消费区门槛若处于「跟随」状态，跟着变（两处口径始终一致）
+    if (STATE.wasteMin === null || STATE.wasteMin === undefined) renderWaste();
   };
   $('thrQuick').querySelectorAll('button').forEach(b => {
     b.onclick = () => {
@@ -1664,6 +3009,7 @@ function bindEvents() {
       cfgSet('thr', STATE.thr);
       thr.value = STATE.thr;
       renderBig();
+      if (STATE.wasteMin === null || STATE.wasteMin === undefined) renderWaste();
     };
   });
   $('segBigSort').querySelectorAll('button').forEach(b => {
@@ -1674,13 +3020,85 @@ function bindEvents() {
     };
   });
 
-  $('segWastePage').querySelectorAll('button').forEach(b => {
+  // ---- 高消费区金额门槛（默认跟随大额清单阈值）----
+  const wmr = $('wasteMinRange');
+  wmr.oninput = () => {
+    const v = +wmr.value;
+    // 滑到 0 = 全部（不过滤）
+    // **数值等于大额清单阈值时就保持「跟随」** —— 否则用户只是碰了一下滑块
+    // （甚至用方向键 +50 又 -50 回到原位）就永久切断了联动，
+    // 而两边显示的数字一模一样，用户根本看不出自己已经切断了。
+    if (v > 0 && v === STATE.thr) {
+      if (STATE.wasteMin !== null && STATE.wasteMin !== undefined) {
+        STATE.wasteMin = null;
+        cfgSet('wasteMin', null);
+      }
+    } else {
+      STATE.wasteMin = v;
+      cfgSet('wasteMin', v);
+    }
+    STATE.wastePage = 1;
+    // **rAF 节流** —— input 事件在拖动时按帧触发，但一帧内来十几个 input
+    // 就会把整张账单重算十几遍。合并到下一帧渲染一次就够了。
+    scheduleWasteRender();
+  };
+  $('wasteMinQuick').querySelectorAll('button').forEach(b => {
     b.onclick = () => {
-      STATE.wastePageN = +b.dataset.n;
+      const v = +b.dataset.v;
+      // 点大额清单当前阈值那一档 → 恢复「跟随」（两处数值一样就该是联动的）
+      if (v > 0 && v === STATE.thr) {
+        STATE.wasteMin = null;
+        cfgSet('wasteMin', null);
+      } else {
+        STATE.wasteMin = v;
+        cfgSet('wasteMin', v);
+      }
+      STATE.wastePage = 1;
       renderWaste();
     };
   });
-  $('chkWasteHideMarked').onchange = (e) => { STATE.wasteHideMarked = e.target.checked; renderWaste(); };
+  $('wasteMinFollow').onclick = () => {
+    STATE.wasteMin = null;
+    cfgSet('wasteMin', null);
+    renderWaste();
+  };
+
+  $('segWastePage').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.wastePageN = +b.dataset.n;
+      STATE.wastePage = 1;      // 每页条数变了，回到第一页（否则可能停在越界页）
+      renderWaste();
+    };
+  });
+  // 两个勾选框互斥：勾上「仅显示已标记」自动取消「隐藏已标记」，反之亦然；都不勾 = 显示全部
+  $('chkWasteHideMarked').onchange = (e) => {
+    STATE.wasteHideMarked = e.target.checked;
+    if (e.target.checked) {
+      STATE.wasteOnlyMarked = false;
+      $('chkWasteOnlyMarked').checked = false;
+      STATE.wasteType = '';         // 隐藏已标记时类型筛选无意义（那一类全被藏了）
+    }
+    STATE.wastePage = 1;
+    renderWaste();
+  };
+  $('chkWasteOnlyMarked').onchange = (e) => {
+    STATE.wasteOnlyMarked = e.target.checked;
+    if (e.target.checked) {
+      STATE.wasteHideMarked = false;
+      $('chkWasteHideMarked').checked = false;
+    }
+    if (!e.target.checked) STATE.wasteType = '';   // 取消「仅显示已标记」→ 类型筛选一起清掉
+    STATE.wastePage = 1;
+    renderWaste();
+  };
+  // 标记类型筛选按钮：只看那一类
+  $('wasteTypeQuick').querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      STATE.wasteType = b.dataset.t || '';
+      STATE.wastePage = 1;
+      renderWaste();
+    };
+  });
 
   $('btnReload').onclick = () => load(true);
 }
@@ -1699,9 +3117,19 @@ async function load(manual) {
 
   if (!led.ok || !led.n) {
     $('cardEmpty').hidden = false;
-    ['cardOverview', 'baseline', 'layers', 'layerWhere', 'layerSave'].forEach(id => { if ($(id)) $(id).hidden = true; });
+    // 三个图层同源（都读账本明细），所以账本为空时三层都不可用，
+    // 但仍保留导航，让用户能直接看到空态说明而不是一个空白页。
+    ['cardOverview', 'baseline', 'layerWhere', 'layerSave'].forEach(id => { if ($(id)) $(id).hidden = true; });
+    $('layers').hidden = false;
+    // **必须清掉上一轮的数据** —— 否则 STATE.raw 还是上次的账单，
+    // 周度层会继续画出一份标注着旧年份的完整图表，和状态栏「读到 0 条记录」直接打架。
+    STATE.raw = []; STATE.exp = []; STATE.years = [];
+    STATE.income = { n: 0, amt: 0 };
+    CS = null;
+    switchLayer('week');
     st.className = 'status warn';
-    st.textContent = led.ok ? `读到 0 条记录${led.warn ? `（跳过 ${led.warn} 条格式异常）` : ''}` : '未找到账本数据';
+    st.textContent = (led.ok ? `读到 0 条记录${led.warn ? `（跳过 ${led.warn} 条格式异常）` : ''}` : '未找到账本数据') +
+      ' · 三层分析均基于账本明细，导入后即可使用';
     return;
   }
   $('cardEmpty').hidden = true;
@@ -1716,11 +3144,23 @@ async function load(manual) {
     $('cardEmpty').hidden = false;
     $('cardEmpty').querySelector('h2').textContent = '明细年数据不足';
     $('cardEmpty').querySelector('.empty').innerHTML =
-      `账本里的支出记录不足，无法分析。<br>共读到 ${led.n} 条记录，其中可用于分类分析的明细年支出为 0 笔。`;
+      `账本里的支出记录不足，无法分析。<br>共读到 ${led.n} 条记录，其中可用于分类分析的明细年支出为 0 笔` +
+      `（口径：某个自然年的支出笔数需大于 ${DETAIL_MIN} 笔才算明细年，年度汇总数不计入）。`;
+    // 注意：这里**不能清 STATE.raw** —— 账本其实有记录（led.n > 0），
+    // 只是不满足「明细年」门槛。周度层用的是原始账本（raw），
+    // 它看的是「哪一周节奏出问题」，本来就不该受明细年门槛约束。
+    // preprocess() 已经把 STATE.raw 更新成本次读到的数据了，不会残留上一轮。
+    STATE.exp = []; STATE.years = [];
+    STATE.income = { n: 0, amt: 0 };
     st.className = 'status warn';
-    st.textContent = '没有可分析的明细年支出';
+    st.textContent = `没有可分析的明细年支出（明细年门槛：> ${DETAIL_MIN} 笔/年）`;
     return;
   }
+
+  // 旧版标记键（uid）→ 内容指纹，一次性迁移，保留已有判断
+  const migrated = migrateLegacyMarks();
+  // 清理已废弃的旧两类标记值（确实浪费 / 正常必需）
+  const purged = purgeInvalidMarks();
 
   CS = catSummary();
   renderOverview();
@@ -1730,6 +3170,15 @@ async function load(manual) {
   renderBig();
   renderMulti();
   renderSaveTotal();
+  if (STATE.layer === 'week') renderWeek();   // 周度层同源，账本重算后同步刷新
+  refreshMarkSyncUI();
+  // 启动时静默拉一次云端标记（配置了 Token 才拉）—— 这是「换设备能看到」的关键
+  if (ghReady()) {
+    pullMarksFromCloud(true)
+      .then(n => { if (n) setSyncMsg(`✓ 已从云端同步 ${n} 条标记`, 'ok'); })
+      .catch(() => { /* 静默失败不打扰：本机标记照常可用 */ });
+  }
+  if (migrated) { /* 迁移已静默完成 */ }
 
   const d = STATE.lastUpdatedAt ? new Date(STATE.lastUpdatedAt) : null;
   const ds = (d && !isNaN(d)) ? d.toLocaleString('zh-CN', { hour12: false }) : '未知';
@@ -1760,6 +3209,11 @@ document.addEventListener('visibilitychange', () => {
   STATE.grain = cfgGet('grain', 'year');
   STATE.sortKey = cfgGet('sortKey', 'amt');
   STATE.thr = isFinite(cfgGet('thr', 200)) ? cfgGet('thr', 200) : 200;
+  // 高消费区金额门槛：null = 跟随大额清单阈值（默认）；数字 = 独立设定
+  {
+    const wm = cfgGet('wasteMin', null);
+    STATE.wasteMin = (wm === null || wm === undefined) ? null : (+wm || 0);
+  }
   STATE.bigSort = cfgGet('bigSort', 'date');
   $('segGrain').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.g === STATE.grain));
   $('segBigSort').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === STATE.bigSort));

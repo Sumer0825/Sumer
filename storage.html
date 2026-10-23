@@ -476,6 +476,73 @@ const del = (name, id) => new Promise((res, rej) => { const r = st(name, "readwr
 const uid = () => Date.now() + "-" + Math.random().toString(36).slice(2, 7);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[m]));
 
+/* ---------- 外部数据入库校验（云端同步 / JSON 导入共用）----------
+   背景：这三条路径原本把整个对象原样 put 进 IndexedDB，
+   于是仓库文件或导入文件里的任意字符串都能进到渲染层。
+   渲染层虽然已全部 esc，但「入库即校验」才是根因修复：
+   只接受我们真正需要的字段、只放行安全的图片协议、限制文本长度。 */
+const MAX_TXT = 200;     // name / qty 上限
+const MAX_NOTE = 2000;   // note 上限
+
+/* 图片 URL 协议白名单 —— 只放行 data: / blob: / https:。
+ * javascript: 伪协议能直接执行脚本，必须挡掉；
+ * http: 在 https 页面里属于混合内容，会被浏览器直接拦掉，意义不大，故不放行。 */
+function safeImgUrl(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (/^data:image\/(png|jpe?g|gif|webp|avif|bmp);base64,/i.test(s)) return s;
+  if (/^blob:/i.test(s)) return s;
+  if (/^https:\/\//i.test(s)) return s;
+  return '';
+}
+const clampTxt = (s, n) => String(s == null ? '' : s).slice(0, n);
+
+/* 单条物品的清洗：返回 null 表示这条数据非法，直接丢弃 */
+function sanitizeItem(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  if (!id) return null;
+  return {
+    id,
+    levelId: typeof raw.levelId === 'string' ? raw.levelId.slice(0, 120) : '',
+    name: clampTxt(raw.name, MAX_TXT),
+    qty: clampTxt(raw.qty, MAX_TXT),
+    note: clampTxt(raw.note, MAX_NOTE),
+    url: safeImgUrl(raw.url),
+    src: (raw.src === 'github' || raw.src === 'local') ? raw.src : '',
+    createdAt: Number.isFinite(raw.createdAt) ? raw.createdAt : (raw.createdAt ? Date.parse(raw.createdAt) || Date.now() : Date.now()),
+  };
+}
+function sanitizeLoc(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  if (!id) return null;
+  return { id, name: clampTxt(raw.name, MAX_TXT), order: Number.isFinite(raw.order) ? raw.order : 0 };
+}
+function sanitizeLevel(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  if (!id) return null;
+  return {
+    id,
+    locId: typeof raw.locId === 'string' ? raw.locId.slice(0, 120) : '',
+    name: clampTxt(raw.name, MAX_TXT),
+    order: Number.isFinite(raw.order) ? raw.order : 0,
+  };
+}
+
+/* 批量入库：逐条校验，非法条目跳过并计数，返回 {n, bad} */
+async function importStore(name, list, sanitizeFn) {
+  let n = 0, bad = 0;
+  if (!Array.isArray(list)) return { n, bad };
+  for (const raw of list) {
+    const o = sanitizeFn(raw);
+    if (!o) { bad++; continue; }
+    await put(name, o);
+    n++;
+  }
+  return { n, bad };
+}
+
 /* ---------- GitHub 图片上传 ----------
    说明：上传物品图片会写入仓库 images/ 文件夹（需已配置 Token）。
    Token 与仓库信息由页面右下角 ⚙ 同步面板填入并存在 localStorage，本代码不写默认值。 */
@@ -614,8 +681,8 @@ function renderSidebar() {
 
 function toggleSidebar(force) {
   sbCollapsed = (force === true) ? false : (force === false ? true : !sbCollapsed);
-  localStorage.setItem("storage_sb_collapsed", sbCollapsed ? "1" : "0");
-  localStorage.setItem("storage_sb_user", "1");
+  safeSet("storage_sb_collapsed", sbCollapsed ? "1" : "0");
+  safeSet("storage_sb_user", "1");
   $("sidebar").classList.add("user-toggled");
   render();
 }
@@ -676,9 +743,12 @@ function renderContent() {
 }
 
 function itemRow(i) {
-  const thumb = i.url ? `<div class="ithumb"><img src="${i.url}" alt="" /></div>` : `<div class="ithumb">📷</div>`;
+  // **url 必须转义并限协议** —— 它进的是 src 属性，
+  // 含引号就能闭合属性注入 onerror=。而 url 来自云端同步/JSON 导入，
+  // 那两条路径原本零校验整个对象入库。
+  const thumb = i.url ? `<div class="ithumb"><img src="${esc(safeImgUrl(i.url))}" alt="" /></div>` : `<div class="ithumb">📷</div>`;
   const dateStr = i.createdAt ? new Date(i.createdAt).toISOString().slice(0, 10) : '';
-  return `<div class="irow" data-id="${i.id}">
+  return `<div class="irow" data-id="${esc(i.id)}">
       ${thumb}
       <div class="info">
         <div class="nm">${esc(i.name || "未命名")}</div>
@@ -686,16 +756,16 @@ function itemRow(i) {
         ${dateStr ? `<div class="created">📅 ${dateStr}</div>` : ""}
         ${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}
       </div>
-      <button class="edit-x" data-edit="${i.id}">编辑</button>
-      <button class="del-x" data-del="${i.id}">删除</button>
+      <button class="edit-x" data-edit="${esc(i.id)}">编辑</button>
+      <button class="del-x" data-del="${esc(i.id)}">删除</button>
     </div>`;
 }
 
 function itemCard(i) {
   const thumb = i.url
-    ? `<img class="thumb" src="${i.url}" alt="" />`
+    ? `<img class="thumb" src="${esc(safeImgUrl(i.url))}" alt="" />`
     : `<div class="thumb"><span class="ph-icon">📷</span><span class="ph-txt">暂无图片</span></div>`;
-  return `<div class="item" data-id="${i.id}">
+  return `<div class="item" data-id="${esc(i.id)}">
       ${thumb}
       <div class="im">
         <div class="nm">${esc(i.name || "未命名")}</div>
@@ -790,7 +860,7 @@ function openItemModal(levelId, editId) {
       $("itemName").value = it.name || "";
       $("itemQty").value = it.qty || "";
       $("itemNote").value = it.note || "";
-      if (it.url) { $("itemPreview").src = it.url; $("itemPreview").style.display = "block"; uz.classList.add("hasimg"); }
+      if (it.url) { $("itemPreview").src = safeImgUrl(it.url); $("itemPreview").style.display = "block"; uz.classList.add("hasimg"); }
     }
     $("itemTitle").textContent = `编辑物品 · ${L ? L.name : ""}`;
   } else {
@@ -868,6 +938,7 @@ $("itemFile").onchange = (e) => { if (e.target.files[0]) readItemFile(e.target.f
 ["dragleave","drop"].forEach(ev => $("upzone").addEventListener(ev, e => { e.preventDefault(); $("upzone").classList.remove("drag"); }));
 $("upzone").addEventListener("drop", e => { if (e.dataTransfer.files[0]) readItemFile(e.dataTransfer.files[0]); });
 function readItemFile(file) {
+  if (!checkFileSize(file, MAX_IMAGE_BYTES, '图片')) return;
   if (!file.type.startsWith("image/")) return alert("请选择图片");
   const r = new FileReader();
   r.onload = () => { itemFileData = r.result; const p = $("itemPreview"); p.src = r.result; p.style.display = "block"; $("upzone").classList.add("hasimg"); };
@@ -888,7 +959,7 @@ function openView(id) {
 function showView() {
   const it = viewList[viewIndex];
   if (!it) return;
-  $("viewImg").src = it.url || "";
+  $("viewImg").src = safeImgUrl(it.url) || "";
   $("viewImg").style.display = it.url ? "block" : "none";
   $("viewName").textContent = it.name || "未命名";
   $("viewCat").textContent = `${esc(it._loc)} · ${esc(it._lvl)}`;
@@ -913,7 +984,64 @@ document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => $(b.dat
 
 /* ====================== GitHub 同步（与 weight/budget/time 一致机制） ====================== */
 const GH_KEY = 'storage_gh_cfg_v1';
+
+/* ---------- 导入文件大小上限（低危 #15）----------
+   原版对导入文件不设上限，一个几百 MB 的 Excel 会让
+   await file.text() / SheetJS 解析长时间占住主线程，页面直接假死。
+   这里按类型给出上限并给用户明确提示。 */
+const MAX_IMPORT_BYTES = 20 * 1024 * 1024;   // 表格/JSON 导入：20MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;     // 图片：8MB
+function checkFileSize(file, max, label) {
+  if (!file) return false;
+  if (file.size > max) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    const lim = (max / 1024 / 1024).toFixed(0);
+    const msg = `${label}文件过大（${mb} MB），上限 ${lim} MB。请拆分后再导入。`;
+    if (typeof toast === 'function') toast('⚠️ ' + msg);
+    else if (typeof alert === 'function') alert(msg);
+    else console.warn(msg);
+    return false;
+  }
+  return true;
+}
+
+
+/* ---------- localStorage 安全写入（低危 #18）----------
+   隐私模式 / 配额满 / 存储被禁用时 setItem 会抛 QuotaExceededError。
+   原版在若干处直接裸调 setItem，异常会中断后面的逻辑
+   （最坏情况：Token 存失败但界面已显示「已连接」）。
+   统一走 safeSet：吞掉异常并返回是否成功。 */
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch (e) {
+    console.error('localStorage 写入失败：' + k, e);
+    return false;
+  }
+}
+
+
+/* ---------- 同步路径白名单（中危 #11 / 低危 #19）----------
+   GH.path 会直接进 GitHub contents API 的 PUT 请求。
+   若允许任意值，一次误填就能覆盖仓库里任意文件 —— 包括别的工具的数据文件、
+   甚至账本原件，而用户以为「我只是改了个保存路径」。
+   规则：① 必须在 data/ 目录下；② 不得含 .. ；③ 文件名不得撞其它工具的保留文件。
+   越界时静默回落到本页默认路径，并提示用户。 */
+const GH_RESERVED = [
+  'data/ledger.json', 'data/storage.json', 'data/time.xlsx', 'data/daily.xlsx',
+  'data/weight.xlsx', 'data/budget.xlsx',
+  'data/analysis-marks.json', 'data/analysis-marks-v2.json', 'data/marks.json',
+];
+function sanitizeGhPath(p, fallback) {
+  const v = String(p == null ? '' : p).trim();
+  if (!v) return fallback;
+  if (v.indexOf('..') >= 0 || v.charAt(0) === '/' || v.indexOf('\\') >= 0) return fallback;
+  if (!/^data\/[A-Za-z0-9._\-\/]+\.(json|xlsx|csv|txt|md|pdf)$/i.test(v)) return fallback;
+  if (GH_RESERVED.indexOf(v) >= 0 && v !== fallback) return fallback;
+  return v;
+}
+
 let GH = (() => { try { return JSON.parse(localStorage.getItem(GH_KEY) || 'null') || {}; } catch (_) { return {}; } })();
+GH.path = sanitizeGhPath(GH.path, 'data/storage.json');   // 旧配置的越界路径在此被拦下
 GH = Object.assign({ token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/storage.json', sha: null }, GH);
 const ghReady = () => !!(GH.token && !/^YOUR|^ghp_xxxx/i.test(GH.token));
 
@@ -986,7 +1114,7 @@ function scheduleAutoPush() {
       }
       const msg = `更新清居置物箱 ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
       await ghPutFile(JSON.stringify(snapshot, null, 2), msg);
-      localStorage.setItem(GH_KEY, JSON.stringify(GH));
+      safeSet(GH_KEY, JSON.stringify(GH));
       setSyncMsg(`✓ 已自动同步到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
     } catch (e) {
       setSyncMsg('自动同步失败：' + e.message, 'err');
@@ -1114,10 +1242,10 @@ $('gh-connect').onclick = async () => {
     owner: $('gh-owner').value.trim() || 'sumer0825',
     repo: $('gh-repo').value.trim() || 'Sumer',
     branch: $('gh-branch').value.trim() || 'main',
-    path: $('gh-path').value.trim() || 'data/storage.json',
+    path: sanitizeGhPath($('gh-path').value.trim(), 'data/storage.json'),
     sha: null
   };
-  localStorage.setItem(GH_KEY, JSON.stringify(GH));
+  safeSet(GH_KEY, JSON.stringify(GH));
   refreshSyncUI();
   setSyncMsg('连接中…');
   try {
@@ -1135,11 +1263,12 @@ $('gh-connect').onclick = async () => {
       const ok = confirm(`已连接到 GitHub。\n\n仓库现有数据：${data.locations?.length || 0} 个位置 / ${data.items?.length || 0} 件物品。\n\n是否将仓库数据导入本机？（选「取消」则保留本机数据，下次改动时会自动推到仓库）`);
       if (ok) {
         await clearAll();
-        if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
-        if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
-        if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+        const rLoc = await importStore('locations', data.locations, sanitizeLoc);
+        const rLvl = await importStore('levels', data.levels, sanitizeLevel);
+        const rItm = await importStore('items', data.items, sanitizeItem);
         await load();
-        setSyncMsg(`✓ 已保存配置 + 从仓库拉取：${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品`, 'ok');
+        const badN = rLoc.bad + rLvl.bad + rItm.bad;
+        setSyncMsg(`✓ 已保存配置 + 从仓库拉取：${rLoc.n} 位置 / ${rItm.n} 物品${badN ? `（已跳过 ${badN} 条非法数据）` : ''}`, 'ok');
       } else {
         setSyncMsg(`✓ 已保存配置，保留本机数据。下次改动时会自动推到仓库。`, 'ok');
       }
@@ -1174,7 +1303,7 @@ $('sync-now-btn').onclick = async () => {
       return;
     }
     await ghPutFile(JSON.stringify(snapshot, null, 2), '更新清居置物箱 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
-    localStorage.setItem(GH_KEY, JSON.stringify(GH));
+    safeSet(GH_KEY, JSON.stringify(GH));
     setSyncMsg(`✓ 已推到仓库：${snapshot.locations.length} 位置 / ${snapshot.items.length} 物品 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
   } catch (e) {
     setSyncMsg('推送失败：' + e.message, 'err');
@@ -1196,16 +1325,18 @@ $('export-json-btn').onclick = async () => {
 };
 $('import-json-input').onchange = async (e) => {
   const file = e.target.files[0]; if (!file) return;
+  if (!checkFileSize(file, MAX_IMPORT_BYTES, 'JSON')) { e.target.value = ''; return; }
   try {
     const txt = await file.text();
     const data = JSON.parse(txt);
     if (!confirm(`将导入文件覆盖本机 IndexedDB？\n\n${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品。\n（不影响 GitHub 仓库）`)) { e.target.value = ''; return; }
     await clearAll();
-    if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
-    if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
-    if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+    const rLoc = await importStore('locations', data.locations, sanitizeLoc);
+    const rLvl = await importStore('levels', data.levels, sanitizeLevel);
+    const rItm = await importStore('items', data.items, sanitizeItem);
     await load();
-    setSyncMsg(`✓ 已导入：${data.locations?.length || 0} 位置 / ${data.levels?.length || 0} 层 / ${data.items?.length || 0} 物品`, 'ok');
+    const badN = rLoc.bad + rLvl.bad + rItm.bad;
+    setSyncMsg(`✓ 已导入：${rLoc.n} 位置 / ${rLvl.n} 层 / ${rItm.n} 物品${badN ? `（已跳过 ${badN} 条非法数据）` : ''}`, 'ok');
   } catch (err) { setSyncMsg('导入失败：' + err.message, 'err'); }
   e.target.value = '';
 };
@@ -1315,11 +1446,12 @@ openDB().then(async () => {
         // 仅当云端数据明显多于本地时（避免误覆盖本机最近改动），自动合并
         if (cloudCount > localCount) {
           await clearAll();
-          if (Array.isArray(data.locations)) for (const l of data.locations) await put('locations', l);
-          if (Array.isArray(data.levels)) for (const l of data.levels) await put('levels', l);
-          if (Array.isArray(data.items)) for (const l of data.items) await put('items', l);
+          const rLoc = await importStore('locations', data.locations, sanitizeLoc);
+          const rLvl = await importStore('levels', data.levels, sanitizeLevel);
+          const rItm = await importStore('items', data.items, sanitizeItem);
           await load();
-          setSyncMsg(`✓ 启动时从仓库拉取：${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品`, 'ok');
+          const badN = rLoc.bad + rLvl.bad + rItm.bad;
+          setSyncMsg(`✓ 启动时从仓库拉取：${rLoc.n} 位置 / ${rItm.n} 物品${badN ? `（已跳过 ${badN} 条非法数据）` : ''}`, 'ok');
         } else {
           setSyncMsg(`已连接 GitHub（云端 ${data.locations?.length || 0} 位置 / ${data.items?.length || 0} 物品，本机 ${localCount} 条）`, '');
         }
@@ -1341,6 +1473,6 @@ openDB().then(async () => {
   }
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v26</div>
+<div class="ver">v27</div>
 </body>
 </html>

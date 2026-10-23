@@ -26,6 +26,16 @@
   .note b{color:#8a6420}
   .note ol{margin:7px 0 0;padding-left:19px}
   .note li{margin:4px 0}
+  .chg{margin-top:22px;background:#f7f6fd;border:1px solid #e6e3f0;border-radius:11px;padding:16px 18px}
+  .chg h2{font-size:13px;margin:0 0 11px;color:#5a5270;letter-spacing:.3px}
+  .chg ul{margin:0;padding:0;list-style:none}
+  .chg li{font-size:12.8px;color:#4a4560;line-height:1.6;margin-bottom:7px;
+          padding-left:15px;position:relative}
+  .chg li:last-child{margin-bottom:0}
+  .chg li::before{content:'';position:absolute;left:0;top:8px;width:5px;height:5px;
+                  border-radius:50%;background:#9b8fd0}
+  .chg .tag{display:inline-block;font-size:10.5px;font-weight:700;color:#5a4fb0;
+            background:#ece9f9;border-radius:4px;padding:1px 6px;margin-right:7px;vertical-align:1px}
   .tip{margin-top:14px;font-size:12px;color:#a09aae;text-align:center}
 </style>
 </head>
@@ -35,23 +45,85 @@
   <div class="sub">GitHub Pages 整包覆盖上传用</div>
 
   <div class="pkg">
-    <div class="nm">sumer-pages-v71.zip</div>
-    <div class="meta">🆕 最新 v45：28 个文件 · 已移除「年度总账」· 账单透视镜收入口径说明</div>
+    <div class="nm" id="nm">sumer-pages-v94.zip</div>
+    <div class="meta" id="meta">🆕 最新 v94：33 个文件 · 1730 KB</div>
   </div>
 
-  <a class="btn" href="/dl" download="sumer-pages-v71.zip">⬇ 下载 sumer-pages-v71.zip</a>
+  <a class="btn" id="dl" href="/dl" download="sumer-pages-v94.zip">⬇ 下载 sumer-pages-v94.zip</a>
+
+  <div class="chg">
+    <h2>本次更新</h2>
+    <ul id="chg">
+      <li><span class=tag>安全</span>标记文件路径白名单：原先填「data/ledger.json」就能直接覆盖账本原件（不可逆丢数据），现只允许写三个标记文件，越界自动改回并提示</li>
+      <li><span class=tag>安全</span>收支记录器、体重记录器补上 HTML 转义函数：备注列里放一行标签就能在渲染历史时执行脚本（同源页面的 GitHub Token 就在浏览器里）</li>
+      <li><span class=tag>安全</span>物品柜的图片地址加协议白名单（只放行 data:/blob:/https:），挡住能直接执行脚本的伪协议</li>
+      <li><span class=tag>安全</span>物品柜、时光记录器的外部数据入库前逐条校验（字段白名单 + 长度上限），云端同步与 JSON 导入不再整包塞进数据库</li>
+      <li><span class=tag>安全</span>体重记录的时段字段加白名单（早/中/晚），旧数据里的异常值自动降级</li>
+      <li><span class=tag>安全</span>六个工具的云端同步路径加白名单：只能写 data/ 目录，且不能覆盖别的工具的数据文件或账本原件</li>
+      <li><span class=tag>安全</span>Service Worker 清理缓存时只删本应用自己的缓存，不再连带清掉同域下其它站点的缓存</li>
+      <li><span class=tag>安全</span>第三方库（SheetJS）改为独立带版本号的缓存，发新版不会继续命中旧库</li>
+      <li><span class=tag>安全</span>体重记录器的配置键改为独立命名空间，不再与其它工具共用同一个键</li>
+      <li><span class=tag>修复</span>导入文件加大小上限（表格 20MB / 图片 8MB），超大文件不再卡死页面</li>
+      <li><span class=tag>修复</span>浏览器存储写满时给出明确提示，不再静默丢数据</li>
+      <li><span class=tag>修复</span>本机数据格式损坏时不再直接显示为空，原始内容会备份到带 _corrupt 后缀的键里，可手工找回</li>
+      <li><span class=tag>新增</span>高消费补上翻页器：原先「每页 30/60/120」只是硬截断，超出的记录直接看不到；现在有首页/上一页/页码/下一页/末页 + 跳页</li>
+      <li><span class=tag>新增</span>高消费顶部四类统计可点击：点「其他 57 笔」直接只列那 57 笔，标错了好找；勾「仅显示已标记」后另有类型筛选条</li>
+      <li><span class=tag>修复</span>标记保护的「修改密码」按钮点了没反应（改密码功能原先在界面上不可达）</li>
+      <li><span class=tag>修复</span>高消费列表为空时，顶部四类统计点不动（按钮看着能点其实没绑事件）</li>
+      <li><span class=tag>修复</span>金额门槛滑块拖回原值会永久脱离「大额消费清单」阈值的联动</li>
+      <li><span class=tag>修复</span>账本读空后周度层仍显示上一次的旧图表</li>
+      <li><span class=tag>修复</span>年粒度下矩阵图例把「占比」列误说成涨跌（表头已改名为「占比」）</li>
+      <li><span class=tag>修复</span>单年视图下矩阵表格与下方结论用了两套时间跨度</li>
+      <li><span class=tag>修复</span>单年视图下数据总览的口径说明整段消失</li>
+      <li><span class=tag>优化</span>高消费区渲染提速：一次遍历算完所有口径 + 排序缓存 + 指纹预计算 + 滑块 rAF 节流（6912 条账单下单次渲染 1.4ms）</li>
+      <li><span class=tag>修复</span>修复「标记存了但页面不显示」：备注里的换行符（）经浏览器解析属性时被改写成 
+，导致标记键写入与读取对不上；现已统一归一，并让指纹不再经过 HTML 属性传递（历史标记会自动恢复显示）</li>
+      <li><span class=tag>新增</span>高消费新增第四类「其他」（排在最后，房租/还款/学费等刚性支出，不计入「可省的」）</li>
+      <li><span class=tag>新增</span>高消费新增「仅显示已标记」勾选框，与「隐藏已标记」互斥，方便回头查询已分类的账</li>
+      <li><span class=tag>优化</span>标记同步面板可折叠：标题栏加「✕ 收起」，入口按钮文案随状态切换</li>
+      <li><span class=tag>优化</span>标记同步面板改为「② 不该花的」标签页内就地展开，不再像新增了一个 tab</li>
+      <li><span class=tag>新增</span>标记保护：取消标记、更改标记需输入密码（首次标记免密码），密码不明文存并随标记同步到云端</li>
+      <li><span class=tag>新增</span>「不该花的」标记支持跨设备同步：在该标签页内填 GitHub Token，标记写入仓库独立文件，标记后自动上传</li>
+      <li><span class=tag>优化</span>标记键改为内容指纹（跨设备对得上）并带时间戳，多设备合并以新为准</li>
+      <li><span class=tag>优化</span>周度账观改为按年查看：只列明细年（该年支出&gt;100笔），不再一次铺开所有年份</li>
+      <li><span class=tag>修复</span>明细年门槛统一为每年支出&gt;100笔，并排除每年仅1笔的年度汇总年</li>
+      <li><span class=tag>优化</span>周度图轴标签稀疏化且与柱图共用滚动容器，修正标签与柱子错位</li>
+      <li><span class=tag>优化</span>周度结余图改为基线居中的发散柱（绿上红下），超支周一眼可见</li>
+      <li><span class=tag>修复</span>周度账观改为与分类分析同源（读账本明细按周聚合），金额保留小数不再被抹零</li>
+      <li><span class=tag>清理</span>全项目零引用文件清理：移出 3 个无引用文件，新增自动巡检闸门</li>
+      <li><span class=tag>新增</span>快捷方式 / 书签栏 / 标签栏专用 icon（浏览器 .ico 多档尺寸）</li>
+      <li><span class=tag>优化</span>本月每日记录表头吸顶，滚动时锁定日期 / 星期 / 实际 / 预算 / 备注</li>
+      <li><span class=tag>修复</span>删除按钮满屏误显示：收紧为「仅录入当天可删」，并一次性迁移旧脏数据</li>
+      <li><span class=tag>优化</span>记录范围说明改排版：第一行加粗上色，第二行改中性灰并倾斜</li>
+      <li><span class=tag>重命名</span>门户「收支规划局」→「刚需日用账」，副标题「追踪每日底线刚需开销」</li>
+      <li><span class=tag>修复</span>删除判定支持「当天补录历史日期」：录入当天可删，过天即禁</li>
+      <li><span class=tag>新增</span>Excel 导出新增第 5 列「录入日」，删除权限随录入日期持久化</li>
+      <li><span class=tag>优化</span>账单透视镜「② 不该花的」改为「② 高消费」，三类：家庭采购 / 个人置物 / 冲动消费</li>
+      <li><span class=tag>优化</span>高消费按钮由 2 个改 3 个，统计、口径、页面文案全部按三类重写</li>
+      <li><span class=tag>优化</span>「③ 可省的」只计个人置物 + 冲动消费，家庭采购属刚需不计入</li>
+      <li><span class=tag>新增</span>账单透视镜「② 高消费」新增金额门槛筛选，默认跟随「大额消费清单」阈值，可独立设定</li>
+      <li><span class=tag>优化</span>账单透视镜背景图换成 assets/bg-ledger.png 平铺</li>
+      <li><span class=tag>重命名</span>账本透视 → 历年收支簿（门户卡片、页面标题、导出文件名同步；数据层 ledger-p612 / data/ledger.json 不变）</li>
+      <li><span class=tag>优化</span>门户按钮「历史账单导入与分析」改为「历年收支导入与分析」</li>
+      <li><span class=tag>新增</span>账单透视镜「② 高消费」新增第四类「其他」，排在最后，用于房租/还款/学费等刚性支出</li>
+      <li><span class=tag>优化</span>「其他」不计入「③ 可省的」年省额（刚性支出砍不掉，计入会让年可省虚高）</li>
+      <li><span class=tag>优化</span>高消费四类统计、徽章、按钮配色与文案同步（其他用灰色系区分）</li>
+      <li><span class=tag>新增</span>账单透视镜「② 高消费」新增「仅显示已标记」勾选框，只显示标记过的交易，方便回头查询</li>
+      <li><span class=tag>优化</span>「仅显示已标记」与「隐藏已标记」互斥（勾一个自动取消另一个），都不勾默认显示全部</li>
+    </ul>
+  </div>
 
   <div class="note">
     <b>下载后：</b>
     <ol>
-      <li>解压得到 27 个文件（<b>没有</b> md 说明文件）</li>
+      <li>解压得到 <b id="cnt">33</b> 个文件（<b>没有</b> md 说明文件）</li>
       <li>把解压出的文件<b>全量覆盖</b>上传到 GitHub 仓库根目录（<code>main</code> 分支）</li>
       <li>等 GitHub Pages 构建完成（约 1 分钟）</li>
       <li>浏览器 <b>Ctrl+Shift+R</b> 强制刷新</li>
     </ol>
   </div>
 
-  <div class="tip">务必确认 sw.js 一起上传（缓存版本 p612-v71），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v94），否则页面看起来"没变化"</div>
 </div>
 </body>
 </html>

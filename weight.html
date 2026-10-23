@@ -412,6 +412,45 @@ const KEY = 'weight_records_v1';
 // 注：本工具不再内置种子 Excel，无 Token 时本机为空，全部依赖链接后从仓库拉取
 const SHEET_NAME = 'Sheet1 (2)';                 // 与你的 Excel 保持一致
 const $ = id => document.getElementById(id);
+
+/* HTML 转义 —— 渲染任何用户可控文本前必须过这里。
+ * 缺失这个函数曾导致一个真实 XSS：导入的 Excel 备注列里放
+ * `<img src=x onerror=...>` 就能在渲染历史时执行脚本，
+ * 而同源页面的 GitHub Token 就在 localStorage 里可被读走。 */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({
+
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[m]));
+
+/* ---------- localStorage 安全写入（低危 #18）----------
+   隐私模式 / 配额满 / 存储被禁用时 setItem 会抛 QuotaExceededError。
+   原版在若干处直接裸调 setItem，异常会中断后面的逻辑
+   （最坏情况：Token 存失败但界面已显示「已连接」）。
+   统一走 safeSet：吞掉异常并返回是否成功。 */
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch (e) {
+    console.error('localStorage 写入失败：' + k, e);
+    return false;
+  }
+}
+
+/* 日期白名单 —— 只放行 YYYY-MM-DD / YYYY-MM / YYYY / YYYY年M月D日，
+ * 其余（空、非法格式、任意字符串）一律降级为空串。
+ * 日期会进 data-date 属性和排序键，不校验就可能被注入。 */
+function normDatePart(s) {
+  const v = String(s == null ? '' : s).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (/^\d{4}-\d{2}$/.test(v)) return v + '-01';
+  if (/^\d{4}$/.test(v)) return v + '-01-01';
+  if (!v) return '';
+  const m = v.match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+  if (m) {
+    const mm = String(+m[2]).padStart(2, '0'), dd = String(+m[3]).padStart(2, '0');
+    return `${m[1]}-${mm}-${dd}`;
+  }
+  return '';
+}
 const fmt = n => (n == null || isNaN(n)) ? '--' : Number(n).toFixed(1);
 const K2J = v => Math.round(v * 2 * 10) / 10;     // kg → 斤（显示/换算用）
 const segCls = s => s === '中' ? 'seg-n' : s === '晚' ? 'seg-e' : 'seg-m';
@@ -434,7 +473,16 @@ const goalOf = () => { const g = parseFloat(localStorage.getItem('weight_goal'))
 // 旧数据迁移：早期版本把时段（早/中/晚）存在 note 里，挪到 seg 字段
 const load = () => {
   let d = [];
-  try { d = JSON.parse(localStorage.getItem(KEY)) || []; } catch { d = []; }
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch { d = []; return d; }
+  if (!raw) return d;
+  try { d = JSON.parse(raw) || []; }
+  catch (e) {
+    // 解析失败不静默丢数据：备份原始内容，用户还能手工捞回
+    try { localStorage.setItem(KEY + '_corrupt', String(raw).slice(0, 200000)); } catch (_) {}
+    console.error('weight 数据解析失败，已备份到 ' + KEY + '_corrupt', e);
+    d = [];
+  }
   if (!Array.isArray(d)) d = [];
   d.forEach(r => {
     if (!r || typeof r !== 'object') return;
@@ -442,11 +490,31 @@ const load = () => {
       if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; }
       else r.seg = '早';
     }
+    // **seg 必须过白名单** —— 旧数据里的 seg 可能是任意字符串，
+    // 它会进 class 属性和渲染文本。白名单外一律降级为「早」。
+    if (!['早', '中', '晚'].includes(r.seg)) r.seg = '早';
+    r.date = normDatePart(r.date);          // 日期同样只接受合法格式
+    r.note = String(r.note == null ? '' : r.note).slice(0, 500);
     r.goal = r.goal || GOAL_DEFAULT;     // 旧数据没填目标 → 统一补默认 106 斤
   });
   return d;
 };
-const save = d => localStorage.setItem(KEY, JSON.stringify(d));   // 本地缓存（离线兜底）
+/* 本地缓存（离线兜底）。
+ * **必须捕获配额溢出** —— localStorage 通常只有 5–10MB，
+ * 写满时 setItem 抛 QuotaExceededError，不 catch 的话调用方的 await 会直接 reject，
+ * 用户看到「什么都没发生」以为没保存，实际数据全丢（而且没有任何提示）。 */
+const save = d => {
+  try {
+    safeSet(KEY, JSON.stringify(d));
+    return true;
+  } catch (e) {
+    const msg = '保存失败：浏览器本地存储空间已满（或处于隐私模式）。\n' +
+      '请到「设置 → 清除缓存」导出备份后清理，或减少记录条数。';
+    if (typeof toast === 'function') toast(msg); else alert(msg);
+    console.error('[weight] localStorage 写入失败', e);
+    return false;
+  }
+};
 
 // ===== Excel ↔ 页面数据 转换层 =====
 // Excel 列结构：日期 | 时段 | 体重（斤） | 备注
@@ -509,9 +577,54 @@ function b64ToBuf(b64) {
 // ===== GitHub 文件同步层 =====
 // 数据写入仓库里的 data/weight.xlsx（Excel 文件，每次保存 = 一次 commit）。
 // Token 仅存本机；无 token 时退化为纯 localStorage（与旧版一致）。
+/* ---------- 同步路径白名单（中危 #11 / 低危 #19）----------
+   GH.path 会直接进 GitHub contents API 的 PUT 请求。
+   若允许任意值，一次误填就能覆盖仓库里任意文件 —— 包括别的工具的数据文件、
+   甚至账本原件，而用户以为「我只是改了个保存路径」。
+   规则：① 必须在 data/ 目录下；② 不得含 .. ；③ 文件名不得撞其它工具的保留文件。
+   越界时静默回落到本页默认路径，并提示用户。 */
+const GH_RESERVED = [
+  'data/ledger.json', 'data/storage.json', 'data/time.xlsx', 'data/daily.xlsx',
+  'data/weight.xlsx', 'data/budget.xlsx',
+  'data/analysis-marks.json', 'data/analysis-marks-v2.json', 'data/marks.json',
+];
+function sanitizeGhPath(p, fallback) {
+  const v = String(p == null ? '' : p).trim();
+  if (!v) return fallback;
+  if (v.indexOf('..') >= 0 || v.charAt(0) === '/' || v.indexOf('\\') >= 0) return fallback;
+  if (!/^data\/[A-Za-z0-9._\-\/]+\.(json|xlsx|csv|txt|md|pdf)$/i.test(v)) return fallback;
+  if (GH_RESERVED.indexOf(v) >= 0 && v !== fallback) return fallback;
+  return v;
+}
+
+/* ---------- 导入文件大小上限（低危 #15）----------
+   原版对导入文件不设上限，一个几百 MB 的 Excel 会让
+   await file.text() / SheetJS 解析长时间占住主线程，页面直接假死。
+   这里按类型给出上限并给用户明确提示。 */
+const MAX_IMPORT_BYTES = 20 * 1024 * 1024;   // 表格/JSON 导入：20MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;     // 图片：8MB
+function checkFileSize(file, max, label) {
+  if (!file) return false;
+  if (file.size > max) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    const lim = (max / 1024 / 1024).toFixed(0);
+    const msg = `${label}文件过大（${mb} MB），上限 ${lim} MB。请拆分后再导入。`;
+    if (typeof toast === 'function') toast('⚠️ ' + msg);
+    else if (typeof alert === 'function') alert(msg);
+    else console.warn(msg);
+    return false;
+  }
+  return true;
+}
+
 let GH = {
+
+
+
+
+
   owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/weight.xlsx',
-  token: localStorage.getItem('gh_token') || '',
+  token: localStorage.getItem('weight_gh_token_v1') || localStorage.getItem('gh_token') || '',
   sha: null
 };
 let DATA = load();   // 内存中的当前数据，渲染以此为准
@@ -845,10 +958,10 @@ function renderHistory(data) {
     items.forEach(d => {
       const canDel = d.date === today;   // 仅当前自然日（24 小时内）可删
       const isMax = weekMaxSet.has(d);   // 本周最大体重
-      html += `<tr><td>${d.date}</td><td><span class="seg-tag ${segCls(d.seg)}">${d.seg || '早'}</span></td><td class="${isMax ? 'week-max' : ''}"><b>${fmt(K2J(d.weight))}</b> 斤</td><td>${fmt(K2J(d.goal || GOAL_DEFAULT))} 斤</td>`;
-      html += `<td class="note">${d.note || ''}</td>`;
+      html += `<tr><td>${esc(d.date)}</td><td><span class="seg-tag ${segCls(d.seg)}">${esc(d.seg || '早')}</span></td><td class="${isMax ? 'week-max' : ''}"><b>${fmt(K2J(d.weight))}</b> 斤</td><td>${fmt(K2J(d.goal || GOAL_DEFAULT))} 斤</td>`;
+      html += `<td class="note">${esc(d.note || '')}</td>`;
       if (canDel)
-        html += `<td style="text-align:right"><button class="del" data-date="${d.date}" data-seg="${d.seg || '早'}">删除</button></td>`;
+        html += `<td style="text-align:right"><button class="del" data-date="${esc(d.date)}" data-seg="${esc(d.seg || '早')}">删除</button></td>`;
       else
         html += `<td style="text-align:right"><button class="del" disabled title="超过 24 小时，不可删除">删除</button></td>`;
     });
@@ -895,7 +1008,7 @@ $('form').onsubmit = async e => {
     note: $('f-note').value.trim()
   };
   if (!entry.date || isNaN(entry.weight) || isNaN(jin)) return;
-  localStorage.setItem('weight_goal', String(entry.goal));           // 目标持久化（不进 Excel）
+  safeSet('weight_goal', String(entry.goal));           // 目标持久化（不进 Excel）
   let data = DATA.slice();
   const i = data.findIndex(d => d.date === entry.date && (d.seg || '早') === entry.seg);
   if (i >= 0) data[i] = entry; else data.push(entry);        // 同日同时段覆盖，不同时段共存
@@ -918,6 +1031,7 @@ $('file-input').onchange = e => {
   const file = e.target.files[0];
   e.target.value = '';                       // 先清空，便于重复选同一文件
   if (!file) return;
+  if (!checkFileSize(file, MAX_IMPORT_BYTES, '文件')) { e.target.value = ''; return; }
   const isXlsx = /\.xlsx$/i.test(file.name) || (file.type || '').includes('spreadsheet');
   if (isXlsx) importXlsx(file);
   else importJson(file);
@@ -957,9 +1071,19 @@ function importJson(file) {
       return;
     }
     arr.forEach(r => {
+      // **seg 白名单化** —— 原先 `r.seg` 已存在时原样保留，
+      // 导入 JSON 可以塞任意字符串，它会进 class 属性和页面文本。
       if (!r.seg) { if (/^(早|中|晚)$/.test(r.note || '')) { r.seg = r.note; r.note = ''; } else r.seg = '早'; }
+      else if (!['早', '中', '晚'].includes(r.seg)) { bad.push(`seg 应为 早/中/晚`); r.seg = '早'; }
       r.goal = r.goal || GOAL_DEFAULT;     // 导入数据未填目标 → 统一按默认 106 斤
+      // **note 长度上限** —— 防御超长文本撑爆页面
+      if (typeof r.note === 'string' && r.note.length > 500) r.note = r.note.slice(0, 500);
+      else if (r.note != null && typeof r.note !== 'string') r.note = String(r.note).slice(0, 500);
     });
+    if (bad.length) {
+      alert('导入失败，有 ' + bad.length + ' 条格式不对：\n' + bad.slice(0, 5).join('\n') + (bad.length > 5 ? '\n…' : ''));
+      return;
+    }
     const existing = DATA.length;
     if (existing && !confirm(`将导入 ${arr.length} 条记录，并覆盖现有 ${existing} 条，确定继续？`)) return;
     await persist(arr);
@@ -1043,19 +1167,20 @@ setInterval(tick, 1000);
 
 // ===== GitHub 同步面板交互 =====
 function ghCfgLoad() {
-  try { const c = JSON.parse(localStorage.getItem('gh_cfg') || '{}'); Object.assign(GH, c); } catch {}
+  try { const c = JSON.parse(localStorage.getItem('weight_gh_cfg_v1') || localStorage.getItem('gh_cfg') || '{}'); Object.assign(GH, c); } catch {}
   if (/\.json$/i.test(GH.path)) GH.path = GH.path.replace(/\.json$/i, '.xlsx');   // 旧 JSON 配置自动迁移到 Excel
-  if (GH.token) localStorage.setItem('gh_token', GH.token);
+  GH.path = sanitizeGhPath(GH.path, 'data/weight.xlsx');   // 旧配置的越界路径在此被拦下
+  if (GH.token) safeSet('weight_gh_token_v1', GH.token);
 }
 function ghCfgSave() {
   GH.token = $('gh-token').value.trim();
   GH.owner = $('gh-owner').value.trim() || 'sumer0825';
   GH.repo = $('gh-repo').value.trim() || 'Sumer';
   GH.branch = $('gh-branch').value.trim() || 'main';
-  GH.path = $('gh-path').value.trim() || 'data/weight.xlsx';
+  GH.path = sanitizeGhPath($('gh-path').value.trim(), 'data/weight.xlsx');
   GH.sha = null;
-  localStorage.setItem('gh_token', GH.token);
-  localStorage.setItem('gh_cfg', JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path }));
+  safeSet('weight_gh_token_v1', GH.token);
+  safeSet('weight_gh_cfg_v1', JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path }));
   $('store-mode').textContent = 'GitHub Excel（' + GH.owner + '/' + GH.repo + '）';
 }
 function ghPrefill() {
@@ -1099,8 +1224,10 @@ $('gh-connect').onclick = async () => {
 $('sync-now-btn').onclick = () => refresh();
 $('gh-disconnect').onclick = async () => {
   if (!confirm('确定断开 GitHub 链接？\n\n将清空：本机 Token、本机浏览器缓存的体重数据\n不会动：仓库里 Excel 表格已写入的数据\n\n断开后本机将变为空白，需重新配置 Token 从云端拉取。')) return;
-  localStorage.removeItem('gh_token');
-  localStorage.removeItem('gh_cfg');
+  localStorage.removeItem('weight_gh_token_v1');
+  localStorage.removeItem('gh_token');   // 顺带清掉旧版遗留的通用键
+  localStorage.removeItem('weight_gh_cfg_v1');
+  localStorage.removeItem('gh_cfg');     // 顺带清掉旧版遗留的通用键
   localStorage.removeItem('weight_records_v1');   // 清空本机缓存数据
   localStorage.removeItem('weight_goal');         // 清空本机缓存的目标
   DATA = [];
@@ -1134,6 +1261,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v34</div>
+<div class="ver">v35</div>
 </body>
 </html>

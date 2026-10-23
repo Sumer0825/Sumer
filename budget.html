@@ -405,6 +405,14 @@ html.in-frame .month-picker { top: 4px; }
 <script src="lib/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
+
+/* HTML 转义 —— 渲染任何用户可控文本前必须过这里。
+ * 缺失这个函数曾导致一个真实 XSS：导入的 Excel 备注列里放
+ * `<img src=x onerror=...>` 就能在渲染历史时执行脚本，
+ * 而同源页面的 GitHub Token 就在 localStorage 里可被读走。 */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[m]));
 const KEY = 'budget_records_v1';
 // 注：本工具不再内置种子 Excel，无 Token 时本机为空，全部依赖链接后从仓库拉取
 const SHEET_NAME = 'budget';
@@ -496,7 +504,21 @@ function sortAll(d) {
   d.actuals.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 }
 const load = () => { try { return normData(JSON.parse(localStorage.getItem(KEY))); } catch { return emptyData(); } };
-const save = d => { d.meta.lastModified = new Date().toISOString(); localStorage.setItem(KEY, JSON.stringify(d)); };
+/* 同样要捕获配额溢出 —— 否则写满时抛 QuotaExceededError，
+ * 调用方 await 直接 reject，用户以为存上了、实际全丢，且没有任何提示。 */
+const save = d => {
+  d.meta.lastModified = new Date().toISOString();
+  try {
+    safeSet(KEY, JSON.stringify(d));
+    return true;
+  } catch (e) {
+    const msg = '保存失败：浏览器本地存储空间已满（或处于隐私模式）。\n' +
+      '请先导出备份再清理，或减少记录条数。';
+    if (typeof toast === 'function') toast(msg); else alert(msg);
+    console.error('[budget] localStorage 写入失败', e);
+    return false;
+  }
+};
 let DATA = load();
 
 // 某天的日预算：
@@ -692,6 +714,62 @@ function b64ToBuf(b64) {
    GitHub 同步层（独立 key：budget_gh_cfg_v1）
    ========================================================= */
 const GH_CFG_KEY = 'budget_gh_cfg_v1';
+
+/* ---------- 导入文件大小上限（低危 #15）----------
+   原版对导入文件不设上限，一个几百 MB 的 Excel 会让
+   await file.text() / SheetJS 解析长时间占住主线程，页面直接假死。
+   这里按类型给出上限并给用户明确提示。 */
+const MAX_IMPORT_BYTES = 20 * 1024 * 1024;   // 表格/JSON 导入：20MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;     // 图片：8MB
+function checkFileSize(file, max, label) {
+  if (!file) return false;
+  if (file.size > max) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    const lim = (max / 1024 / 1024).toFixed(0);
+    const msg = `${label}文件过大（${mb} MB），上限 ${lim} MB。请拆分后再导入。`;
+    if (typeof toast === 'function') toast('⚠️ ' + msg);
+    else if (typeof alert === 'function') alert(msg);
+    else console.warn(msg);
+    return false;
+  }
+  return true;
+}
+
+
+/* ---------- localStorage 安全写入（低危 #18）----------
+   隐私模式 / 配额满 / 存储被禁用时 setItem 会抛 QuotaExceededError。
+   原版在若干处直接裸调 setItem，异常会中断后面的逻辑
+   （最坏情况：Token 存失败但界面已显示「已连接」）。
+   统一走 safeSet：吞掉异常并返回是否成功。 */
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch (e) {
+    console.error('localStorage 写入失败：' + k, e);
+    return false;
+  }
+}
+
+
+/* ---------- 同步路径白名单（中危 #11 / 低危 #19）----------
+   GH.path 会直接进 GitHub contents API 的 PUT 请求。
+   若允许任意值，一次误填就能覆盖仓库里任意文件 —— 包括别的工具的数据文件、
+   甚至账本原件，而用户以为「我只是改了个保存路径」。
+   规则：① 必须在 data/ 目录下；② 不得含 .. ；③ 文件名不得撞其它工具的保留文件。
+   越界时回落到本页默认路径。 */
+const GH_RESERVED = [
+  'data/ledger.json', 'data/storage.json', 'data/time.xlsx', 'data/daily.xlsx',
+  'data/weight.xlsx', 'data/budget.xlsx',
+  'data/analysis-marks.json', 'data/analysis-marks-v2.json', 'data/marks.json',
+];
+function sanitizeGhPath(p, fallback) {
+  const v = String(p == null ? '' : p).trim();
+  if (!v) return fallback;
+  if (v.indexOf('..') >= 0 || v.charAt(0) === '/' || v.indexOf('\\') >= 0) return fallback;
+  if (!/^data\/[A-Za-z0-9._\-\/]+\.(json|xlsx|csv|txt|md|pdf)$/i.test(v)) return fallback;
+  if (GH_RESERVED.indexOf(v) >= 0 && v !== fallback) return fallback;
+  return v;
+}
+
 let GH = { owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/budget.xlsx', token: '', sha: null };
 
 const ghHeaders = () => ({ Authorization: `Bearer ${GH.token}`, Accept: 'application/vnd.github+json' });
@@ -1048,14 +1126,14 @@ function renderHistory() {
     const over = dl != null && a.amount > dl;
     const chk = monthEditable ? canDeleteActual(a, today) : { ok: false, why: '该月已结清，不可修改' };
     html += `<tr>
-      <td>${a.date.slice(5)}</td>
-      <td class="note">${WEEKDAY[d.getDay()]}</td>
+      <td>${esc(a.date.slice(5))}</td>
+      <td class="note">${esc(WEEKDAY[d.getDay()])}</td>
       <td class="num"><span class="${over ? 'amt-over' : 'amt-ok'}">${money(a.amount)}</span></td>
       <td class="num note">${dl == null ? '--' : money(dl)}</td>
-      <td class="note">${a.note || ''}</td>
+      <td class="note">${esc(a.note || '')}</td>
       <td style="text-align:right">${chk.ok
-        ? `<button class="del" data-date="${a.date}">删除</button>`
-        : `<button class="del" disabled title="${chk.why}">删除</button>`}</td>
+        ? `<button class="del" data-date="${esc(a.date)}">删除</button>`
+        : `<button class="del" disabled title="${esc(chk.why)}">删除</button>`}</td>
     </tr>`;
   });
   html += '</tbody></table></div>';
@@ -1274,6 +1352,7 @@ $('file-input').onchange = e => {
   if (isXlsx) importXlsx(file); else importJson(file);
 };
 async function importXlsx(file) {
+  if (!checkFileSize(file, MAX_IMPORT_BYTES, 'Excel')) return;
   let d;
   try { d = parseXlsxBuf(await file.arrayBuffer()); }
   catch (err) { alert('Excel 解析失败：' + (err.message || err)); return; }
@@ -1308,15 +1387,16 @@ function ghCfgLoad() {
   try { const c = JSON.parse(localStorage.getItem(GH_CFG_KEY) || '{}'); if (c && typeof c === 'object') Object.assign(GH, c); } catch {}
   if (/\.json$/i.test(GH.path)) GH.path = GH.path.replace(/\.json$/i, '.xlsx');   // 旧 JSON 配置自动迁移
   if (!/^data\//.test(GH.path)) GH.path = 'data/budget.xlsx';
+  GH.path = sanitizeGhPath(GH.path, 'data/budget.xlsx');   // 旧配置的越界路径在此被拦下
 }
 function ghCfgSave() {
   GH.token = $('gh-token').value.trim();
   GH.owner = $('gh-owner').value.trim() || 'sumer0825';
   GH.repo = $('gh-repo').value.trim() || 'Sumer';
   GH.branch = $('gh-branch').value.trim() || 'main';
-  GH.path = $('gh-path').value.trim() || 'data/budget.xlsx';
+  GH.path = sanitizeGhPath($('gh-path').value.trim(), 'data/budget.xlsx');
   GH.sha = null;
-  localStorage.setItem(GH_CFG_KEY, JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path, token: GH.token }));
+  safeSet(GH_CFG_KEY, JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path, token: GH.token }));
   $('store-mode').textContent = GH.token ? `GitHub Excel（${GH.owner}/${GH.repo}）` : '本机浏览器（localStorage）';
 }
 function ghPrefill() {
@@ -1402,6 +1482,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v29</div>
+<div class="ver">v30</div>
 </body>
 </html>

@@ -521,14 +521,31 @@ function loadCats() {
   try {
     const raw = localStorage.getItem(CKEY);
     if (raw) { const o = JSON.parse(raw); if (o && Array.isArray(o.expense) && Array.isArray(o.income)) { CATS = o; return; } }
-  } catch (e) {}
+  } catch (e) {
+    try { localStorage.setItem(CKEY + '_corrupt', String(localStorage.getItem(CKEY) || '').slice(0, 100000)); } catch (_) {}
+    console.error('daily 分类配置解析失败，已备份到 ' + CKEY + '_corrupt', e);
+  }
   CATS = JSON.parse(JSON.stringify(DEF_CATS));
 }
-function saveCats() { try { localStorage.setItem(CKEY, JSON.stringify(CATS)); } catch (e) {} }
+function saveCats() { try { safeSet(CKEY, JSON.stringify(CATS)); } catch (e) {} }
 function loadRecs() {
-  try { const o = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(o)) RECS = o; } catch (e) { RECS = []; }
+  // **不能静默丢数据** —— 原版解析失败就 RECS = []，
+  // 用户看到的是「记录全没了」，实际只是本机存储格式损坏。
+  // 现在把原始内容备份到 <KEY>_corrupt，用户还能手工捞回来。
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { RECS = []; return; }
+  if (!raw) { RECS = []; return; }
+  try {
+    const o = JSON.parse(raw);
+    RECS = Array.isArray(o) ? o : [];
+  } catch (e) {
+    try { localStorage.setItem(KEY + '_corrupt', raw.slice(0, 200000)); } catch (_) {}
+    console.error('daily 记录解析失败，已备份到 ' + KEY + '_corrupt', e);
+    RECS = [];
+    toast('⚠️ 本机记录格式异常，已备份原始内容（键名 ' + KEY + '_corrupt），当前显示为空');
+  }
 }
-function saveRecs() { try { localStorage.setItem(KEY, JSON.stringify(RECS)); } catch (e) {} }
+function saveRecs() { try { safeSet(KEY, JSON.stringify(RECS)); } catch (e) {} }
 function saveBoth() { saveRecs(); saveCats(); }
 
 /* ---------- 工具 ---------- */
@@ -944,9 +961,45 @@ $('cat-mask').onclick = e => { if (e.target === $('cat-mask')) $('cat-mask').cla
    GitHub Excel 同步
    ========================================================= */
 const GH_KEY = 'daily_gh_cfg_v1';
+
+/* ---------- localStorage 安全写入（低危 #18）----------
+   隐私模式 / 配额满 / 存储被禁用时 setItem 会抛 QuotaExceededError。
+   原版在若干处直接裸调 setItem，异常会中断后面的逻辑
+   （最坏情况：Token 存失败但界面已显示「已连接」）。
+   统一走 safeSet：吞掉异常并返回是否成功。 */
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch (e) {
+    console.error('localStorage 写入失败：' + k, e);
+    return false;
+  }
+}
+
+
+/* ---------- 同步路径白名单（中危 #11 / 低危 #19）----------
+   GH.path 会直接进 GitHub contents API 的 PUT 请求。
+   若允许任意值，一次误填就能覆盖仓库里任意文件 —— 包括别的工具的数据文件、
+   甚至账本原件，而用户以为「我只是改了个保存路径」。
+   规则：① 必须在 data/ 目录下；② 不得含 .. ；③ 文件名不得撞其它工具的保留文件。
+   越界时静默回落到本页默认路径，并提示用户。 */
+const GH_RESERVED = [
+  'data/ledger.json', 'data/storage.json', 'data/time.xlsx', 'data/daily.xlsx',
+  'data/weight.xlsx', 'data/budget.xlsx',
+  'data/analysis-marks.json', 'data/analysis-marks-v2.json', 'data/marks.json',
+];
+function sanitizeGhPath(p, fallback) {
+  const v = String(p == null ? '' : p).trim();
+  if (!v) return fallback;
+  if (v.indexOf('..') >= 0 || v.charAt(0) === '/' || v.indexOf('\\') >= 0) return fallback;
+  if (!/^data\/[A-Za-z0-9._\-\/]+\.(json|xlsx|csv|txt|md|pdf)$/i.test(v)) return fallback;
+  if (GH_RESERVED.indexOf(v) >= 0 && v !== fallback) return fallback;
+  return v;
+}
+
 let GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/daily.xlsx', sha: null };
-function loadGh() { try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {} }
-function saveGh() { try { localStorage.setItem(GH_KEY, JSON.stringify({ ...GH })); } catch (e) {} }
+function loadGh() { try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {}
+  GH.path = sanitizeGhPath(GH.path, 'data/daily.xlsx'); }   // 旧配置的越界路径在此被拦下
+function saveGh() { try { safeSet(GH_KEY, JSON.stringify({ ...GH })); } catch (e) {} }
 function ghReady() { return !!(GH.token && GH.owner && GH.repo); }
 function ghApi() { return `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`; }
 function ghHeaders() { return { 'Authorization': `Bearer ${GH.token}`, 'Accept': 'application/vnd.github+json' }; }
@@ -1098,7 +1151,7 @@ $('sync-save').onclick = async () => {
   GH.owner = $('gh-owner').value.trim() || 'sumer0825';
   GH.repo = $('gh-repo').value.trim() || 'Sumer';
   GH.branch = $('gh-branch').value.trim() || 'main';
-  GH.path = $('gh-path').value.trim() || 'data/daily.xlsx';
+  GH.path = sanitizeGhPath($('gh-path').value.trim(), 'data/daily.xlsx');
   GH.sha = null;
   saveGh();
   refreshSyncBtn();
@@ -1175,6 +1228,6 @@ doPull(true);   // 启动时静默拉一次云端
   });
 })();
 </script>
-<div class="ver">v3</div>
+<div class="ver">v4</div>
 </body>
 </html>

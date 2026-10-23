@@ -490,13 +490,57 @@ function parseText(text) {
 }
 
 /* ---------- 存储 ---------- */
+/* 事件清洗 —— localStorage / 云端 Excel 两条来源都要过这里。
+ * 字段白名单 + 日期格式白名单 + 分类白名单 + 文本长度上限，
+ * 保证渲染层拿到的永远是安全字符串。 */
+const EV_MAX_TITLE = 200, EV_MAX_NOTE = 2000;
+function sanitizeEvent(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  if (!id) return null;
+  const from = normDatePart(raw.from);
+  const to = normDatePart(raw.to) || from;
+  return {
+    id,
+    from,
+    to,
+    sortKey: (typeof raw.sortKey === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw.sortKey)) ? raw.sortKey.slice(0, 10) : (from || ''),
+    span: !!raw.span,
+    title: String(raw.title == null ? '' : raw.title).slice(0, EV_MAX_TITLE),
+    cat: CATS.includes(raw.cat) ? raw.cat : '其他',
+    note: String(raw.note == null ? '' : raw.note).slice(0, EV_MAX_NOTE),
+  };
+}
 function loadLocal() {
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { return []; }
+  if (!raw) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    // **不能静默丢弃** —— 原版直接 return []，用户以为数据没了，
+    // 实际是格式损坏。这里把坏数据备份到 time_events_v1_corrupt，
+    // 用户还能手工捞回来。
+    try { safeSet(KEY + '_corrupt', raw.slice(0, 200000)); } catch (_) {}
+    console.error('time_events_v1 解析失败，已备份到 ' + KEY + '_corrupt', e);
+    toast('⚠️ 本机事件数据格式异常，已备份原始内容（键名 time_events_v1_corrupt），当前显示为空');
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out = [];
+  for (const it of parsed) { const e = sanitizeEvent(it); if (e) out.push(e); }
+  return out;
 }
 let syncTimer = null;
 function persist(arr, silent, noPush) {
-  DATA = arr;
-  try { localStorage.setItem(KEY, JSON.stringify(arr)); } catch (e) {}
+  // 入库前再过一次清洗 —— 任何写入路径（新增/编辑/云端合并）都统一走这里，
+  // 保证 localStorage 里存的永远是安全结构。
+  DATA = (Array.isArray(arr) ? arr : []).map(sanitizeEvent).filter(Boolean);
+  try { safeSet(KEY, JSON.stringify(DATA)); } catch (e) {
+    console.error('time 写入本机存储失败（可能超出配额）', e);
+    if (!silent) toast('⚠️ 写入本机存储失败，可能是浏览器存储空间已满');
+  }
   if (noPush) return;                          // 静默拉取场景：只更新本地，不回写云端
   if (ghReady()) {                             // 有 Token：自动写回云端 Excel
     if (syncTimer) clearTimeout(syncTimer);
@@ -599,16 +643,16 @@ function render() {
       d.innerHTML = `
         <div class="ev-body">
           <div class="ev-meta">
-            <span class="ev-d">${dateTxt}</span>
+            <span class="ev-d">${esc(dateTxt)}</span>
             ${ev.span ? '<span class="tag span-tag">时间段</span>' : ''}
-            <span class="tag">${ev.cat}</span>
+            <span class="tag">${esc(ev.cat)}</span>
             ${lk ? '<span class="tag lock-tag" title="超过一年的记录不可删除，编辑不受限">🔒 已保护</span>' : ''}
           </div>
           <div class="ev-title">${esc(ev.title)}</div>
           ${ev.note ? `<div class="ev-note">${esc(ev.note)}</div>` : ''}
           <div class="ev-ops">
-            <button class="op" data-act="edit" data-id="${ev.id}">编辑</button>
-            <button class="op del${lk ? ' locked' : ''}" data-act="del" data-id="${ev.id}"
+            <button class="op" data-act="edit" data-id="${esc(ev.id)}">编辑</button>
+            <button class="op del${lk ? ' locked' : ''}" data-act="del" data-id="${esc(ev.id)}"
               title="${lk ? '超过一年的记录不可删除（可以编辑）' : '删除这条记录'}">删除${lk ? ' 🔒' : ''}</button>
           </div>
         </div>`;
@@ -643,7 +687,7 @@ let collapsedYears = new Set((() => {
   try { return JSON.parse(localStorage.getItem(YR_COLLAPSE_KEY)) || []; } catch (e) { return []; }
 })());
 function persistCollapsed() {
-  try { localStorage.setItem(YR_COLLAPSE_KEY, JSON.stringify([...collapsedYears])); } catch (e) {}
+  try { safeSet(YR_COLLAPSE_KEY, JSON.stringify([...collapsedYears])); } catch (e) {}
 }
 function applyYearEl(g, c) {
   g.classList.toggle('collapsed', c);
@@ -821,6 +865,7 @@ function confirmImport() {
 }
 $('import-file').onchange = e => {
   const f = e.target.files[0];
+  if (f && !checkFileSize(f, MAX_IMPORT_BYTES, '表格')) { e.target.value = ''; return; }
   if (!f) return;
   const rd = new FileReader();
   rd.onload = ev => {
@@ -880,9 +925,66 @@ function askPassword(tip) {
 
 /* ---------- 云端同步（GitHub Excel） ---------- */
 const GH_KEY = 'time_gh_cfg_v1';
+
+/* ---------- 导入文件大小上限（低危 #15）----------
+   原版对导入文件不设上限，一个几百 MB 的 Excel 会让
+   await file.text() / SheetJS 解析长时间占住主线程，页面直接假死。
+   这里按类型给出上限并给用户明确提示。 */
+const MAX_IMPORT_BYTES = 20 * 1024 * 1024;   // 表格/JSON 导入：20MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;     // 图片：8MB
+function checkFileSize(file, max, label) {
+  if (!file) return false;
+  if (file.size > max) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    const lim = (max / 1024 / 1024).toFixed(0);
+    const msg = `${label}文件过大（${mb} MB），上限 ${lim} MB。请拆分后再导入。`;
+    if (typeof toast === 'function') toast('⚠️ ' + msg);
+    else if (typeof alert === 'function') alert(msg);
+    else console.warn(msg);
+    return false;
+  }
+  return true;
+}
+
+
+/* ---------- localStorage 安全写入（低危 #18）----------
+   隐私模式 / 配额满 / 存储被禁用时 setItem 会抛 QuotaExceededError。
+   原版在若干处直接裸调 setItem，异常会中断后面的逻辑
+   （最坏情况：Token 存失败但界面已显示「已连接」）。
+   统一走 safeSet：吞掉异常并返回是否成功。 */
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch (e) {
+    console.error('localStorage 写入失败：' + k, e);
+    return false;
+  }
+}
+
+
+/* ---------- 同步路径白名单（中危 #11 / 低危 #19）----------
+   GH.path 会直接进 GitHub contents API 的 PUT 请求。
+   若允许任意值，一次误填就能覆盖仓库里任意文件 —— 包括别的工具的数据文件、
+   甚至账本原件，而用户以为「我只是改了个保存路径」。
+   规则：① 必须在 data/ 目录下；② 不得含 .. ；③ 文件名不得撞其它工具的保留文件。
+   越界时静默回落到本页默认路径，并提示用户。 */
+const GH_RESERVED = [
+  'data/ledger.json', 'data/storage.json', 'data/time.xlsx', 'data/daily.xlsx',
+  'data/weight.xlsx', 'data/budget.xlsx',
+  'data/analysis-marks.json', 'data/analysis-marks-v2.json', 'data/marks.json',
+];
+function sanitizeGhPath(p, fallback) {
+  const v = String(p == null ? '' : p).trim();
+  if (!v) return fallback;
+  if (v.indexOf('..') >= 0 || v.charAt(0) === '/' || v.indexOf('\\') >= 0) return fallback;
+  if (!/^data\/[A-Za-z0-9._\-\/]+\.(json|xlsx|csv|txt|md|pdf)$/i.test(v)) return fallback;
+  if (GH_RESERVED.indexOf(v) >= 0 && v !== fallback) return fallback;
+  return v;
+}
+
 let GH = { token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/time.xlsx', sha: null };
 function loadGh() {
   try { Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY) || '{}')); } catch (e) {}
+  GH.path = sanitizeGhPath(GH.path, 'data/time.xlsx');   // 旧配置的越界路径在此被拦下
 }
 function ghReady() { return !!(GH.token && GH.owner && GH.repo); }
 
@@ -911,13 +1013,35 @@ function rowsToEvents(rows) {
     const f = String(from || '').trim(), t = String(to || f || '').trim();
     out.push({
       id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + i,
-      from: f, to: t, sortKey: f.length === 7 ? f + '-00' : f,
-      span: f !== t, title: String(title || '(未命名)'),
+      // **日期格式校验** —— 原样保留 Excel 里的任意字符串，
+      // 渲染时它会进 innerHTML（未转义）→ 导入一个含标签的单元格就能执行脚本。
+      // 这里只接受 YYYY-MM-DD / YYYY-MM / YYYY（事件允许只写年或年月）。
+      from: normDatePart(f),
+      to: normDatePart(t),
+      sortKey: normDatePart(f).length === 7 ? normDatePart(f) + '-00' : normDatePart(f),
+      span: normDatePart(f) !== normDatePart(t),
+      title: String(title || '(未命名)'),
       cat: CATS.includes(cat) ? cat : '其他',
       note: String(note || ''),
     });
   });
   return out;
+}
+/* 日期字段白名单化：只放行 YYYY / YYYY-MM / YYYY-MM-DD，其它一律降级为 YYYY-01-01。
+ * 这既堵掉注入，也让 sortKey 的比较逻辑始终成立。 */
+function normDatePart(s) {
+  const v = String(s == null ? '' : s).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (/^\d{4}-\d{2}$/.test(v)) return v + '-01';
+  if (/^\d{4}$/.test(v)) return v + '-01-01';
+  if (!v) return '';
+  // 含非日期字符 → 提取前 10 个字符里的合法日期前缀，实在没有就用占位
+  const m = v.match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+  if (m) {
+    const mm = String(+m[2]).padStart(2, '0'), dd = String(+m[3]).padStart(2, '0');
+    return `${m[1]}-${mm}-${dd}`;
+  }
+  return '';
 }
 function eventsToRows(arr) {
   const rows = [['开始日期', '结束日期', '事件', '分类', '备注']];
@@ -968,7 +1092,7 @@ async function ghPush(arr) {
   return true;
 }
 function saveGh() {
-  try { localStorage.setItem(GH_KEY, JSON.stringify({ ...GH })); } catch (e) {}
+  try { safeSet(GH_KEY, JSON.stringify({ ...GH })); } catch (e) {}
 }
 async function doPull(silent) {
   if (!ghReady()) return;
@@ -1033,7 +1157,7 @@ $('sync-save').onclick = async () => {
   GH.owner = $('gh-owner').value.trim() || 'sumer0825';
   GH.repo = $('gh-repo').value.trim() || 'Sumer';
   GH.branch = $('gh-branch').value.trim() || 'main';
-  GH.path = $('gh-path').value.trim() || 'data/time.xlsx';
+  GH.path = sanitizeGhPath($('gh-path').value.trim(), 'data/time.xlsx');
   GH.sha = null;
   $('sync-msg').textContent = '连接中…';
   const before = DATA.length;
@@ -1089,6 +1213,6 @@ loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v20</div>
+<div class="ver">v21</div>
 </body>
 </html>

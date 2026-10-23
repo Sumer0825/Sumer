@@ -6,10 +6,10 @@
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>账本透视</title>
+<title>历年收支簿</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="账本透视">
+<meta name="apple-mobile-web-app-title" content="历年收支簿">
 <meta name="theme-color" content="#efeaf8">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
@@ -166,7 +166,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 </head>
 <body>
   <header>
-    <h1>账本透视<span class="tag">历史账单导入与分析</span></h1>
+    <h1>历年收支簿<span class="tag">历年收支导入与分析</span></h1>
     <p class="subtitle">把记账 App 导出的 Excel 拖进来，自动整理成图表——收入支出趋势、分类占比、每月盈亏、累计结余一目了然。</p>
     <p class="store-line">数据存储：<span class="mode" id="store-mode">本机浏览器（IndexedDB）</span> · 可导出 / 重新导入</p>
     <div class="sync-bar">
@@ -348,8 +348,66 @@ let sortKey = "date", sortDir = -1;  // 表格排序
 
 /* ====================== GitHub 同步（与 storage/budget/weight 一致） ====================== */
 const GH_KEY = 'ledger_gh_cfg_v1';
+
+/* ---------- 导入文件大小上限（低危 #15）----------
+   原版对导入文件不设上限，一个几百 MB 的 Excel 会让
+   await file.text() / SheetJS 解析长时间占住主线程，页面直接假死。
+   这里按类型给出上限并给用户明确提示。 */
+const MAX_IMPORT_BYTES = 20 * 1024 * 1024;   // 表格/JSON 导入：20MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;     // 图片：8MB
+function checkFileSize(file, max, label) {
+  if (!file) return false;
+  if (file.size > max) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    const lim = (max / 1024 / 1024).toFixed(0);
+    const msg = `${label}文件过大（${mb} MB），上限 ${lim} MB。请拆分后再导入。`;
+    if (typeof toast === 'function') toast('⚠️ ' + msg);
+    else if (typeof alert === 'function') alert(msg);
+    else console.warn(msg);
+    return false;
+  }
+  return true;
+}
+
+
+/* ---------- localStorage 安全写入（低危 #18）----------
+   隐私模式 / 配额满 / 存储被禁用时 setItem 会抛 QuotaExceededError。
+   原版在若干处直接裸调 setItem，异常会中断后面的逻辑
+   （最坏情况：Token 存失败但界面已显示「已连接」）。
+   统一走 safeSet：吞掉异常并返回是否成功。 */
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v); return true; }
+  catch (e) {
+    console.error('localStorage 写入失败：' + k, e);
+    return false;
+  }
+}
+
+
+/* ---------- 同步路径白名单（中危 #11 / 低危 #19）----------
+   GH.path 会直接进 GitHub contents API 的 PUT 请求。
+   若允许任意值，一次误填就能覆盖仓库里任意文件 —— 包括别的工具的数据文件、
+   甚至账本原件，而用户以为「我只是改了个保存路径」。
+   规则：① 必须在 data/ 目录下；② 不得含 .. ；③ 文件名不得撞其它工具的保留文件。
+   越界时静默回落到本页默认路径，并提示用户。 */
+const GH_RESERVED = [
+  'data/ledger.json', 'data/storage.json', 'data/time.xlsx', 'data/daily.xlsx',
+  'data/weight.xlsx', 'data/budget.xlsx',
+  'data/analysis-marks.json', 'data/analysis-marks-v2.json', 'data/marks.json',
+];
+function sanitizeGhPath(p, fallback) {
+  const v = String(p == null ? '' : p).trim();
+  if (!v) return fallback;
+  if (v.indexOf('..') >= 0 || v.charAt(0) === '/' || v.indexOf('\\') >= 0) return fallback;
+  if (!/^data\/[A-Za-z0-9._\-\/]+\.(json|xlsx|csv|txt|md|pdf)$/i.test(v)) return fallback;
+  if (GH_RESERVED.indexOf(v) >= 0 && v !== fallback) return fallback;
+  return v;
+}
+
 let GH = (() => { try { return JSON.parse(localStorage.getItem(GH_KEY) || 'null') || {}; } catch (_) { return {}; } })();
 GH = Object.assign({ token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/ledger.json', sha: null }, GH);
+// 旧配置里可能存着越界路径（改版前无校验），读回时必须再过滤一次
+GH.path = sanitizeGhPath(GH.path, 'data/ledger.json');
 const ghReady = () => !!(GH.token && !/^YOUR|^ghp_xxxx/i.test(GH.token));
 const CLEAR_PW = '870825';
 
@@ -400,8 +458,8 @@ function scheduleAutoPush() {
       if (!GH.sha) { try { const m = await ghGetMeta(); GH.sha = m ? m.sha : null; } catch (_) {} }
       const snap = exportSnapshot();
       if (!snap.records.length) return;
-      await ghPutFile(JSON.stringify(snap, null, 2), '更新账本透视 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
-      localStorage.setItem(GH_KEY, JSON.stringify(GH));
+      await ghPutFile(JSON.stringify(snap, null, 2), '更新历年收支簿 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
+      safeSet(GH_KEY, JSON.stringify(GH));
       setSyncMsg(`✓ 已自动同步到仓库：${snap.records.length} 条记录 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
     } catch (e) { setSyncMsg('自动同步失败：' + e.message, 'err'); }
   }, 600);
@@ -464,7 +522,7 @@ async function ghPutFile(content, msg) {
 // 写：小文件（contents API，快路径）
 async function ghPutContents(content, msg) {
   const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
-  const body = { message: msg || ('更新账本透视 ' + new Date().toISOString().slice(0, 10)), content: b64encode(content), branch: GH.branch };
+  const body = { message: msg || ('更新历年收支簿 ' + new Date().toISOString().slice(0, 10)), content: b64encode(content), branch: GH.branch };
   if (GH.sha) body.sha = GH.sha;
   const res = await fetch(apiUrl, { method: 'PUT', headers: GH_HDR({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
   if (res.status === 422) { GH.sha = null; return ghPutContents(content, msg); }
@@ -496,7 +554,7 @@ async function ghPutBlob(content, msg) {
   if (!r4.ok) { const e = await r4.json().catch(() => ({})); throw new Error(e.message || ('Tree API ' + r4.status)); }
   const treeSha = (await r4.json()).sha;
   // 4) 建 commit 并推进 ref
-  const commitMsg = msg || ('更新账本透视 ' + new Date().toISOString().slice(0, 10));
+  const commitMsg = msg || ('更新历年收支簿 ' + new Date().toISOString().slice(0, 10));
   const r5 = await fetch(api + '/git/commits', {
     method: 'POST', headers: GH_HDR({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ message: commitMsg, tree: treeSha, parents: [refSha] })
@@ -527,8 +585,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('sync-
 $('gh-connect').onclick = async () => {
   const tk = $('gh-token').value.trim();
   if (!tk) { setSyncMsg('请填写 Token', 'err'); $('gh-token').focus(); return; }
-  GH = { token: tk, owner: $('gh-owner').value.trim() || 'sumer0825', repo: $('gh-repo').value.trim() || 'Sumer', branch: $('gh-branch').value.trim() || 'main', path: $('gh-path').value.trim() || 'data/ledger.json', sha: null };
-  localStorage.setItem(GH_KEY, JSON.stringify(GH));
+  GH = { token: tk, owner: $('gh-owner').value.trim() || 'sumer0825', repo: $('gh-repo').value.trim() || 'Sumer', branch: $('gh-branch').value.trim() || 'main', path: sanitizeGhPath($('gh-path').value.trim(), 'data/ledger.json'), sha: null };
+  safeSet(GH_KEY, JSON.stringify(GH));
   refreshSyncUI();
   setSyncMsg('连接中…');
   try {
@@ -544,7 +602,7 @@ $('gh-connect').onclick = async () => {
       if (!f.text) throw new Error(`仓库返回了空内容（文件 ${Math.round((f.size || 0) / 1024)} KB）。请检查 Token 权限是否包含 contents:read。`);
       const data = JSON.parse(f.text);
       const n = (data.records?.length) || 0;
-      if (!n) throw new Error(`仓库文件有 ${Math.round((f.size || 0) / 1024)} KB 但 records 为空，可能不是账本透视的数据文件。`);
+      if (!n) throw new Error(`仓库文件有 ${Math.round((f.size || 0) / 1024)} KB 但 records 为空，可能不是历年收支簿的数据文件。`);
       const ok = confirm(`已连接到 GitHub。\n\n仓库现有数据：${n} 条记录。\n\n是否将仓库数据导入本机？（选「取消」则保留本机数据，下次导入时会自动推到仓库）`);
       if (ok) { await loadFromSnapshot(data, true); setSyncMsg(`✓ 已保存配置 + 从仓库拉取：${n} 条记录`, 'ok'); }
       else { setSyncMsg(`✓ 已保存配置，保留本机数据。仓库有 ${n} 条。`, 'ok'); }
@@ -572,8 +630,8 @@ $('sync-now-btn').onclick = async () => {
     const snap = exportSnapshot();
     // 最后一道保险：绝不上传空快照
     if (!snap.records.length) { setSyncMsg('⚠️ 本机无数据，已跳过推送，云端未改动', 'err'); return; }
-    await ghPutFile(JSON.stringify(snap, null, 2), '更新账本透视 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
-    localStorage.setItem(GH_KEY, JSON.stringify(GH));
+    await ghPutFile(JSON.stringify(snap, null, 2), '更新历年收支簿 ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
+    safeSet(GH_KEY, JSON.stringify(GH));
     setSyncMsg(`✓ 已推到仓库：${snap.records.length} 条记录 · ${new Date().toLocaleTimeString('zh-CN')}`, 'ok');
   } catch (e) { setSyncMsg('推送失败：' + e.message, 'err'); }
 };
@@ -674,7 +732,7 @@ $('export-xls-btn').onclick = () => {
   ws['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 34 }, { wch: 14 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '账单明细');
-  XLSX.writeFile(wb, `账本透视-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `历年收支簿-${new Date().toISOString().slice(0, 10)}.xlsx`);
   alert(`已导出 ${RECORDS.length} 条账单`);
 };
 
@@ -684,7 +742,7 @@ $('export-json-btn').onclick = () => {
   const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `账本透视-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `历年收支簿-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 };
@@ -826,7 +884,8 @@ function parseRecords(rows, sheetHint) {
   return { records: out, skipped, isBillSheet: true };
 }
 async function importExcelFile(file) {
-  // JSON 备份（账本透视导出的 .json）走单独解析，不当 Excel 读
+  if (!checkFileSize(file, MAX_IMPORT_BYTES, '表格')) return;
+  // JSON 备份（历年收支簿导出的 .json）走单独解析，不当 Excel 读
   if (/\.json$/i.test(file.name) || file.type === 'application/json') {
     return importJsonBackup(file);
   }
@@ -887,7 +946,7 @@ async function importExcelFile(file) {
     setImportMeta(0, 0, 0, 0, '读取失败：' + (err && err.message ? err.message : err));
   }
 }
-/* ---------- 导入 JSON 备份（账本透视自己导出的 .json，可完整恢复） ---------- */
+/* ---------- 导入 JSON 备份（历年收支簿自己导出的 .json，可完整恢复） ---------- */
 async function importJsonBackup(file) {
   try {
     const text = await file.text();
@@ -1258,6 +1317,6 @@ openDB().then(async () => {
   refreshSyncUI();
 }).catch(e => alert("数据库初始化失败：" + e.message));
 </script>
-<div class="ver">v17</div>
+<div class="ver">v19</div>
 </body>
 </html>
