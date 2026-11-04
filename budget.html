@@ -36,6 +36,24 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     --shadow: 0 10px 30px rgba(31, 39, 51, 0.06);
     --radius: 16px;
     --warm: #bf9a7d;
+
+    /* ===== v34 UI 美化：圆角阶梯 + 控件专用色 =====
+       ⚠️ 刻意**不改** --line 和 --radius：
+       - --line 用在 11 处，含表格分隔线 / 表头底线 / 进度条轨道 → 提浓会外溢到表格
+       - --radius 唯一用在 .card → 改了会波及概览/表格/图表三张卡
+       所以另开一套专供「控件」使用的变量。 */
+    --r-xs: 8px;          /* 小元素：删除按钮 */
+    --r-ctl: 14px;        /* 控件：输入框 / 按钮 */
+    --r-card: 20px;       /* 数据块：合计栏 */
+    --r-pane: 22px;       /* 面板：月份切换器 */
+    --r-pill: 999px;      /* 药丸：页签 */
+    --line-ctl: #e2e8f2;  /* 控件描边（比 --line 略深，「只见方框不见线」的解药） */
+    --line-strong: #d3dcec;
+    --shadow-xs: 0 1px 2px rgba(31, 39, 51, .05);
+    --shadow-sm: 0 6px 18px rgba(31, 39, 51, .07);
+    --primary-2: #7da2ff; /* 渐变副色（与 .prog-bar 同色系） */
+    --extra-2: #e6a6c2;   /* 非刚需渐变副色 */
+    --ease-soft: cubic-bezier(.22, .61, .36, 1);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -51,7 +69,55 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     padding-bottom: max(60px, env(safe-area-inset-bottom) + 60px);
   }
   header { padding-top: env(safe-area-inset-top); }
-  .wrap { max-width: 720px; margin: 0 auto; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* ===== 左右分栏（照搬 weight.html 的骨架）=====
+     左栏 = 操作类（切换控件 + 记一笔 + 预警）
+     右栏 = 数据类（概览 / 柱图 / 预算设置 / 每日记录） */
+  .layout { display: flex; gap: 18px; align-items: flex-start; }
+  .col-left { flex: 0 0 372px; width: 372px; min-width: 0; }
+  .col-right { flex: 1 1 0; min-width: 0; }
+  .col-left > .card:last-child { margin-bottom: 0; }
+  /* 左栏里的页签改竖排：刚需/非刚需各占一行，合计块在其下 */
+  .kind-tabs { flex-direction: column; align-items: stretch; gap: 8px; }
+  .kind-tabs .side { width: 100%; }
+  .kind-tabs .side button { width: 100%; justify-content: flex-start; padding: 0 16px; }
+  .total-chip { width: 100%; margin-inline: 0; margin-top: 2px; }
+  /* 记一笔在窄栏里改为竖排 */
+  .today-input { flex-direction: column; }
+  /* 左栏竖排时的输入框尺寸规则**放在文件后面的 .today-input 定义处** ——
+     放这里会被后面的 `.today-input input`（同特异性、位置更靠后）覆盖。 */
+  /* 表格在窄栏里放不下 7 列 → 允许横向滚动，别把整个页面撑破。
+     （原来 .tbl-scroll 只有 overflow-y:auto，表格会把 .wrap 的 scrollWidth
+       撑到 1653px → 页面出现横向滚动条） */
+  .tbl-scroll { overflow-x: auto; }
+  .tbl-scroll table { min-width: 460px; }
+
+  @media (max-width: 980px) {
+    .layout { flex-direction: column; align-items: stretch; }
+    .col-left { flex: 1 1 auto; width: auto; }
+    /* ⚠️ 改回横排时必须**同步**把 .side button 的 width 改回 auto ——
+       否则两个 728px 宽的按钮并排 = 1456px，把 .wrap 的 scrollWidth
+       撑到 1653px → 页面出现横向滚动条（实测 760/900px 都中招）。 */
+    .kind-tabs { flex-direction: row; align-items: center; flex-wrap: wrap; }
+    .kind-tabs .side { flex: 1 1 auto; width: auto; min-width: 0; }
+    .kind-tabs .side button { width: auto; flex: 1 1 auto; justify-content: center; }
+    /* 窄屏：合计块保持**横排**（标签在左、四格在右）——
+       改回竖排的话宽度会按内容收缩（实测 390px 时只有 210px < 300），
+       四个数字挤在一起不好看。横排 + 四个数字均分，占满整行。 */
+    .total-chip, .col-left .total-chip {
+      width: 100%; margin-inline: 0; margin-top: 4px;
+      flex-direction: row; align-items: center; gap: 10px; padding: 10px 14px;
+    }
+    .total-chip .tc-label, .col-left .total-chip .tc-label {
+      text-align: left; margin-bottom: 0; flex: none;
+    }
+    .total-chip .tc-vals { flex: 1; justify-content: space-between; }
+    .today-input { flex-direction: row; }
+    /* 窄屏恢复横排的覆盖规则放在文件后面的 .col-left 竖排规则之后（见下）。 */
+  }
+  /* 兜底：任何 flex 子项都不许把容器撑破 */
+  .layout > *, .kind-tabs > *, .today-input > * { min-width: 0; }
 
   header { text-align: center; margin-bottom: 18px; }
   header h1 { font-size: 26px; font-weight: 700; }
@@ -66,22 +132,33 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   }
   .card h2 { font-size: 16px; margin-bottom: 14px; }
 
-  /* ===== 月份切换器（吸顶） ===== */
+  /* ===== 月份切换器（吸顶）=====
+     ★ v34 UI 美化：容器圆角 14→22px、描边改 --line-ctl（原来 --line 太淡，
+        「只见方框不见线」）；`.mp-btn` 由 10px 硬方块改成 **50% 圆形图标钮**
+        （沿用 daily.html `.icon-btn{border-radius:50%}` 的手法），
+        解决「圆角壳里嵌方块」的违和感。尺寸 38×38 不变。 */
   .month-picker {
     position: sticky; top: 0; z-index: 20;
     display: flex; align-items: center; justify-content: center; gap: 8px;
     background: rgba(255,255,255,.86);
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--line); border-radius: 14px;
+    border: 1px solid var(--line-ctl); border-radius: var(--r-pane);
     padding: 8px 10px; margin-bottom: 16px;
-    box-shadow: 0 4px 16px rgba(31,39,51,.05);
+    box-shadow: 0 8px 24px rgba(31,39,51,.07);
   }
   .mp-btn {
-    width: 38px; height: 38px; flex: 0 0 38px; border-radius: 10px;
-    border: 1px solid var(--line); background: #fff; color: var(--primary);
+    width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%;
+    border: 1px solid var(--line-ctl); background: #fff; color: var(--primary);
     font-size: 18px; line-height: 1; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    -webkit-tap-highlight-color: transparent; transition: .15s;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .18s var(--ease-soft), color .18s var(--ease-soft),
+                border-color .18s var(--ease-soft), box-shadow .18s var(--ease-soft),
+                transform .1s;
+  }
+  .mp-btn:hover:not(:disabled) {
+    background: var(--primary-soft); color: var(--primary);
+    border-color: #d3deff; box-shadow: 0 4px 12px rgba(79,124,255,.18);
   }
   .mp-btn:active { transform: scale(.94); background: var(--primary-soft); }
   .mp-btn:disabled { color: #c4c9d4; cursor: not-allowed; border-color: var(--line); }
@@ -104,6 +181,12 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .alert-danger { background: #fff4f5; border-left: 4px solid var(--danger); color: #c0392b; }
   .alert-warn   { background: #fffaf0; border-left: 4px solid var(--warn);   color: #a86b00; }
   .alert-info   { background: #f4f7ff; border-left: 4px solid var(--primary); color: #3a5bbf; }
+  /* ★ v36：预警条移到记账卡片**上方**后，间距改由容器统一控制 ——
+     否则每条 .alert 自带的 margin-bottom:12px 会让最后一条与卡片之间
+     只剩 12px（偏挤），且容器为空时也会留下空隙。
+     用 :not(:empty) 保证「没有提醒」时完全不占位。 */
+  #alerts:not(:empty) { margin-bottom: 14px; }
+  #alerts .alert:last-child { margin-bottom: 0; }
 
   /* ===== 今日状态 ===== */
   .today-card { border: 1.5px solid rgba(79,124,255,.22); }
@@ -119,17 +202,80 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .budget-line b { font-size: 26px; color: var(--text); font-variant-numeric: tabular-nums; }
   .budget-line .unit { font-size: 14px; color: var(--muted); font-weight: 500; }
 
-  .today-input { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: stretch; }
+  /* ===== v34 可访问性：键盘焦点环 =====
+     三个输入框原本都写了 `outline: none` 却没有替代样式 →
+     **键盘 Tab 聚焦时完全看不到焦点在哪**（鼠标点击有 focus 光晕，
+     键盘用户没有）。这是可访问性缺口，本次统一补上。
+
+     ⚠️ 用 `:focus-visible` 而不是 `:focus` —— 前者只在「键盘操作」时显示
+     焦点环，鼠标点击不会同时出现「光晕 + 外框」两重指示。 */
+  .today-input input:focus-visible,
+  .field input:focus-visible,
+  #pw-input:focus-visible {
+    outline: 2px solid var(--primary); outline-offset: 2px;
+  }
+  /* 按钮与页签：键盘焦点也要可见 */
+  button:focus-visible,
+  .kind-tabs .side button:focus-visible,
+  .mp-btn:focus-visible {
+    outline: 2px solid var(--primary); outline-offset: 2px;
+  }
+  .kind-tabs .side button.on:focus-visible,
+  .mp-btn:focus-visible { outline-color: var(--primary); }
+
+  /* ★ v34 UI 美化：这一行原本是三个圆角不同的方块（输入 12px / 按钮 10px），
+     高度也不齐。统一成「同高 46px + 同圆角 14px + 同描边色 + 同 focus 光晕」。 */
+  .today-input { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: stretch; }
   .today-input input {
-    flex: 1 1 110px; min-width: 0; padding: 12px 12px; border: 1px solid var(--line);
-    border-radius: 12px; font-size: 18px; outline: none; background: #fbfcfe;
-    font-variant-numeric: tabular-nums; font-family: inherit; transition: border-color .15s;
+    flex: 1 1 110px; min-width: 0; height: 46px; padding: 0 14px;
+    border: 1px solid var(--line-ctl);
+    border-radius: var(--r-ctl); font-size: 18px; outline: none; background: #fbfcfe;
+    font-variant-numeric: tabular-nums; font-family: inherit;
+    transition: border-color .16s var(--ease-soft), box-shadow .16s var(--ease-soft),
+                background .16s var(--ease-soft);
     -webkit-appearance: none;
   }
-  .today-input input:focus { border-color: var(--primary); background: #fff; }
+  .today-input input:focus {
+    border-color: var(--primary); background: #fff;
+    box-shadow: 0 0 0 3px rgba(79,124,255,.12);
+  }
   .today-input input::placeholder { font-size: 15px; }
-  .today-input .btn-primary { flex: 0 0 auto; padding: 12px 18px; }
-  .today-input .datepick { flex: 0 0 132px; font-size: 16px; color: var(--text); padding: 12px 8px; }
+  .today-input .btn-primary { flex: 0 0 auto; height: 46px; padding: 0 22px; border-radius: var(--r-ctl); }
+  .today-input .datepick {
+    flex: 0 0 140px; height: 46px; font-size: 16px; color: var(--text); padding: 0 10px;
+    border-radius: var(--r-ctl);
+  }
+  /* ★ v35 左栏竖排态：输入框**锁死 46px 高**、占满整行。
+     ⚠️ 位置必须在上面两条规则**之后**、且选择器要更具体 ——
+     否则会被 `.today-input input`（同特异性、位置更靠后）覆盖：
+     竖排时 flex-basis 变成**高度基准**，110px / 140px 会被当成高度，
+     输入框被撑成两个巨块（实测日期框 140px 高、金额框 110px 高）。 */
+  /* 左栏（372px）里记一笔的排布：**日期 + 金额同行，按钮独占一行**。
+     三个控件各占一整行太浪费竖向空间；日期140 + 金额自适应 正好一行放得下
+     （372 - 2×20 padding - 10 gap = 322 → 日期140 + 金额172）。 */
+  .col-left .today-input { display: grid; grid-template-columns: 140px 1fr; gap: 10px; }
+  .col-left .today-input input,
+  .col-left .today-input .datepick {
+    flex: 0 0 auto; width: auto; height: 46px; min-width: 0;
+  }
+  .col-left .today-input input { width: 100%; }
+  .col-left .today-input .btn-primary {
+    grid-column: 1 / -1; flex: 0 0 46px; width: 100%; height: 46px;
+  }
+  /* 窄屏（≤980px）堆叠成单列后，页签回到横排、记一笔也回到横排 ——
+     这时宽度要交回 flex 管，只保留 46px 的**高度**锁定。
+     ⚠️ 必须写在上面那条竖排规则**之后**：它的 `flex: 0 0 46px` 在横排时
+     会把**宽度**也锁成 46px（实测窄屏三个控件全塌成 46px 宽）。 */
+  @media (max-width: 980px) {
+    .today-input input, .today-input .datepick, .today-input .btn-primary,
+    .col-left .today-input input,
+    .col-left .today-input .datepick,
+    .col-left .today-input .btn-primary {
+      width: auto; flex: 0 0 auto; height: 46px;
+    }
+    .today-input input, .col-left .today-input input { flex: 1 1 110px; }
+    .today-input .datepick, .col-left .today-input .datepick { flex: 0 0 140px; }
+  }
   .today-input .datepick::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; padding: 0 2px; }
   @media (max-width: 420px) {
     .today-input .datepick { flex: 1 1 100%; }   /* 窄屏：日期独占一行，金额+按钮同行 */
@@ -166,19 +312,128 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .lg-g { background: var(--success); }
   .lg-r { background: var(--danger); }
 
+  /* ===== v30 内容区分页签（刚需 / 非刚需）=====
+     ★ v33：改成「左页签 │ 合计块 │ 右页签」三段式
+     ★ v34 UI 美化：**拆掉框中框** —— 原来「灰底容器 + 5px 内衬 + 6px 缝」
+        三重嵌套把三个块挤成「田字格」拼贴。现在容器去掉底色与内衬，
+        三个块各自成为独立的药丸；`space-between` 让左右页签贴两端、
+        合计块用 `margin-inline:auto` 水平居中（仍严格夹在两按钮之间）。 */
+  .kind-tabs {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: transparent; border: 0; border-radius: 0; padding: 0; margin-bottom: 16px;
+  }
+  /* ⚠️ `.side` 必须 `flex: 0 0 auto` —— 若保留 `flex:1`，左右页签会被拉成
+     265px 的宽方块，药丸感消失、中间的合计块还会被挤压。 */
+  .kind-tabs .side { flex: 0 0 auto; display: flex; min-width: 0; }
+  .kind-tabs .side button {
+    /* ★ v34：`min-width` 让两侧药丸**等宽** —— 两边文字长度不同（「刚需 531」
+       vs「非刚需 688」），不等宽会让右侧显得空、整体不平衡。
+       用 min-width 而非固定 width：内容更长时仍能自适应撑开，不会截断。 */
+    flex: 0 0 auto; min-width: 148px; height: 46px; padding: 0 18px; border: 1px solid transparent;
+    border-radius: var(--r-pill); background: rgba(255,255,255,.72);
+    font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: var(--shadow-xs);
+    transition: background .18s var(--ease-soft), color .18s var(--ease-soft),
+                box-shadow .18s var(--ease-soft);
+    /* ★ v34：删掉原来的 `min-width: 0` —— 它在 L247 的 `min-width:148px` 之后，
+       优先级相同、位置更靠后，会把药丸的最小宽度**覆盖回 0**，
+       导致两侧药丸宽度随内容变化、不等宽（实测 minWidth 读到 0px）。 */
+    white-space: nowrap;
+  }
+  .kind-tabs .side button:hover:not(.on) { background: #fff; color: var(--text); box-shadow: var(--shadow-sm); }
+  /* 选中态：主色渐变实心（与 .btn-primary 同源，替代原来突兀的紫色阴影） */
+  .kind-tabs .side button.on {
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    box-shadow: 0 6px 16px rgba(79,124,255,.26);
+  }
+  .kind-tabs .side button.on[data-kind="extra"] {
+    background: linear-gradient(135deg, var(--extra), var(--extra-2));
+    box-shadow: 0 6px 16px rgba(200,95,146,.26);
+  }
+  .kind-tabs .kb {
+    font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: var(--r-pill);
+    background: rgba(0,0,0,.06); color: var(--muted); font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+  .kind-tabs .side button.on .kb { background: rgba(255,255,255,.24); color: #fff; }
+
+  /* ===== v33 合计栏（夹在两个页签中间）===== */
+  /* ★ v34：圆角 10→20px。外层灰底容器已消失，原来「容器 14 套内块 10」的
+     双层直角随之瓦解；20px 与卡片 16px 同族但略大，形成「数据块浮在页签之上」的层次。 */
+  .total-chip {
+    flex: 0 0 auto; margin-inline: auto;
+    display: flex; flex-direction: column; justify-content: center;
+    background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(247,249,255,.9));
+    border: 1px solid var(--line-ctl); border-radius: var(--r-card);
+    padding: 8px 16px; box-shadow: var(--shadow-sm);
+  }
+  /* ★ v35：左栏里合计块改**横排**（标签在左、四格在右）——
+     竖排空间下「标签在上、数字在下」会左侧对齐、右侧空出一大块。
+     ⚠️ 必须写在 .total-chip 原始定义**之后** —— 之前放在前面被
+     `flex-direction: column` 覆盖掉了（实测标签与数字重叠）。 */
+  .col-left .total-chip {
+    flex-direction: row; align-items: center; gap: 12px; padding: 10px 16px;
+  }
+  .col-left .total-chip .tc-label { text-align: left; margin-bottom: 0; flex: none; }
+  .col-left .total-chip .tc-vals { flex: 1; justify-content: space-between; }
+  .total-chip .tc-label {
+    font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap;
+    line-height: 1.2; text-align: center; letter-spacing: .3px; margin-bottom: 3px;
+  }
+  .total-chip .tc-label small { font-weight: 500; opacity: .75; margin-left: 3px; }
+  .total-chip .tc-vals { display: flex; gap: 13px; }
+  .tc-item { text-align: center; }
+  .tc-item .l { font-size: 10px; color: var(--muted); white-space: nowrap; line-height: 1.2; }
+  .tc-item .v {
+    font-size: 14.5px; font-weight: 700; margin-top: 1px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .tc-item .v.over { color: var(--danger); }
+  .tc-item .v.under { color: var(--success); }
+  .tc-item .v.plus { color: var(--danger); }
+  .tc-item .v.minus { color: var(--success); }
+  /* 窄屏：合计块换行到页签下方一行，四个数字均分宽度 */
+  @media (max-width: 560px) {
+    .kind-tabs { flex-wrap: wrap; }
+    .total-chip { order: 3; width: 100%; margin-top: 4px; padding: 8px 12px; }
+    /* ★ v34：四个数字**均分整行**（space-around + 子项 flex:1）——
+       原来只写 space-around，数字本身仍按内容宽（实测 320px 时
+       items 宽 30/30/20/20，右侧空出 104px，容器挤在左边）。 */
+    .total-chip .tc-vals { justify-content: space-between; gap: 0; }
+    .total-chip .tc-item { flex: 1 1 0; min-width: 0; }
+  }
+  /* 非刚需专属色（浅色主题） */
+  :root { --extra: #c85f92; --extra-soft: #fdeef4; }
+  /* 记录表里的非刚需行标记 */
+  tr.x-row td { background: #fdf7fa; }
+  tr.x-row td:first-child { box-shadow: inset 3px 0 0 var(--extra); }
+  .x-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px;
+    border-radius: 5px; background: var(--extra-soft); color: var(--extra); white-space: nowrap;
+  }
+  .x-badge.need-badge { background: var(--primary-soft); color: var(--primary); }
+  .kind-note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+
   /* ===== 预算设置行 ===== */
   .set-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .set-row .field { flex: 1 1 140px; min-width: 0; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .field input {
-    width: 100%; padding: 11px 13px; border: 1px solid var(--line);
-    border-radius: 10px; font-size: 17px; outline: none; background: #fbfcfe;
-    font-variant-numeric: tabular-nums; font-family: inherit; transition: border-color .15s;
+    width: 100%; height: 46px; padding: 0 14px; border: 1px solid var(--line-ctl);
+    border-radius: var(--r-ctl); font-size: 17px; outline: none; background: #fbfcfe;
+    font-variant-numeric: tabular-nums; font-family: inherit;
+    transition: border-color .16s var(--ease-soft), box-shadow .16s var(--ease-soft),
+                background .16s var(--ease-soft);
     -webkit-appearance: none;
   }
-  .field input:focus { border-color: var(--primary); background: #fff; }
+  .field input:focus {
+    border-color: var(--primary); background: #fff;
+    box-shadow: 0 0 0 3px rgba(79,124,255,.12);
+  }
   .field input:disabled { background: #f4f5f8; color: var(--muted); cursor: not-allowed; }
-  .set-row .btn-primary { flex: 0 0 auto; padding: 12px 20px; }
+  .set-row .btn-primary { flex: 0 0 auto; height: 46px; padding: 0 24px; border-radius: var(--r-ctl); }
   .set-hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
 
   /* ===== 表格 ===== */
@@ -207,14 +462,31 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
   button {
     border: none; border-radius: 10px; padding: 11px 18px; font-size: 14px;
-    font-weight: 600; cursor: pointer; transition: transform .1s, opacity .15s;
+    font-weight: 600; cursor: pointer;
+    transition: transform .1s, opacity .15s,
+                background .18s var(--ease-soft), color .18s var(--ease-soft),
+                box-shadow .18s var(--ease-soft), border-color .18s var(--ease-soft);
     font-family: inherit; -webkit-tap-highlight-color: transparent;
   }
   button:active { transform: scale(.97); }
   button:disabled { opacity: .45; cursor: not-allowed; }
-  .btn-primary { background: var(--primary); color: #fff; }
+  /* ★ v34：圆角**只加在语义类上** —— 裸 button 的 10px 会波及
+     `.del`（表格里的小删除按钮，圆角太大显笨）和 `#sync-now-btn`。
+     `.del` 显式收到 8px。 */
+  .btn-primary, .btn-ghost, .btn-line { border-radius: var(--r-ctl); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff;
+    box-shadow: 0 6px 16px rgba(79,124,255,.24);
+  }
+  .btn-primary:hover:not(:disabled) { box-shadow: 0 8px 20px rgba(79,124,255,.32); }
   .btn-ghost { background: var(--primary-soft); color: var(--primary); }
-  .btn-line { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .btn-ghost:hover:not(:disabled) { background: #dde7ff; }
+  .btn-line {
+    background: rgba(255,255,255,.7); color: var(--muted);
+    border: 1px solid var(--line-ctl);
+  }
+  .btn-line:hover:not(:disabled) { color: var(--primary); border-color: #cfdcff; background: #fff; }
+  .del { border-radius: var(--r-xs); }
 
   /* ===== GitHub 同步 ===== */
   .sync-bar { margin-top: 12px; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
@@ -233,8 +505,9 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .pw-card { background: #fff; border-radius: 16px; padding: 22px 22px 18px; width: min(320px, 100%); box-shadow: 0 20px 50px rgba(0,0,0,.28); }
   .pw-title { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 6px; }
   .pw-tip { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 14px; line-height: 1.45; }
-  #pw-input { width: 100%; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 18px; text-align: center; letter-spacing: .35em; outline: none; background: #fbfcfe; font-variant-numeric: tabular-nums; font-family: inherit; }
-  #pw-input:focus { border-color: var(--primary); background: #fff; }
+  #pw-input { width: 100%; height: 46px; padding: 0 14px; border: 1px solid var(--line-ctl); border-radius: var(--r-ctl); font-size: 18px; text-align: center; letter-spacing: .35em; outline: none; background: #fbfcfe; font-variant-numeric: tabular-nums; font-family: inherit;
+    transition: border-color .16s var(--ease-soft), box-shadow .16s var(--ease-soft), background .16s var(--ease-soft); }
+  #pw-input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(79,124,255,.12); }
   .pw-err { color: var(--danger); font-size: 12px; height: 16px; text-align: center; margin: 6px 0 8px; }
   .pw-actions { display: flex; gap: 10px; }
   .pw-actions .btn-line { flex: 1; }
@@ -304,92 +577,122 @@ html.in-frame .month-picker { top: 4px; }
     <button type="button" class="mp-btn" id="mp-next" title="下一月">›</button>
   </div>
 
-  <!-- 预警横幅 -->
-  <div id="alerts"></div>
+  <!-- ★ v30 内容区分页签：刚需 / 非刚需　★ v33：中间加合计栏 -->
+  <!-- ★ 左右分栏：左=操作类（切换/记一笔/预警），右=数据类（概览/柱图/预算/记录） -->
+  <div class="layout">
+    <div class="col-left">
+      <div class="kind-tabs" id="kind-tabs" role="tablist">
+        <div class="side">
+          <button type="button" data-kind="need" class="on" role="tab">🔒 刚需 <span class="kb" id="kb-need">--</span></button>
+        </div>
+        <!-- 两账合计：总实际 / 总预算 / 已用 / 结余 -->
+        <div class="total-chip" id="total-chip">
+          <div class="tc-label">两账合计<small id="tc-month"></small></div>
+          <div class="tc-vals">
+            <div class="tc-item"><div class="l">总实际</div><div class="v" id="tc-actual">--</div></div>
+            <div class="tc-item"><div class="l">总预算</div><div class="v" id="tc-budget">--</div></div>
+            <div class="tc-item"><div class="l">已用</div><div class="v" id="tc-pct">--</div></div>
+            <div class="tc-item"><div class="l">结余</div><div class="v" id="tc-bal">--</div></div>
+          </div>
+        </div>
+        <div class="side">
+          <button type="button" data-kind="extra" role="tab">🎈 非刚需 <span class="kb" id="kb-extra">--</span></button>
+        </div>
+      </div>
 
-  <!-- 今日状态 -->
-  <section class="card today-card">
-    <div class="today-head">
-      <div class="today-date" id="t-date">--</div>
-      <span class="clock" id="clock"></span>
-    </div>
-    <div class="budget-line">
-      <span>日预算</span><b id="t-budget">--</b><span class="unit">元</span>
-    </div>
-    <div class="today-input">
-      <input type="date" id="t-datepick" class="datepick" title="选择日期">
-      <input type="number" id="t-input" step="0.01" min="0" inputmode="decimal" placeholder="多少元？">
-      <button type="button" class="btn-primary" id="t-save">记一笔</button>
-    </div>
-    <div class="prog-line">
-      <span>今日实际 <b id="t-actual">--</b> 元</span>
-      <span id="t-remain-wrap">剩余 <b id="t-remain">--</b> 元</span>
-    </div>
-    <div class="prog-bar" id="t-bar"><span id="t-bar-fill" style="width:0%"></span></div>
-  </section>
+      <!-- ★ v36：预警条上移到**记账卡片上方**。
+           原来 #alerts 在 today-card 之后，窄屏单列时提醒落在页面最底部，
+           用户已经填完账/正要填账时反而看不到，等于白提醒。 -->
+      <div id="alerts"></div>
 
-  <!-- 本月概览 -->
-  <section class="card">
-    <h2 id="sum-title">本月概览</h2>
-    <div class="stats">
-      <div class="stat"><div class="label">总预算<small id="sum-budget-note"></small></div><div class="value" id="s-budget">--</div></div>
-      <div class="stat"><div class="label">累计实际</div><div class="value" id="s-actual">--</div></div>
-      <div class="stat"><div class="label">已用</div><div class="value" id="s-pct">--</div></div>
-      <div class="stat"><div class="label">结余</div><div class="value" id="s-bal">--</div></div>
-      <div class="stat"><div class="label">剩余天数</div><div class="value" id="s-days">--</div></div>
-    </div>
-    <div class="stat-note" id="sum-note"></div>
-  </section>
+      <section class="card today-card">
+        <div class="today-head">
+          <div class="today-date" id="t-date">--</div>
+          <span class="clock" id="clock"></span>
+        </div>
+        <div class="budget-line">
+          <span id="t-budget-label">日预算</span><b id="t-budget">--</b><span class="unit">元</span>
+        </div>
+        <div class="today-input">
+          <input type="date" id="t-datepick" class="datepick" title="选择日期">
+          <input type="number" id="t-input" step="0.01" min="0" inputmode="decimal" placeholder="多少元？">
+          <button type="button" class="btn-primary" id="t-save">记一笔</button>
+        </div>
+        <div class="prog-line">
+          <span id="t-actual-wrap">今日实际 <b id="t-actual">--</b> 元</span>
+          <span id="t-remain-wrap">剩余 <b id="t-remain">--</b> 元</span>
+        </div>
+        <div class="prog-bar" id="t-bar"><span id="t-bar-fill" style="width:0%"></span></div>
+      </section>
 
-  <!-- 记录范围说明（始终可见，提醒哪些算、哪些不算） -->
-  <div class="alert alert-info" style="margin-top:-6px;padding-bottom:14px">
-    <span class="ai">📒</span>
-    <span class="at">
-      <b style="color:#ae292b;font-size:15px">本记录仅涵盖：每日餐饮等必要、固定的刚性支出</b><br>
-      <span style="display:inline-block;transform:skewX(-10deg);transform-origin:left center;padding:3px 0 7px"><b style="color:#4a5568;font-size:15px">不计入：</b><span style="color:#4a5568;font-size:15px">房租等由录入人主观认定为非刚需的支出不计入其中（相关录入金额不具备严谨记账的准确参考价值）</span></span></span>
-    </span>
+      <!-- 今日状态 -->
+    </div>
+    <div class="col-right">
+      <!-- 本月概览 -->
+      <section class="card">
+        <h2 id="sum-title">本月概览</h2>
+        <div class="stats">
+          <div class="stat"><div class="label" id="sum-budget-label">总预算<small id="sum-budget-note"></small></div><div class="value" id="s-budget">--</div></div>
+          <div class="stat"><div class="label">累计实际</div><div class="value" id="s-actual">--</div></div>
+          <div class="stat"><div class="label">已用</div><div class="value" id="s-pct">--</div></div>
+          <div class="stat"><div class="label">结余</div><div class="value" id="s-bal">--</div></div>
+          <div class="stat"><div class="label">剩余天数</div><div class="value" id="s-days">--</div></div>
+        </div>
+        <div class="stat-note" id="sum-note"></div>
+      </section>
+
+      <!-- 记录范围说明（始终可见，提醒哪些算、哪些不算；非刚需页签下隐藏 —— v30） -->
+      <div class="alert alert-info" id="scope-note" style="margin-top:-6px;padding-bottom:14px">
+        <span class="ai">📒</span>
+        <span class="at">
+          <b style="color:#ae292b;font-size:15px">本记录仅涵盖：每日餐饮等必要、固定的刚性支出</b><br>
+          <span style="display:inline-block;transform:skewX(-10deg);transform-origin:left center;padding:3px 0 7px"><b style="color:#4a5568;font-size:15px">不计入：</b><span style="color:#4a5568;font-size:15px">房租等由录入人主观认定为非刚需的支出不计入其中（相关录入金额不具备严谨记账的准确参考价值）</span></span></span>
+        </span>
+      </div>
+
+      <!-- 周柱图 -->
+      <section class="card">
+        <h2>每周实际 vs 预算</h2>
+        <div class="chart-scroll"><div class="chart-box"><svg class="chart" id="chart"></svg></div></div>
+        <div class="legend">
+          <span><i class="lg-b"></i>周预算</span>
+          <span><i class="lg-g"></i>实际（未超）</span>
+          <span><i class="lg-r"></i>实际（超支）</span>
+        </div>
+      </section>
+
+      <!-- 日预算设置 -->
+      <section class="card">
+        <h2 id="bset-title">日预算设置</h2>
+        <div class="set-row">
+          <div class="field" style="flex:1 1 160px"><label id="bset-label">每天预算金额（元）</label><input type="number" id="b-input" step="0.01" min="0" inputmode="decimal" placeholder="如 120"></div>
+          <button type="button" class="btn-primary" id="b-save">保存</button>
+          <button type="button" class="btn-ghost" id="b-unlock" style="display:none" title="本月已过 8 号锁定时，输入密码可临时解锁修改">🔓 输密码解锁</button>
+        </div>
+        <div class="set-hint" id="b-hint"></div>
+      </section>
+
+      <!-- 每日记录 -->
+      <section class="card">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+          <h2 style="margin-bottom:0" id="hist-title">每日记录</h2>
+          <span class="tip" id="hist-count" style="margin-top:0"></span>
+        </div>
+        <div id="history"></div>
+        <div class="actions">
+          <button type="button" class="btn-line" id="export-btn">导出 Excel</button>
+          <button type="button" class="btn-line" id="import-btn">导入</button>
+          <button type="button" class="btn-ghost" id="clear-btn" title="清空本月记录（需密码）">清空本月</button>
+        </div>
+      </section>
+    </div>
+
+    <input type="file" id="file-input" accept=".xlsx,.json,application/json" style="display:none">
+
+    <!-- 清空密码确认弹窗 -->
+    </div>
   </div>
 
-  <!-- 周柱图 -->
-  <section class="card">
-    <h2>每周实际 vs 预算</h2>
-    <div class="chart-scroll"><div class="chart-box"><svg class="chart" id="chart"></svg></div></div>
-    <div class="legend">
-      <span><i class="lg-b"></i>周预算</span>
-      <span><i class="lg-g"></i>实际（未超）</span>
-      <span><i class="lg-r"></i>实际（超支）</span>
-    </div>
-  </section>
-
-  <!-- 日预算设置 -->
-  <section class="card">
-    <h2>日预算设置</h2>
-    <div class="set-row">
-      <div class="field" style="flex:1 1 160px"><label>每天预算金额（元）</label><input type="number" id="b-input" step="0.01" min="0" inputmode="decimal" placeholder="如 120"></div>
-      <button type="button" class="btn-primary" id="b-save">保存</button>
-      <button type="button" class="btn-ghost" id="b-unlock" style="display:none" title="本月已过 8 号锁定时，输入密码可临时解锁修改">🔓 输密码解锁</button>
-    </div>
-    <div class="set-hint" id="b-hint"></div>
-  </section>
-
-  <!-- 每日记录 -->
-  <section class="card">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-      <h2 style="margin-bottom:0" id="hist-title">每日记录</h2>
-      <span class="tip" id="hist-count" style="margin-top:0"></span>
-    </div>
-    <div id="history"></div>
-    <div class="actions">
-      <button type="button" class="btn-line" id="export-btn">导出 Excel</button>
-      <button type="button" class="btn-line" id="import-btn">导入</button>
-      <button type="button" class="btn-ghost" id="clear-btn" title="清空本月记录（需密码）">清空本月</button>
-    </div>
-  </section>
-</div>
-
-<input type="file" id="file-input" accept=".xlsx,.json,application/json" style="display:none">
-
-<!-- 清空密码确认弹窗 -->
 <div class="pw-mask" id="pw-mask">
   <div class="pw-card">
     <div class="pw-title">🔒 清空确认</div>
@@ -480,7 +783,41 @@ function toast(msg) {
    budgets: 预算变更历史（append-only），{ id, month, effective_from, daily, note }
    actuals: 每日实际（按 date upsert），  { date, amount, note }
    ========================================================= */
-function emptyData() { return { meta: { version: 1, schemaVersion: 2, lastModified: '' }, budgets: [], actuals: [] }; }
+function emptyData() {
+  // v30：新增 monthlyBudgets（非刚需月总预算）；actuals 加 kind 字段
+  return { meta: { version: 1, schemaVersion: 3, lastModified: '' }, budgets: [], monthlyBudgets: [], actuals: [] };
+}
+/** 记录属于哪本账：'need' 刚需 / 'extra' 非刚需（缺省刚需，兼容老数据） */
+const kindOf = a => (a && a.kind === 'extra') ? 'extra' : 'need';
+/** 取某本账在某个月的实际合计 */
+function sumByKind(month, kind) {
+  let s = 0;
+  for (const a of DATA.actuals) {
+    if (a.date.slice(0, 7) !== month) continue;
+    if (kindOf(a) !== kind) continue;
+    s += a.amount;
+  }
+  return s;
+}
+/** 取某本账某天的实际（刚需按日预算口径，非刚需只有一个总额） */
+function actualOn(date, kind) {
+  const r = DATA.actuals.find(a => a.date === date && kindOf(a) === kind);
+  return r ? r.amount : null;
+}
+/** 非刚需的月总预算（该月没有则 null）
+ *  ★ 取**最后一条** —— normData 不去重同月多条，
+ *    原来用 find 取第一条、而 dataToRows 用遍历覆盖取最后一条，
+ *    两边不一致 → 界面显示 300、导出写 999，同步后数值就变了。 */
+function extraBudgetOf(month) {
+  const list = (DATA.monthlyBudgets || []).filter(x => x.month === month);
+  if (!list.length) return null;
+  return list[list.length - 1].total;
+}
+/** 非刚需：把月总预算均摊到每周（用于柱状图的预算柱对比） */
+function extraWeeklyBudget(month, weekCount) {
+  const t = extraBudgetOf(month);
+  return (t == null || !weekCount) ? 0 : t / weekCount;
+}
 function normData(d) {
   if (!d || typeof d !== 'object') return emptyData();
   const out = emptyData();
@@ -493,15 +830,34 @@ function normData(d) {
   }
   if (Array.isArray(d.actuals)) {
     out.actuals = d.actuals.filter(a => a && /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') && !isNaN(parseFloat(a.amount)))
-      .map(a => ({ date: a.date, amount: Math.round(parseFloat(a.amount) * 100) / 100, note: a.note || '', entryDate: /^\d{4}-\d{2}-\d{2}$/.test(a.entryDate || '') ? a.entryDate : '' }));
+      .map(a => ({
+        date: a.date, amount: Math.round(parseFloat(a.amount) * 100) / 100, note: a.note || '',
+        entryDate: /^\d{4}-\d{2}-\d{2}$/.test(a.entryDate || '') ? a.entryDate : '',
+        // **kind：'need' 刚需 / 'extra' 非刚需**（缺省刚需 → 老数据全是刚需）
+        kind: a.kind === 'extra' ? 'extra' : 'need',
+      }));
     if (legacySchema) { out.actuals.forEach(a => { a.entryDate = ''; }); out.meta.schemaVersion = 2; }
   }
+  // v30：非刚需的月总预算
+  if (Array.isArray(d.monthlyBudgets)) {
+    out.monthlyBudgets = d.monthlyBudgets
+      .filter(b => b && /^\d{4}-\d{2}$/.test(b.month || '') && !isNaN(parseFloat(b.total)))
+      .map((b, i) => ({ id: b.id || 'm' + (i + 1), month: b.month, total: Math.round(parseFloat(b.total) * 100) / 100, note: b.note || '' }));
+    // ★ v31：同月多条只保留**最后一条**（与 extraBudgetOf / dataToRows 口径一致）
+    const seen = new Map();
+    out.monthlyBudgets.forEach(b => seen.set(b.month, b));
+    out.monthlyBudgets = [...seen.values()];
+  }
+  // v26→v30 的老数据（schemaVersion 2）升级到 3
+  if (parseInt((d.meta && d.meta.schemaVersion) || 1, 10) < 3) out.meta.schemaVersion = 3;
   sortAll(out);
   return out;
 }
 function sortAll(d) {
   d.budgets.sort((a, b) => a.effective_from < b.effective_from ? -1 : a.effective_from > b.effective_from ? 1 : 0);
   d.actuals.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  // v30：非刚需月预算按月份排序
+  if (d.monthlyBudgets) d.monthlyBudgets.sort((a, b) => a.month < b.month ? -1 : a.month > b.month ? 1 : 0);
 }
 const load = () => { try { return normData(JSON.parse(localStorage.getItem(KEY))); } catch { return emptyData(); } };
 /* 同样要捕获配额溢出 —— 否则写满时抛 QuotaExceededError，
@@ -554,13 +910,18 @@ function monthBudgetTotal(month, budgets) {
 }
 // 该月到「今天」为止的真实累计：只统计已填的记录。
 // （旧版会把未填的过去日按预算额计入，导致「累计实际」紧贴总预算、看起来像目标；v16 起未填不计入）
-function monthActualSoFar(month, d) {
+// kind：'need' 刚需（默认）/ 'extra' 非刚需
+// ★ v31：**必须按 kind 过滤** —— 两本账共存后同一天可能有两条记录，
+//   原来的 find 只取第一条，于是刚需的「累计实际」会被非刚需串账，
+//   而且数值随录入顺序漂移（先记非刚需再记刚需 → 显示非刚需的金额）。
+function monthActualSoFar(month, d, kind) {
+  const k = kind === 'extra' ? 'extra' : 'need';
   const today = todayStr();
   let sum = 0, filled = 0, past = 0;
   for (const day of daysInMonth(month)) {
     if (day > today) break;
     past++;
-    const rec = (d || DATA).actuals.find(a => a.date === day);
+    const rec = (d || DATA).actuals.find(a => a.date === day && kindOf(a) === k);
     if (rec) { sum += rec.amount; filled++; }
   }
   return { sum, filled, past };
@@ -584,10 +945,13 @@ function setBudget(month, daily, fromDate) {
   else DATA.budgets.push({ id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), month, effective_from: from, daily, note: '' });
   sortAll(DATA);
 }
-function upsertActual(date, amount, note) {
-  const i = DATA.actuals.findIndex(a => a.date === date);
+// kind：'need' 刚需（默认）/ 'extra' 非刚需 —— v30
+// **同一天可以同时有刚需和非刚需两条**（记到哪个页签就算哪个页签的）
+function upsertActual(date, amount, note, kind) {
+  const k = kind === 'extra' ? 'extra' : 'need';
+  const i = DATA.actuals.findIndex(a => a.date === date && kindOf(a) === k);
   // entryDate = 本次录入/编辑当天的本地日期，删除权限靠它判定（见 canDeleteActual）
-  const rec = { date, amount, note: note || '', entryDate: todayStr() };
+  const rec = { date, amount, note: note || '', entryDate: todayStr(), kind: k };
   if (i >= 0) DATA.actuals[i] = rec;
   else DATA.actuals.push(rec);
   sortAll(DATA);
@@ -621,32 +985,94 @@ function xlDate(v) {
   return m ? `${m[1]}-${pad(+m[2])}-${pad(+m[3])}` : s;
 }
 function dataToRows(d) {
-  const rows = [['日期', '日预算', '实际花费', '备注', '录入日']];
+  // ★ v30：加「类型」列（刚需/非刚需）与「非刚需月预算」列
+  //   老表格只有 5 列（日期|日预算|实际花费|备注|录入日）→ 导入端按表头识别
+  const rows = [['日期', '日预算', '实际花费', '备注', '录入日', '类型', '非刚需月预算']];
   const today = todayStr();
-  const months = [...new Set(d.budgets.map(b => b.month))].sort();
+  // ★ v30：月份集合要包含**所有**有记录的月份 ——
+  //   原来只取 d.budgets（刚需预算）的月份，
+  //   于是「只有非刚需记录、没设刚需日预算」的月份整月被跳过，
+  //   那些非刚需记录在导出时直接丢失（实测：往返后 extra 记录没了）。
+  const monthSet = new Set(d.budgets.map(b => b.month));
+  (d.monthlyBudgets || []).forEach(b => monthSet.add(b.month));
+  d.actuals.forEach(a => monthSet.add(a.date.slice(0, 7)));
+  const months = [...monthSet].sort();
+  // 非刚需月预算：每月一条，写在该月第一行
+  const extraByMonth = {};
+  (d.monthlyBudgets || []).forEach(b => { extraByMonth[b.month] = b.total; });
+  // ★ v31：记录每个月已写了多少行 —— 非刚需月预算要写在该月**第一行**
+  //   （不论那行是刚需还是非刚需、也不论有没有记录）
+  const monthRowCount = {};
   months.forEach(month => {
     const def = daysInMonth(month);
     let wrote = false;
+    // ★ v31：**日预算只取该月自身的段**，不沿用上月。
+    //   原来用 dailyAt(day, d.budgets) —— 它会回退到「上月最后一段」，
+    //   于是「本月没设刚需日预算」的月份导出时写出的是上月金额，
+    //   导入后凭空生成本月预算段（实测：凭空多出 2026-11-02@88）。
+    const monthSegs = d.budgets.filter(b => b.month === month)
+      .sort((a, b) => a.effective_from < b.effective_from ? -1 : a.effective_from > b.effective_from ? 1 : 0);
+    const dailyOfDay = day => {
+      // 该月自身的分段里，effective_from <= day 的最后一段
+      let cur = null;
+      for (const s of monthSegs) { if (s.effective_from <= day) cur = s; }
+      return cur ? cur.daily : null;
+    };
     for (const day of def) {
       if (day > today) break;                                   // 未来日不写
-      const daily = dailyAt(day, d.budgets);
-      const rec = d.actuals.find(a => a.date === day);
-      if (daily == null && !rec) continue;                      // 两者都无 → 跳过
-      rows.push([day, daily == null ? '' : daily, rec ? rec.amount : '', rec ? (rec.note || '') : '', rec ? (rec.entryDate || '') : '']);
-      wrote = true;
+      const daily = dailyOfDay(day);
+      // ★ 同一天可能有刚需与非刚需两条 → 都要写出来
+      const recs = d.actuals.filter(a => a.date === day);
+      const hasNeedRec = recs.some(r => kindOf(r) === 'need');
+      if (daily == null && !recs.length) continue;              // 两者都无 → 跳过
+      if (!recs.length) {
+        rows.push([day, daily == null ? '' : daily, '', '', '', '刚需',
+                   !(monthRowCount[month] > 0) && extraByMonth[month] != null ? extraByMonth[month] : '']);
+        monthRowCount[month] = (monthRowCount[month] || 0) + 1;
+        wrote = true;
+        continue;
+      }
+      // ★ v31：**某天有非刚需记录但没有刚需记录时，也要补一行刚需基线**，
+      //   否则导入端反推预算段时那天的 daily 丢了 → 段漂移甚至整段消失。
+      if (daily != null && !hasNeedRec) {
+        rows.push([day, daily, '', '', '', '刚需',
+                   !(monthRowCount[month] > 0) && extraByMonth[month] != null ? extraByMonth[month] : '']);
+        monthRowCount[month] = (monthRowCount[month] || 0) + 1;
+      }
+      recs.forEach((rec, ri) => {
+        const isX = kindOf(rec) === 'extra';
+        // 非刚需行的「日预算」列留空（非刚需没有日预算）
+        rows.push([day, isX ? '' : (daily == null ? '' : daily), rec.amount, rec.note || '',
+                   rec.entryDate || '', isX ? '非刚需' : '刚需',
+                   // ★ v31：非刚需月预算写在该月**第一行**（不论那行是刚需还是非刚需）。
+                   //   原来只写在「该月第一条记录」上，而当第一条恰好是刚需行时，
+                   //   月预算仍会写；但若该月第一行是刚需且 recs[0] 判断有偏差就会漏。
+                   //   这里改成用「该月已写行数」计数，最稳。
+                   (!(monthRowCount[month] > 0) && extraByMonth[month] != null) ? extraByMonth[month] : '']);
+        monthRowCount[month] = (monthRowCount[month] || 0) + 1;
+        wrote = true;
+      });
     }
     // 未来月（整月都在未来）或本月尚未开始：预算段无处落脚 → 写在月初一行，备注标注
     if (!wrote) {
       d.budgets.filter(b => b.month === month).forEach(b => {
-        rows.push([b.effective_from, b.daily, '', '预算设定', '']);
+        rows.push([b.effective_from, b.daily, '', '预算设定', '', '刚需',
+                   extraByMonth[month] != null ? extraByMonth[month] : '']);
       });
+      // ★ v31：该月只有非刚需月预算（没设刚需日预算）时，也要把月预算写出来
+      if (!d.budgets.some(b => b.month === month) && extraByMonth[month] != null) {
+        rows.push([month + '-01', '', '', '非刚需月预算设定', '', '非刚需', extraByMonth[month]]);
+      }
     }
   });
   // 有实际记录但所属月没有预算段的（极端情况）也补上
   d.actuals.forEach(a => {
     if (a.date > today) return;
-    if (rows.some(r => r[0] === a.date)) return;
-    rows.push([a.date, '', a.amount, a.note || '', a.entryDate || '']);
+    const isX = kindOf(a) === 'extra';
+    // 同一天已写过同类型就跳过（但另一类型还要写）
+    if (rows.some(r => r[0] === a.date && (r[5] || '刚需') === (isX ? '非刚需' : '刚需'))) return;
+    rows.push([a.date, '', a.amount, a.note || '', a.entryDate || '', isX ? '非刚需' : '刚需',
+               isX && extraByMonth[a.date.slice(0, 7)] != null ? extraByMonth[a.date.slice(0, 7)] : '']);
   });
   const head = rows[0];
   const body = rows.slice(1).sort((x, y) => x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0);
@@ -655,16 +1081,50 @@ function dataToRows(d) {
 function rowsToData(rows) {
   const out = emptyData();
   const dailyByDate = {};
+  // ★ v30：按**表头**识别列（不能写死列号）——
+  //   老表：日期|日预算|实际花费|备注|录入日（5 列）
+  //   新表：…|类型|非刚需月预算（7 列）
+  const head = (rows[0] || []).map(c => String(c == null ? '' : c).trim());
+  const colType = head.indexOf('类型');
+  const colExtra = head.indexOf('非刚需月预算');
+  const hasTypeCol = colType >= 0;
+  const colNote = head.indexOf('备注');
+  const colEntry = head.indexOf('录入日');
   for (let i = 1; i < rows.length; i++) {
     const r = Array.isArray(rows[i]) ? rows[i] : [];
     const date = xlDate(r[0]);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    const daily = parseFloat(r[1]);
+    // ★ v31：**类型=非刚需 的行，其「日预算」列不参与反推** ——
+    //   非刚需没有日预算概念，那一列必须留空；
+    //   万一有值也不能拿去重建刚需的预算段。
+    const typeRaw0 = hasTypeCol ? String(r[colType] == null ? '' : r[colType]).trim() : '';
+    const isExtraRow = (typeRaw0 === '非刚需' || typeRaw0.toLowerCase() === 'extra');
+    const daily = isExtraRow ? NaN : parseFloat(r[1]);
     if (!isNaN(daily)) dailyByDate[date] = Math.round(daily * 100) / 100;
     const amt = parseFloat(r[2]);
     if (!isNaN(amt)) {
-      const ed = xlDate(r[4]);   // 第 5 列「录入日」：没有就留空（视为历史数据，不可删）
-      out.actuals.push({ date, amount: Math.round(amt * 100) / 100, note: r[3] == null ? '' : String(r[3]).trim(), entryDate: /^\d{4}-\d{2}-\d{2}$/.test(ed) ? ed : '' });
+      const noteV = colNote >= 0 ? r[colNote] : r[3];
+      const edV = colEntry >= 0 ? r[colEntry] : r[4];
+      const ed = xlDate(edV);   // 「录入日」：没有就留空（视为历史数据，不可删）
+      // 类型：'非刚需'/'extra' → extra；'刚需'/'need'/空 → need（老表无此列 → 全是刚需）
+      const tRaw = hasTypeCol ? String(r[colType] == null ? '' : r[colType]).trim() : '';
+      const kind = (tRaw === '非刚需' || tRaw.toLowerCase() === 'extra') ? 'extra' : 'need';
+      out.actuals.push({
+        date, amount: Math.round(amt * 100) / 100,
+        note: noteV == null ? '' : String(noteV).trim(),
+        entryDate: /^\d{4}-\d{2}-\d{2}$/.test(ed) ? ed : '',
+        kind,
+      });
+    }
+    // 非刚需月预算：同一月可能多行都有值，取第一个非空的
+    if (colExtra >= 0) {
+      const ex = parseFloat(r[colExtra]);
+      if (!isNaN(ex) && ex > 0) {
+        const m = date.slice(0, 7);
+        if (!out.monthlyBudgets.some(b => b.month === m)) {
+          out.monthlyBudgets.push({ id: 'm' + out.monthlyBudgets.length, month: m, total: Math.round(ex * 100) / 100, note: '' });
+        }
+      }
     }
   }
   // 把逐日 baseline 折叠回「预算变更记录」：同月内 daily 变化才追加一条
@@ -841,13 +1301,16 @@ async function refresh() {
    渲染
    ========================================================= */
 let VIEW = curMonth();      // 当前查看的月份 'YYYY-MM'
+let curKind = 'need';       // v30：当前看哪本账 'need' 刚需 | 'extra' 非刚需
+const isNeedKind = () => curKind === 'need';
 let budgetUnlocked = false; // 会话级：本月已过 8 号锁定时，输密码可临时解锁修改（切月/刷新后复位）
 
 const WEEKDAY = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 // 把一个月按自然周（周一起）分组，返回 [{label, budget, actual, over, futureOnly}] 
-function weeksOfMonth(month, d) {
+function weeksOfMonth(month, d, kind) {
   const today = todayStr();
+  const kindK = kind || 'need';
   const days = daysInMonth(month);
   const groups = [];
   let cur = null;
@@ -856,26 +1319,39 @@ function weeksOfMonth(month, d) {
     if (!cur || cur.key !== k) { cur = { key: k, days: [] }; groups.push(cur); }
     cur.days.push(day);
   });
+  // ★ v30：非刚需的「周预算」= 月总预算均摊到每周（用于柱状图对比线）
+  const extraWeekly = kindK === 'extra' ? extraWeeklyBudget(month, groups.length) : 0;
   return groups.map((g, idx) => {
     let budget = 0, actual = 0, hasOpen = false, allFuture = true, filled = 0, past = 0;
     g.days.forEach(day => {
-      const daily = dailyAt(day, d.budgets) || 0;
-      const rec = d.actuals.find(a => a.date === day);
+      const daily = kindK === 'extra' ? 0 : (dailyAt(day, d.budgets) || 0);
+      const rec = d.actuals.find(a => a.date === day && kindOf(a) === kindK);
       if (day <= today) {
         allFuture = false;
         past++;
         budget += daily;
-        if (rec) { actual += rec.amount; filled++; } else { actual += daily; }   // 未填按花满
+        if (rec) { actual += rec.amount; filled++; }
+        // ★ v32：**未填不计入**（原来刚需会按花满算，与「累计实际」口径矛盾）。
+        //   统一成「没填就是 0」——周柱子的实际高度 = 真实已录入金额。
+        //   这样柱图与概览「累计实际」加起来对得上。
       } else {
         hasOpen = true;
       }
     });
+    if (kindK === 'extra') budget = extraWeekly;   // 非刚需：整月预算均摊
     return { idx: idx + 1, days: g.days, budget, actual, over: budget > 0 && actual > budget, allFuture, hasOpen, filled, past };
   });
 }
 
 function render() {
   renderPicker();
+  renderKindBadges();     // v30：页签上的金额小标
+  renderTotalBar();       // v33：两账合计栏
+  // ★ v30：范围说明讲的是「刚需」，非刚需页签下隐藏（换成非刚需的说明）
+  const scopeEl = $('scope-note');
+  if (scopeEl) {
+    scopeEl.style.display = isNeedKind() ? '' : 'none';
+  }
   renderAlerts();
   renderToday();
   renderSummary();
@@ -914,19 +1390,44 @@ function renderAlerts() {
   const isCur = VIEW === curMonth();
   const list = [];
 
+  // ★ v30：非刚需分支 —— 月总预算口径，与刚需完全独立
+  if (!isNeedKind()) {
+    const total = extraBudgetOf(VIEW);
+    const sum = sumByKind(VIEW, 'extra');
+    if (isCur) {
+      const todayExtra = actualOn(today, 'extra');
+      if (total == null) {
+        list.push(['info', '💡', '还没设非刚需月总预算。在「月总预算设置」里填一个金额，就能开始记录。']);
+      }
+      if (todayExtra == null && new Date().getHours() >= 12) {
+        list.push(['warn', '📌', '今天还没记非刚需支出，往下记一笔。']);
+      }
+    }
+    // ★ v31：超支只弹**一条** —— 原来当月超支会同时弹
+    //   「本月非刚需已超支」和「本月非刚需累计超支」，金额完全一样，纯重复。
+    if (total != null && sum > total) {
+      list.push(['danger', '📉', `本月非刚需已超支 <b>¥${money(sum - total)}</b>（月预算 ¥${money(total)}，实际 ¥${money(sum)}）`]);
+    }
+    box.innerHTML = list.map(([cls, icon, text]) =>
+      `<div class="alert alert-${cls}"><span class="ai">${icon}</span><span class="at">${text}</span></div>`
+    ).join('');
+    return;
+  }
+
   if (isCur) {
     const daily = dailyAt(today, DATA.budgets);
-    const rec = DATA.actuals.find(a => a.date === today);
+    // ★ v31：必须按 kind 过滤 —— 只记了非刚需时，刚需页签不该报「今日已超支」
+    const rec = DATA.actuals.find(a => a.date === today && kindOf(a) === 'need');
     if (rec && daily != null && rec.amount > daily) {
       list.push(['danger', '⚠️', `今日已超支 <b>¥${money(rec.amount - daily)}</b>（预算 ¥${money(daily)}，实际 ¥${money(rec.amount)}）`]);
     }
     if (!rec && new Date().getHours() >= 12) {
-      list.push(['warn', '📌', '今日还未记录，记得填一笔。' + (daily != null ? `（今天预算 <b>¥${money(daily)}</b>）` : '（还没设日预算）')]);
+      list.push(['warn', '📌', '今日还未记录，往下记一笔。' + (daily != null ? `（今天预算 <b>¥${money(daily)}</b>）` : '（还没设日预算）')]);
     }
   }
   // 本月累计超支（任何月都能看，但只有当月/未来月有意义）
   const mb = monthBudgetTotal(VIEW, DATA.budgets);
-  const { sum } = monthActualSoFar(VIEW, DATA);
+  const { sum } = monthActualSoFar(VIEW, DATA, 'need');
   const cap = VIEW === curMonth()
     ? monthBudgetTotal(VIEW, DATA.budgets)   // 当月总预算含全月，用「至今预算」比更公平
     : mb;
@@ -966,9 +1467,63 @@ function renderToday() {
   const today = todayStr();
   const t = parseYmd(today);
   $('t-date').innerHTML = `${t.getMonth() + 1} 月 ${t.getDate()} 日<span>${WEEKDAY[t.getDay()]}</span>`;
+
+  // ★ v30：非刚需 —— 显示「本月非刚需月总预算」而不是日预算
+  if (!isNeedKind()) {
+    const total = extraBudgetOf(VIEW);
+    const sum = sumByKind(VIEW, 'extra');
+    const todayExtra = actualOn(today, 'extra');
+    $('t-budget-label').textContent = '非刚需月总预算';
+    $('t-budget').textContent = total == null ? '--' : money(total);
+    $('t-actual-wrap').innerHTML = `本月非刚需 <b id="t-actual">--</b> 元`;
+    $('t-remain-wrap').innerHTML = `剩余 <b id="t-remain">--</b> 元`;
+    const remainX = total == null ? null : total - sum;
+    const rwX = $('t-remain-wrap');
+    rwX.className = remainX == null ? '' : (remainX < 0 ? 'over' : 'under');
+    $('t-remain').textContent = remainX == null ? '--' : money(remainX);
+    const pctX = (total != null && total > 0) ? Math.min(999, sum / total * 100) : null;
+    const barX = $('t-bar');
+    barX.className = 'prog-bar' + (pctX == null ? '' : pctX > 100 ? ' over' : ' under');
+    $('t-bar-fill').style.width = (pctX == null ? 0 : Math.min(100, pctX)) + '%';
+
+    // 日期选择器 + 输入框同步（非刚需自己的记录）
+    const dpX = $('t-datepick');
+    const minDateX = earliestEditableMonth() + '-01';
+    dpX.min = minDateX; dpX.max = today;
+    dpX.title = '选择日期（补录窗口内可回填上个月）';
+    if (document.activeElement !== dpX) {
+      let vX = (lastPick && lastPick <= today) ? lastPick : today;
+      if (vX < minDateX) vX = today;
+      dpX.value = vX;
+    }
+    const pickedX = dpX.value;
+    dpX.onchange = () => {
+      const d = dpX.value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      lastPick = d;
+      const r = DATA.actuals.find(a => a.date === d && kindOf(a) === 'extra');
+      $('t-input').value = r ? r.amount : '';
+      $('t-input').focus();
+    };
+    $('t-input').disabled = false;
+    $('t-save').disabled = false;
+    const recPX = DATA.actuals.find(a => a.date === pickedX && kindOf(a) === 'extra');
+    if (document.activeElement !== $('t-input')) $('t-input').value = recPX ? recPX.amount : '';
+    $('t-input').placeholder = '非刚需花了多少？';
+    $('t-save').textContent = '记一笔（非刚需）';
+    // 今日非刚需金额（同步显示在进度条旁）
+    const txEl = document.getElementById('t-actual');
+    if (txEl) txEl.textContent = todayExtra == null ? '0.00' : money(todayExtra);
+    return;
+  }
+
   const daily = dailyAt(today, DATA.budgets);
+  $('t-budget-label').textContent = '日预算';
   $('t-budget').textContent = daily == null ? '--' : money(daily);
-  const rec = DATA.actuals.find(a => a.date === today);
+  $('t-actual-wrap').innerHTML = '今日实际 <b id="t-actual">--</b> 元';
+  $('t-input').placeholder = '多少元？';
+  $('t-save').textContent = '记一笔';
+  const rec = DATA.actuals.find(a => a.date === today && kindOf(a) === 'need');
 
   // 日期选择：默认今天；约束在 [最早可编辑月1号, 今天]；保存后保持在上一次操作的日期
   const dp = $('t-datepick');
@@ -987,7 +1542,7 @@ function renderToday() {
     const d = dp.value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
     lastPick = d;
-    const r = DATA.actuals.find(a => a.date === d);
+    const r = DATA.actuals.find(a => a.date === d && kindOf(a) === 'need');
     $('t-input').value = r ? r.amount : '';
     $('t-input').focus();
   };
@@ -996,14 +1551,18 @@ function renderToday() {
   $('t-input').disabled = false;
   $('t-save').disabled = false;
   // 输入框同步「当前所选日期」的已有记录（保存后日期不跳，金额也停留在刚记的那天）
-  const recPicked = DATA.actuals.find(a => a.date === picked);
+  const recPicked = DATA.actuals.find(a => a.date === picked && kindOf(a) === 'need');
   if (document.activeElement !== $('t-input')) $('t-input').value = recPicked ? recPicked.amount : '';
 
-  // 今日实际（未填时按花满展示，但用斜体弱化区分）
-  const shown = rec ? rec.amount : daily;
-  $('t-actual').textContent = shown == null ? '--' : money(shown) + (rec ? '' : '（未填·按预算计）');
+  // ★ v32：今日实际 —— **没填就是 0**，不按预算计。
+  //   原来未填时显示 daily（按预算计），于是「今日实际 60.00（未填·按预算计）」
+  //   看起来像真花了 60 元，和「累计实际」的口径（未填不计入，v16 起）自相矛盾。
+  //   用户明确要求：没填就是 0，后面会自己补录。
+  const shown = rec ? rec.amount : 0;
+  $('t-actual').textContent = money(shown);
+  // 未填时保留一点弱化，让用户看得出「这是 0，不是花了 0」
   $('t-actual').style.fontStyle = rec ? 'normal' : 'italic';
-  $('t-actual').style.opacity = rec ? '1' : '.7';
+  $('t-actual').style.opacity = rec ? '1' : '.62';
 
   const remain = (daily != null && shown != null) ? daily - shown : null;
   const rw = $('t-remain-wrap');
@@ -1019,11 +1578,48 @@ function renderToday() {
 function renderSummary() {
   const isCur = VIEW === curMonth();
   const today = todayStr();
+
+  // ★ v30：非刚需 —— 月总预算口径
+  if (!isNeedKind()) {
+    const totalX = extraBudgetOf(VIEW);
+    const sumX = sumByKind(VIEW, 'extra');
+    const daysX = daysInMonth(VIEW);
+    const leftX = isCur ? daysX.filter(d => d >= today).length : (VIEW > curMonth() ? daysX.length : 0);
+    const recsX = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW && kindOf(a) === 'extra').length;
+    $('sum-title').textContent = (isCur ? '本月' : monthLabel(VIEW)) + '非刚需概览';
+    $('sum-budget-label').innerHTML = '月总预算<small id="sum-budget-note"></small>';
+    $('s-budget').innerHTML = totalX != null ? money(totalX) : '--';
+    $('s-actual').innerHTML = money(sumX);
+    const pctX = totalX != null && totalX > 0 ? sumX / totalX * 100 : null;
+    const elX = $('s-pct');
+    elX.textContent = pctX == null ? '--' : pctX.toFixed(1) + '%';
+    elX.className = 'value' + (pctX == null ? '' : pctX > 100 ? ' over' : '');
+    const balElX = $('s-bal');
+    if (totalX != null) {
+      const bal = totalX - sumX;
+      balElX.textContent = money(bal);
+      balElX.className = 'value' + (bal > 0 ? ' plus' : bal < 0 ? ' minus' : '');
+    } else {
+      balElX.textContent = '--'; balElX.className = 'value';
+    }
+    $('s-days').innerHTML = leftX ? `${leftX}<small>天</small>` : '--';
+    const partsX = [];
+    partsX.push(`已记 ${recsX} 笔非刚需`);
+    if (isCur) partsX.push(inBackfillWindow() ? '上月可补录至本月 7 号，8 号自动结清' : '跨月后该月自动冻结，不可再改');
+    $('sum-note').textContent = partsX.join(' · ');
+    // 按钮可用性
+    const canClearX = isCur || isBackfillMonth(VIEW);
+    $('clear-btn').disabled = !canClearX;
+    $('clear-btn').title = canClearX ? `清空${isCur ? '本月' : monthLabel(VIEW)}的非刚需记录（需密码）` : '该月已结清，不可修改';
+    return;
+  }
+
   const total = monthBudgetTotal(VIEW, DATA.budgets);
-  const { sum, filled, past } = monthActualSoFar(VIEW, DATA);
+  const { sum, filled, past } = monthActualSoFar(VIEW, DATA, 'need');
   const hasB = DATA.budgets.some(b => b.month === VIEW);
 
   $('sum-title').textContent = (isCur ? '本月' : monthLabel(VIEW)) + '概览';
+  $('sum-budget-label').innerHTML = '总预算<small id="sum-budget-note"></small>';
   $('s-budget').innerHTML = hasB ? money(total) : '--';
   $('s-actual').innerHTML = past ? money(sum) : '--';
   const pct = total > 0 ? sum / total * 100 : null;
@@ -1049,8 +1645,8 @@ function renderSummary() {
 
   const parts = [];
   if (hasB) parts.push('总预算 = 每日预算 × 当月天数');
-  if (filled) parts.push(`已填 ${filled}/${past} 天，未填日期不计入实际`);
-  else if (past) parts.push(`已填 0/${past} 天，未填日期不计入实际`);
+  if (filled) parts.push(`已填 ${filled}/${past} 天，未填按 0 计`);
+  else if (past) parts.push(`已填 0/${past} 天，未填按 0 计`);
   if (isCur) parts.push(inBackfillWindow() ? '上月可补录至本月 7 号，8 号自动结清' : '跨月后该月自动冻结，不可再改');
   if (isBackfillMonth(VIEW)) parts.push(`⏰ 补录窗口：${monthLabel(VIEW)}可修改至本月 7 号`);
   $('sum-note').textContent = parts.join(' · ');
@@ -1063,12 +1659,43 @@ function renderSummary() {
 
 function renderBudgetSetting() {
   const monthEditable = canEditMonth(VIEW);
-  const frozenThisMonth = budgetLockedThisMonth();   // 当月 8 号后冻结
+  const frozenThisMonth = budgetLockedThisMonth();   // 当月 8 号后冻结（刚需与非刚需一致）
   const editable = monthEditable && (!frozenThisMonth || budgetUnlocked);
   const inp = $('b-input'), btn = $('b-save'), ubtn = $('b-unlock');
   inp.disabled = !editable;
   btn.disabled = !editable;
   ubtn.style.display = (frozenThisMonth && !budgetUnlocked) ? '' : 'none';
+
+  // ★ v30：非刚需 —— 月总预算（同样锁 8 号）
+  if (!isNeedKind()) {
+    $('bset-title').textContent = '月总预算设置';
+    $('bset-label').textContent = '每月非刚需总预算（元）';
+    inp.placeholder = '如 800';
+    const tx = extraBudgetOf(VIEW);
+    if (document.activeElement !== inp) inp.value = tx == null ? '' : tx;
+    const hintX = $('b-hint');
+    if (!monthEditable) {
+      hintX.innerHTML = `🔒 ${monthLabel(VIEW)}已结清，预算与记录均不可修改。`;
+    } else if (isBackfillMonth(VIEW)) {
+      hintX.innerHTML = `⏰ <b>补录窗口</b>：${monthLabel(VIEW)}尚未结清，本月 1~7 号仍可补录与修改，<b>本月 8 号起自动结清</b>。<br>` +
+        (tx != null ? `当前非刚需月总预算：¥${money(tx)}。` : '该月尚未设置非刚需月总预算。');
+    } else if (frozenThisMonth && !budgetUnlocked) {
+      hintX.innerHTML = `🔒 本月已过 8 号，非刚需月总预算已锁定（每月仅 1~7 号可改，或点「🔓 输密码解锁」临时修改）。<br>` +
+        (tx != null ? `当前：¥${money(tx)}，已生效。` : '尚未设置。');
+    } else if (frozenThisMonth && budgetUnlocked) {
+      hintX.innerHTML = `🔓 已输密码解锁，可临时修改本月非刚需预算（仅本次会话有效，刷新或切月后恢复锁定）。<br>` +
+        (tx != null ? `当前：¥${money(tx)}，已生效。` : '尚未设置。');
+    } else {
+      hintX.textContent = tx == null
+        ? '还没有设置非刚需月总预算。填一个金额保存即可开始记录。'
+        : `当前：¥${money(tx)}/月（非刚需按月总额控制，不细分每天）。`;
+    }
+    return;
+  }
+
+  $('bset-title').textContent = '日预算设置';
+  $('bset-label').textContent = '每天预算金额（元）';
+  inp.placeholder = '如 120';
   // 显示当月「当前生效」的日预算（取最后一段）
   const segs = DATA.budgets.filter(b => b.month === VIEW).sort((a, b) => a.effective_from < b.effective_from ? -1 : 1);
   const val = segs.length ? segs[segs.length - 1].daily : '';
@@ -1108,31 +1735,40 @@ function renderHistory() {
   const today = todayStr();
   const monthEditable = canEditMonth(VIEW);   // 补录窗口内上月也可增删
   const isCur = VIEW === curMonth();
+  // ★ v30：刚需与非刚需**同表显示**，非刚需行加标记（淡粉底 + 左侧色条 + 标签）
   const monthDays = daysInMonth(VIEW);
   const monthActuals = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW);
 
   $('hist-title').textContent = (isCur ? '本月' : monthLabel(VIEW)) + '每日记录';
-  $('hist-count').textContent = monthActuals.length ? `已填 ${monthActuals.length} 天 / 共 ${monthDays.length} 天` : '';
+  // ★ v30：统计分两类，让用户一眼看到两本账各记了多少
+  const nNeed = monthActuals.filter(a => kindOf(a) === 'need').length;
+  const nExtra = monthActuals.filter(a => kindOf(a) === 'extra').length;
+  $('hist-count').textContent = monthActuals.length
+    ? `刚需 ${nNeed} 笔 · 非刚需 ${nExtra} 笔 · 共 ${monthDays.length} 天`
+    : '';
 
   if (!monthActuals.length) {
     box.innerHTML = `<div class="empty">${isCur ? '本月还没记录，今天花了多少？' : '该月没有记录'}</div>`;
     return;
   }
   const rows = monthActuals.slice().sort((a, b) => a.date < b.date ? 1 : -1);   // 最新在上
-  let html = '<div class="tbl-scroll"><table><thead><tr><th>日期</th><th>星期</th><th style="text-align:right">实际</th><th style="text-align:right">预算</th><th>备注</th><th></th></tr></thead><tbody>';
+  let html = '<div class="tbl-scroll"><table><thead><tr><th>日期</th><th>星期</th><th style="text-align:right">实际</th><th style="text-align:right">预算</th><th>备注</th><th>类型</th><th></th></tr></thead><tbody>';
   rows.forEach(a => {
     const d = parseYmd(a.date);
-    const dl = dailyAt(a.date, DATA.budgets);
+    const isX = kindOf(a) === 'extra';
+    // 非刚需行没有「日预算」概念 → 预算列显示「—」
+    const dl = isX ? null : dailyAt(a.date, DATA.budgets);
     const over = dl != null && a.amount > dl;
     const chk = monthEditable ? canDeleteActual(a, today) : { ok: false, why: '该月已结清，不可修改' };
-    html += `<tr>
+    html += `<tr class="${isX ? 'x-row' : ''}">
       <td>${esc(a.date.slice(5))}</td>
       <td class="note">${esc(WEEKDAY[d.getDay()])}</td>
       <td class="num"><span class="${over ? 'amt-over' : 'amt-ok'}">${money(a.amount)}</span></td>
-      <td class="num note">${dl == null ? '--' : money(dl)}</td>
+      <td class="num note">${isX ? '—' : (dl == null ? '--' : money(dl))}</td>
       <td class="note">${esc(a.note || '')}</td>
+      <td><span class="x-badge${isX ? '' : ' need-badge'}">${isX ? '非刚需' : '刚需'}</span></td>
       <td style="text-align:right">${chk.ok
-        ? `<button class="del" data-date="${esc(a.date)}">删除</button>`
+        ? `<button class="del" data-date="${esc(a.date)}" data-kind="${isX ? 'extra' : 'need'}">删除</button>`
         : `<button class="del" disabled title="${esc(chk.why)}">删除</button>`}</td>
     </tr>`;
   });
@@ -1141,13 +1777,17 @@ function renderHistory() {
 
   box.querySelectorAll('.del:not([disabled])').forEach(b => b.onclick = () => {
     const date = b.dataset.date;
+    const bk = b.dataset.kind || 'need';
     // 双保险：点击瞬间用最新 today 再校验一次（防跨天/绕过）
-    const rec = DATA.actuals.find(a => a.date === date);
+    const rec = DATA.actuals.find(a => a.date === date && kindOf(a) === bk);
     const chk2 = rec ? canDeleteActual(rec, todayStr()) : { ok: false, why: '记录不存在' };
     if (!chk2.ok) { toast('✗ ' + chk2.why); return; }
-    if (!confirm(`删除 ${date} 的记录？`)) return;
-    DATA.actuals = DATA.actuals.filter(a => a.date !== date);
-    persist(DATA).then(() => toast(`✓ 已删除 ${date} 的记录`));
+    const lbl = bk === 'extra' ? '非刚需' : '刚需';
+    if (!confirm(`删除 ${date} 的${lbl}记录？`)) return;
+    // ★ v30：只删**同类型**的那条 —— 原来只按日期删，
+    // 同一天既有刚需又有非刚需时会连带删掉另一本账的记录
+    DATA.actuals = DATA.actuals.filter(a => !(a.date === date && kindOf(a) === bk));
+    persist(DATA).then(() => toast(`✓ 已删除 ${date} 的${lbl}记录`));
   });
 }
 
@@ -1155,7 +1795,7 @@ function renderHistory() {
 function drawChart() {
   const svg = $('chart');
   svg.innerHTML = '';
-  const groups = weeksOfMonth(VIEW, DATA);
+  const groups = weeksOfMonth(VIEW, DATA, curKind);
   if (!groups.length) return;
 
   const W = Math.max(300, svg.parentElement.clientWidth || 600);
@@ -1231,6 +1871,59 @@ function drawChart() {
 /* =========================================================
    交互
    ========================================================= */
+/* ===== v30 内容区分页签 ===== */
+document.querySelectorAll('#kind-tabs button[data-kind]').forEach(b => {
+  b.onclick = () => {
+    curKind = b.dataset.kind === 'extra' ? 'extra' : 'need';
+    // ★ v33：按 data-kind 高亮（而不是 x === b）——
+    //   结构改成 .side 包裹后，仍要保证同一时刻只有一个页签是选中态。
+    document.querySelectorAll('#kind-tabs button[data-kind]')
+      .forEach(x => x.classList.toggle('on', x.dataset.kind === curKind));
+    // 切换后重置「已解锁」状态，避免用刚需的解锁去改非刚需预算
+    budgetUnlocked = false;
+    render();
+    toast(curKind === 'need' ? '🔒 刚需账（原有记录与计算不变）' : '🎈 非刚需账（独立记录、独立预算）');
+  };
+});
+/** ★ v33 合计栏 —— 两本账的合计
+ *  总实际 = 刚需累计实际 + 非刚需累计实际
+ *  总预算 = 刚需日预算×天数 + 非刚需月总预算
+ *  已用   = 总实际 ÷ 总预算
+ *  结余   = 总预算 − 总实际
+ * 全部复用页面已有的计算函数（sumByKind / monthBudgetTotal / extraBudgetOf），
+ * 所以和下方「本月概览」的口径天然一致，不会出现两处数字对不上。
+ */
+function renderTotalBar() {
+  const m = VIEW || curMonth();
+  const needSum = sumByKind(m, 'need');                 // 刚需累计实际
+  const needTotal = monthBudgetTotal(m, DATA.budgets);   // 刚需总预算
+  const extraSum = sumByKind(m, 'extra');                // 非刚需累计实际
+  const extraTotal = extraBudgetOf(m);                   // 非刚需月总预算（null = 未设）
+  const sum = needSum + extraSum;
+  const total = needTotal + (extraTotal == null ? 0 : extraTotal);
+  $('tc-month').textContent = (m === curMonth() ? '本月' : monthLabel(m));
+  $('tc-actual').textContent = money(sum);
+  $('tc-budget').textContent = total > 0 ? money(total) : '--';
+  const pct = total > 0 ? sum / total * 100 : null;
+  const pctEl = $('tc-pct');
+  pctEl.textContent = pct == null ? '--' : pct.toFixed(1) + '%';
+  pctEl.className = 'v' + (pct == null ? '' : pct > 100 ? ' over' : ' under');
+  const bal = total > 0 ? total - sum : null;
+  const balEl = $('tc-bal');
+  balEl.textContent = bal == null ? '--' : money(bal);
+  balEl.className = 'v' + (bal == null ? '' : bal > 0 ? ' plus' : bal < 0 ? ' minus' : '');
+}
+
+/** 更新页签上的金额小标 */
+function renderKindBadges() {
+  // ★ 用**当前查看的月份**（VIEW），不是 curMonth() ——
+  //   否则翻到上个月/下个月时，页签上的金额还是本月数字，对不上眼前的数据。
+  const m = VIEW || curMonth();
+  const nNeed = sumByKind(m, 'need'), nExtra = sumByKind(m, 'extra');
+  $('kb-need').textContent = nNeed ? money0(nNeed) : '0';
+  $('kb-extra').textContent = nExtra ? money0(nExtra) : '0';
+}
+
 $('mp-prev').onclick = () => shiftMonth(-1);
 $('mp-next').onclick = () => shiftMonth(1);
 
@@ -1245,13 +1938,23 @@ $('t-save').onclick = async () => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dp)) { toast('日期格式错误'); return; }
   if (dp < earliestEditableMonth() + '-01') { toast(inBackfillWindow() ? '最早只能补录上个月的数据' : '只能补录本月数据'); return; }
   if (dp > today) { toast('不能录入未来日期'); return; }
-  const rec = DATA.actuals.find(a => a.date === dp);
-  upsertActual(dp, Math.round(v * 100) / 100, rec ? rec.note : '');
+  // ★ v30：按当前页签决定记到哪本账 —— 「记到哪个页签就算哪个页签的」
+  const rec = DATA.actuals.find(a => a.date === dp && kindOf(a) === curKind);
+  upsertActual(dp, Math.round(v * 100) / 100, rec ? rec.note : '', curKind);
   await persist(DATA);
-  const dl = dailyAt(dp, DATA.budgets);
   const isToday = dp === today;
   const dayLbl = isToday ? '今日' : dp.slice(5).replace('-', '月') + '日';
-  toast(dl != null && v > dl ? `已记录 ${dayLbl} ¥${money(v)} · 超预算 ¥${money(v - dl)}` : `✓ 已记录 ${dayLbl} ¥${money(v)}`);
+  if (curKind === 'extra') {
+    // 非刚需：与月总预算比
+    const totalX = extraBudgetOf(VIEW);
+    const sumX = sumByKind(VIEW, 'extra');
+    toast(totalX != null && sumX > totalX
+      ? `已记录非刚需 ${dayLbl} ¥${money(v)} · 本月已超月预算 ¥${money(sumX - totalX)}`
+      : `✓ 已记录非刚需 ${dayLbl} ¥${money(v)}`);
+  } else {
+    const dl = dailyAt(dp, DATA.budgets);
+    toast(dl != null && v > dl ? `已记录 ${dayLbl} ¥${money(v)} · 超预算 ¥${money(v - dl)}` : `✓ 已记录 ${dayLbl} ¥${money(v)}`);
+  }
 
   // 自动跳到下一天，省得每记一笔都要手动切日期。
   // 三重夹逼：不超过今天（不能记未来）、不低于最早可编辑日（否则下一笔会被校验拦下）。
@@ -1277,42 +1980,72 @@ $('t-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preve
 // 当月已过 8 号时，输入密码可临时解锁预算修改（仅本次会话有效）
 $('b-unlock').onclick = async () => {
   if (!budgetLockedThisMonth()) return;
-  const ok = await askPassword(`本月已过 8 号，日预算已锁定。<br>如需修改，请输入密码解锁（仅本次会话有效，刷新或切月后恢复锁定）`);
+  const isX = !isNeedKind();
+  const ok = await askPassword(isX
+    ? `本月已过 8 号，非刚需月总预算已锁定。<br>如需修改，请输入密码解锁（仅本次会话有效，刷新或切月后恢复锁定）`
+    : `本月已过 8 号，日预算已锁定。<br>如需修改，请输入密码解锁（仅本次会话有效，刷新或切月后恢复锁定）`);
   if (!ok) return;
   budgetUnlocked = true;
   render();
-  toast('🔓 已解锁，可修改本月日预算');
+  toast(isX ? '🔓 已解锁，可修改本月非刚需预算' : '🔓 已解锁，可修改本月日预算');
 };
 
 $('b-save').onclick = async () => {
   if (!canEditMonth(VIEW)) { toast('该月已结清，不可修改'); return; }
-  if (budgetLockedThisMonth() && !budgetUnlocked) { toast('本月已过 8 号，日预算已锁定（点「🔓 输密码解锁」后可改，次月 1 号自动解锁）'); return; }
+  const isX = !isNeedKind();
+  // ★ v30：非刚需的月总预算**同样锁 8 号**（用户拍板）
+  if (budgetLockedThisMonth() && !budgetUnlocked) {
+    toast(isX
+      ? '本月已过 8 号，非刚需月总预算已锁定（点「🔓 输密码解锁」后可改，次月 1 号自动解锁）'
+      : '本月已过 8 号，日预算已锁定（点「🔓 输密码解锁」后可改，次月 1 号自动解锁）');
+    return;
+  }
   const raw = $('b-input').value.trim();
-  if (raw === '') { toast('请填写每天预算金额'); $('b-input').focus(); return; }
+  if (raw === '') { toast(isX ? '请填写每月非刚需总预算' : '请填写每天预算金额'); $('b-input').focus(); return; }
   const v = parseFloat(raw);
   if (isNaN(v) || v <= 0) { toast('请输入大于 0 的金额'); return; }
-  setBudget(VIEW, Math.round(v * 100) / 100);
+  if (isX) {
+    // 非刚需：写月总预算（一个月一条，覆盖式更新）
+    const i = DATA.monthlyBudgets.findIndex(b => b.month === VIEW);
+    if (i >= 0) DATA.monthlyBudgets[i].total = Math.round(v * 100) / 100;
+    else DATA.monthlyBudgets.push({ id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), month: VIEW, total: Math.round(v * 100) / 100, note: '' });
+    sortAll(DATA);
+  } else {
+    setBudget(VIEW, Math.round(v * 100) / 100);
+  }
   await persist(DATA);
   if (budgetLockedThisMonth()) {
     // 冻结月：输密码解锁后保存即重新锁定，下次修改需再次输密码
     budgetUnlocked = false;
     render();
-    toast(`✓ 日预算已更新为 ¥${money(v)}（已重新锁定，再次修改需输密码）`);
+    toast(isX
+      ? `✓ 非刚需月总预算已更新为 ¥${money(v)}（已重新锁定，再次修改需输密码）`
+      : `✓ 日预算已更新为 ¥${money(v)}（已重新锁定，再次修改需输密码）`);
   } else {
-    toast(`✓ 日预算已更新为 ¥${money(v)}`);
+    toast(isX ? `✓ 非刚需月总预算已更新为 ¥${money(v)}` : `✓ 日预算已更新为 ¥${money(v)}`);
   }
 };
 
 $('clear-btn').onclick = async () => {
+  // ★ v30：isCur 要在这里自己算 —— renderSummary 里的 isCur 是局部变量，
+  // 原来直接引用会抛「isCur is not defined」，导致清空按钮点了没反应（密码框不弹）
+  const isCur = VIEW === curMonth();
   if (!isCur && !isBackfillMonth(VIEW)) { toast('该月已结清，不可修改'); return; }
-  const list = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW);
-  if (!list.length && !DATA.budgets.some(b => b.month === VIEW)) { toast('本月没有记录可清空'); return; }
-  const ok = await askPassword(`将清空 <b>${monthLabel(VIEW)}</b> 的 <b>${list.length}</b> 条记录与预算设置，<br>此操作不可恢复。请输入密码继续`);
+  // ★ v30：只清**当前页签**那一本账 —— 清刚需不动非刚需，反之亦然
+  const isX = !isNeedKind();
+  const lbl = isX ? '非刚需' : '刚需';
+  const list = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW && kindOf(a) === curKind);
+  const hasBudget = isX
+    ? (DATA.monthlyBudgets || []).some(b => b.month === VIEW)
+    : DATA.budgets.some(b => b.month === VIEW);
+  if (!list.length && !hasBudget) { toast(`本月没有${lbl}记录可清空`); return; }
+  const ok = await askPassword(`将清空 <b>${monthLabel(VIEW)}</b> 的 <b>${lbl}</b>记录 <b>${list.length}</b> 条与${lbl}预算设置，<br>此操作不可恢复。<b>另一本账（${isX ? '刚需' : '非刚需'}）不受影响。</b><br>请输入密码继续`);
   if (!ok) return;
-  DATA.actuals = DATA.actuals.filter(a => a.date.slice(0, 7) !== VIEW);
-  DATA.budgets = DATA.budgets.filter(b => b.month !== VIEW);
+  DATA.actuals = DATA.actuals.filter(a => !(a.date.slice(0, 7) === VIEW && kindOf(a) === curKind));
+  if (isX) DATA.monthlyBudgets = (DATA.monthlyBudgets || []).filter(b => b.month !== VIEW);
+  else DATA.budgets = DATA.budgets.filter(b => b.month !== VIEW);
   await persist(DATA);
-  toast(`✓ 已清空 ${monthLabel(VIEW)} 的记录`);
+  toast(`✓ 已清空 ${monthLabel(VIEW)} 的${lbl}记录`);
 };
 
 function askPassword(tip) {
@@ -1356,7 +2089,7 @@ async function importXlsx(file) {
   let d;
   try { d = parseXlsxBuf(await file.arrayBuffer()); }
   catch (err) { alert('Excel 解析失败：' + (err.message || err)); return; }
-  if (!d.budgets.length && !d.actuals.length) { alert('导入失败：Excel 里没有读到有效记录（需要表头「日期/日预算/实际花费/备注」+ 数据行）'); return; }
+  if (!d.budgets.length && !d.actuals.length && !(d.monthlyBudgets && d.monthlyBudgets.length)) { alert('导入失败：Excel 里没有读到有效记录（需要表头「日期/日预算/实际花费/备注」+ 数据行）'); return; }
   const n = d.actuals.length + d.budgets.length;
   if ((DATA.actuals.length || DATA.budgets.length) && !confirm(`将从 Excel 导入 ${n} 项数据，并覆盖现有全部数据，确定继续？`)) return;
   await persist(d);
@@ -1372,7 +2105,7 @@ function importJson(file) {
     try { obj = JSON.parse(text); }
     catch (err) { alert('文件不是合法 JSON：' + err.message); return; }
     const d = normData(obj);
-    if (!d.budgets.length && !d.actuals.length) { alert('导入失败：文件里没有有效数据（需包含 budgets / actuals 数组）'); return; }
+    if (!d.budgets.length && !d.actuals.length && !(d.monthlyBudgets && d.monthlyBudgets.length)) { alert('导入失败：文件里没有有效数据（需包含 budgets / actuals 数组）'); return; }
     const n = d.actuals.length + d.budgets.length;
     if ((DATA.actuals.length || DATA.budgets.length) && !confirm(`将导入 ${n} 项数据，并覆盖现有全部数据，确定继续？`)) return;
     await persist(d);
@@ -1482,6 +2215,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v30</div>
+<div class="ver">v36</div>
 </body>
 </html>

@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="时光自撰集">
-<meta name="theme-color" content="#f4f1ec">
+<meta name="theme-color" content="#160b23">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="assets/icon-192.png">
@@ -19,6 +19,17 @@
 /* 被门户 iframe 嵌入时打标记：顶部安全区改由门户顶栏负责，避免重复避让（须尽早执行防布局闪烁） */
 try { if (window.self !== window.top) document.documentElement.classList.add('in-frame'); }
 catch (e) { document.documentElement.classList.add('in-frame'); }
+</script>
+<script>
+/* 尽早套用主题，避免深色用户看到一闪而过的浅色（须在样式生效前后尽快执行） */
+(function () {
+  try {
+    var t = localStorage.getItem('time_theme_v1');
+    document.documentElement.setAttribute('data-theme', (t === 'light') ? 'light' : 'dark');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
 </script>
 <style>
   :root {
@@ -96,7 +107,12 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .yr {
     display: flex; align-items: center; gap: 10px;
     padding: 15px 6px 11px;
-    position: sticky; top: var(--yr-top, 148px); z-index: 10;
+    /* 年份标题的吸顶位置要让开「年份快捷检索条」（它也吸顶，且更高）——
+       所以这里在 --yr-top 基础上再加一个 --yrbar-h（年份条高度）。 */
+    position: sticky; top: calc(var(--yr-top, 0px) + var(--yrbar-h, 0px)); z-index: 10;
+    /* scroll-margin 与吸顶高度对齐 —— scrollIntoView(block:'start') 时
+       元素正好停在吸顶栏下方，不会被 header / 年份条盖住 */
+    scroll-margin-top: calc(var(--yr-top, 0px) + var(--yrbar-h, 0px) + 6px);
     background: linear-gradient(180deg, rgba(250,247,242,.98) 60%, rgba(250,247,242,.85));
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     margin: 0 -6px;
@@ -176,7 +192,10 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   }
   .tag.span-tag { background: rgba(130,155,190,.18); color: #4f6d95; }
   .ev-title { font-size: 14.5px; font-weight: 600; color: #322a20; word-break: break-word; }
-  .ev-note { font-size: 12.5px; color: #6b5d4d; margin-top: 3px; word-break: break-word; }
+  /* 备注支持换行：pre-wrap 让 \n 原样显示成新行（原来是普通空格，全挤成一行）
+     pre-wrap 还会保留连续空格且仍能自动折行，长备注不会撑破卡片 */
+  .ev-note { font-size: 12.5px; color: #6b5d4d; margin-top: 3px; word-break: break-word;
+             white-space: pre-wrap; }
   .ev-ops { display: flex; gap: 6px; margin-top: 8px; }
   .op {
     font-size: 11.5px; padding: 3px 10px; border-radius: 7px; cursor: pointer;
@@ -192,6 +211,266 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   }
   .tag.lock-tag { background: rgba(150,135,120,.16); color: #7d6e60; }
 
+
+  /* ===== 查看体验改版：搜索栏 / 列表视图 / 悬浮操作 ===== */
+  .searchbar {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 10px;
+  }
+  .searchbar .sbox { flex: 1; position: relative; min-width: 0; }
+  .searchbar input {
+    width: 100%; padding: 9px 30px 9px 32px; font-size: 14px; font-family: inherit;
+    border: 1px solid rgba(191,154,125,.35); border-radius: 10px;
+    background: #fff; color: var(--text);
+  }
+  .searchbar input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(191,154,125,.14); }
+  .searchbar .sicon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; opacity: .5; pointer-events: none;
+  }
+  .searchbar .sclr {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    border: none; background: none; color: var(--muted); font-size: 15px;
+    cursor: pointer; padding: 4px 6px; line-height: 1; font-family: inherit;
+  }
+  .viewtog {
+    display: flex; gap: 0; border: 1px solid var(--line); border-radius: 9px;
+    overflow: hidden; flex: none; background: #fff;
+  }
+  .viewtog button {
+    border: none; background: none; padding: 9px 12px; font-size: 12.5px;
+    font-family: inherit; color: var(--muted); cursor: pointer;
+  }
+  .viewtog button.on { background: var(--primary); color: #fff; }
+  .srch-hint { font-size: 11.5px; color: var(--muted); margin: -4px 0 10px; }
+  /* 第二维度筛选按钮 */
+  .keyfilter {
+    flex: none; border: 1px solid var(--line); background: transparent;
+    color: var(--muted); font-size: 12px; font-weight: 600; padding: 8px 11px;
+    border-radius: 9px; cursor: pointer; font-family: inherit; white-space: nowrap;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .keyfilter:hover { border-color: var(--primary); color: var(--primary); }
+  /* ⚙ 规则按钮：方形图标按钮，避免和「只看重要」挤在一起 */
+  .keyfilter.icon {
+    width: 34px; height: 34px; padding: 0; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 15px; line-height: 1;
+  }
+  .keyfilter.on { background: rgba(255,210,74,.16); border-color: #d19b00; color: #a87c00; }
+  html[data-theme="dark"] .keyfilter { border-color: rgba(187,124,228,.28); color: #cfc4dd; }
+  html[data-theme="dark"] .keyfilter:hover { border-color: rgba(187,124,228,.75); color: #fff; }
+  html[data-theme="dark"] .keyfilter.on {
+    background: rgba(255,210,74,.14); border-color: rgba(255,210,74,.55); color: #ffd24a;
+  }
+
+  /* ===== 重要规则弹窗（v27）===== */
+  .rule-stat { font-size: 12.5px; color: var(--muted); line-height: 1.7; margin: 2px 0 4px; }
+  .rule-stat b { color: var(--text); }
+  .rule-stat .rs-hi { color: #a87c00; font-weight: 700; }
+  html[data-theme="dark"] .rule-stat .rs-hi { color: #ffd24a; }
+  .rule-tip {
+    font-size: 11.5px; color: var(--muted); line-height: 1.7; margin-top: 10px;
+    padding: 9px 11px; border: 1px dashed var(--line); border-radius: 9px;
+  }
+  .rule-tip b { color: var(--text); }
+  .rule-tip code { background: rgba(191,154,125,.15); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+  html[data-theme="dark"] .rule-tip { border-color: rgba(187,124,228,.25); }
+  /* ===== 关联图谱（v28）===== */
+  .graph-panel {
+    background: rgba(255,255,255,.5); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden;
+  }
+  html[data-theme="dark"] .graph-panel { background: rgba(27,10,49,.55); }
+  #graph-svg { display: block; width: 100%; height: min(58vh, 560px); touch-action: none; cursor: grab; }
+  #graph-svg.grabbing { cursor: grabbing; }
+  .graph-legend {
+    display: flex; gap: 13px; flex-wrap: wrap; align-items: center;
+    padding: 10px 14px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--muted);
+  }
+  .graph-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .graph-legend b { color: var(--text); font-weight: 600; }
+  .graph-legend .gl-sp { margin-left: auto; }
+  .graph-tip {
+    font-size: 11.5px; color: var(--muted); line-height: 1.75;
+    padding: 9px 14px; border-top: 1px dashed var(--line);
+  }
+  .graph-tip b { color: var(--text); }
+  .graph-tip code { background: rgba(191,154,125,.15); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+  .graph-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px 14px 0;
+  }
+  .graph-bar .tb { padding: 6px 11px; font-size: 12px; white-space: nowrap; flex: none; }
+  .graph-bar .gl-stat { font-size: 11.5px; color: var(--muted); margin-left: auto; text-align: right; }
+  /* 窄屏：按钮不换行，统计信息另起一行 —— 不加 white-space:nowrap 时
+     「重新布局」被挤成竖排四行（实测手机端 390px） */
+  @media (max-width: 480px) {
+    .graph-bar { gap: 6px; }
+    .graph-bar .tb { padding: 6px 9px; font-size: 11.5px; }
+    .graph-bar .gl-stat { flex: 1 0 100%; margin-left: 0; text-align: left; }
+  }
+  .graph-empty { padding: 60px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+  /* 浮层提示 */
+  .graph-pop {
+    position: fixed; pointer-events: none; z-index: 60;
+    background: var(--card-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 11px; font-size: 12px; line-height: 1.6;
+    max-width: 240px; opacity: 0; transition: opacity .12s;
+    box-shadow: 0 8px 24px rgba(0,0,0,.28);
+  }
+  html[data-theme="dark"] .graph-pop { border-color: rgba(187,124,228,.45); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  .graph-pop.show { opacity: 1; }
+  .graph-pop b { display: block; font-size: 13px; margin-bottom: 3px; }
+  .graph-pop span { color: var(--muted); }
+
+  /* 分类栏收纳：放不下的分类折进「更多」 */
+  .cats { flex-wrap: wrap; }
+  .cats .more {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    font-size: 12.5px; padding: 5px 11px; border-radius: 99px;
+    cursor: pointer; font-family: inherit;
+  }
+  .cats .more.on { border-color: var(--primary); color: var(--primary); }
+
+  /* 悬浮操作按钮：桌面 hover 才出，手机点标题展开 */
+  .ev-ops {
+    max-height: 0; opacity: 0; overflow: hidden; margin-top: 0;
+    transition: max-height .22s ease, opacity .18s ease, margin-top .22s ease;
+  }
+  /* 折叠时按钮不可聚焦 —— 否则键盘用户会 Tab 到看不见的「编辑/删除」 */
+  .ev-ops { visibility: hidden; }
+  .ev:hover .ev-ops, .ev.open .ev-ops { max-height: 40px; opacity: 1; margin-top: 8px; visibility: visible; }
+  /* 触屏（无 hover）：点卡片才展开操作区 —— 与桌面端 hover 一致的逻辑，
+     这样 180 张卡不会变成 180 组常驻按钮（噪音 + 误触）。
+     代价是「编辑/删除」多一次点击，故在卡片上加 title 提示。 */
+  @media (hover: none) {
+    .ev-ops { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; visibility: hidden; }
+    .ev.open .ev-ops { max-height: 40px; opacity: 1; margin-top: 8px; visibility: visible; }
+    /* 提示语只出现在第一张卡上 —— 每张都写一遍就成噪音了。
+       用 .seg 的第一张卡（:first-child）来限定。 */
+    .ev:first-child .ev-body::after {
+      content: '轻点卡片显示编辑 / 删除'; display: block; margin-top: 5px;
+      font-size: 10.5px; color: var(--muted); opacity: .7;
+    }
+    .ev:first-child.open .ev-body::after { content: ''; margin-top: 0; }
+  }
+  .ev-body { cursor: pointer; }
+  @media (hover: hover) { .ev-body { cursor: default; } }
+
+  /* 紧凑元信息：日期 + 天数 + 分类 */
+  .ev-d b { color: var(--primary); font-weight: 600; }
+
+  /* 列表视图 */
+  .listview { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .listview th {
+    text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600;
+    padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap;
+    position: sticky; top: 0; background: #faf7f2; z-index: 3;
+  }
+  .listview td {
+    padding: 6px 8px; border-bottom: 1px solid rgba(191,154,125,.12);
+    vertical-align: top; color: var(--text);
+  }
+  .listview .lv-n { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 列表视图：两行式紧凑行（日期+标题 / 分类+备注+操作） */
+  .listview .lv-main { padding: 7px 4px !important; }
+  .listview .lv-r1 { display: flex; align-items: baseline; gap: 8px; }
+  .listview .lv-r2 { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
+  .listview .lv-r2 .lv-n { flex: 1; min-width: 0; }
+  .listview .lv-act { flex: none; }
+  .listview tr:hover td { background: rgba(191,154,125,.05); }
+  .listview .lv-d { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+  .listview .lv-t { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  /* 手机端日期与标题之间留点空隙 —— 原来「1281天」直接贴着标题，
+     长日期 + 长标题时挤成一团读不出来 */
+  .listview .lv-r1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .listview .lv-n { color: var(--muted); font-size: 12px; }
+  .listview .lv-c { white-space: nowrap; }
+  .listview .lv-act { white-space: nowrap; text-align: right; }
+  mark { background: rgba(255, 214, 120, .55); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+  /* ===== 年份快捷检索：一根横向年份条，点一下直达该年 ===== */
+  .yrbar {
+    position: sticky; top: var(--yr-top, 0px); z-index: 11;
+    /* 高度写进 --yrbar-h，供 .yr 让位计算用 */
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 0 8px; margin-bottom: 2px;
+    background: linear-gradient(180deg, rgba(250,247,242,.97) 72%, rgba(250,247,242,.86));
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .yrbar .track {
+    flex: 1; display: flex; gap: 5px; overflow-x: auto; scroll-behavior: smooth;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .yrbar .track::-webkit-scrollbar { display: none; }
+  .yrbar .yb {
+    flex: none; border: 1px solid var(--line); background: #fff; color: var(--muted);
+    font-size: 11.5px; padding: 4px 10px; border-radius: 99px; cursor: pointer;
+    font-family: inherit; font-variant-numeric: tabular-nums; white-space: nowrap;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .yrbar .yb:hover { border-color: var(--primary); color: var(--primary-dark); }
+  .yrbar .yb.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+  .yrbar .yb .c { opacity: .65; margin-left: 3px; font-size: 10.5px; }
+  .yrbar .nav {
+    flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line);
+    background: #fff; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; font-family: inherit;
+  }
+  .yrbar .nav:hover { border-color: var(--primary); color: var(--primary-dark); }
+  .yrbar .nav:disabled { opacity: .3; cursor: default; }
+
+  /* 跳转到某年时的闪烁高亮 */
+  @keyframes yrflash {
+    0%   { background: rgba(191,154,125,.30); }
+    100% { background: transparent; }
+  }
+  .yg.flash .yr { animation: yrflash 1.6s ease-out; }
+  .yg.flash .ev-body { box-shadow: 0 0 0 2px rgba(191,154,125,.45); }
+
+  /* ===== 时间轴总览带（跨年时间段一览）===== */
+  .ovbar {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 11px 13px 9px; margin-bottom: 10px;
+  }
+  .ovbar .ov-h {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px;
+  }
+  .ovbar .ov-h .t { font-size: 12.5px; font-weight: 700; color: #5c5348; }
+  .ovbar .ov-h .n { font-size: 11.5px; color: var(--muted); }
+  .ovbar .ov-h .tip { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .ov-scale {
+    position: relative; height: 15px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ov-scale span {
+    position: absolute; top: 0; font-size: 10px; color: var(--muted);
+    transform: translateX(-50%); font-variant-numeric: tabular-nums;
+  }
+  /* 条数多时总览带自身可滚动 —— 宁可多滚一点，也不丢数据 */
+  .ov-lanes { position: relative; max-height: 190px; overflow-y: auto; }
+  .ov-lanes::-webkit-scrollbar { width: 4px; }
+  .ov-lanes::-webkit-scrollbar-thumb { background: rgba(191,154,125,.35); border-radius: 2px; }
+  .ov-lane { position: relative; height: 17px; margin-bottom: 3px; }
+  .ov-bar {
+    position: absolute; top: 1px; height: 15px; border-radius: 4px;
+    background: linear-gradient(180deg, rgba(191,154,125,.85), rgba(191,154,125,.6));
+    border: 1px solid rgba(191,154,125,.9);
+    display: flex; align-items: center; padding: 0 5px;
+    font-size: 10.5px; color: #fff; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer; min-width: 3px;
+  }
+  .ov-bar:hover { background: linear-gradient(180deg, var(--primary-dark), var(--primary)); }
+  .ov-bar.ov-b2 { background: linear-gradient(180deg, rgba(130,155,190,.8), rgba(130,155,190,.55));
+                  border-color: rgba(130,155,190,.85); }
+  .ov-bar.ov-b3 { background: linear-gradient(180deg, rgba(150,135,120,.75), rgba(150,135,120,.5));
+                  border-color: rgba(150,135,120,.8); }
+  .ov-bar.ov-cur { box-shadow: 0 0 0 2px rgba(191,154,125,.35); }
+  .ov-legend {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-top: 7px;
+    font-size: 10.5px; color: var(--muted);
+  }
+  .ov-legend i { display: inline-block; width: 10px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
   .empty .ico { font-size: 40px; margin-bottom: 12px; opacity: .6; }
   .empty .t { font-size: 14px; margin-bottom: 6px; }
@@ -263,8 +542,11 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .pv-bad { font-size: 12px; color: var(--danger); margin-top: 6px; line-height: 1.5; word-break: break-all; }
 
   .toast {
-    position: fixed; top: max(18px, env(safe-area-inset-top)); left: 50%;
-    transform: translateX(-50%) translateY(-120%);
+    /* **从底部弹出** —— 原来固定在顶部 top:18px，正好压在 sticky header
+       （品牌条 + 页签）上面，提示一出来就把「时光自撰集」和页签挡住了
+       （截图实测）。底部弹出不挡任何顶部内容。 */
+    position: fixed; bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px)); left: 50%;
+    transform: translateX(-50%) translateY(160%);
     background: rgba(35,30,21,.94); color: #fff; padding: 10px 22px; border-radius: 99px;
     font-size: 14px; z-index: 120; box-shadow: 0 8px 24px rgba(0,0,0,.28);
     transition: transform .28s ease, opacity .28s; opacity: 0; pointer-events: none;
@@ -276,18 +558,534 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   @media (max-width: 420px) {
     h1 { font-size: 17.5px; }
     .tb { font-size: 12.5px; }
+    /* 窄屏：搜索框单独占一行，输入框才不会被挤成只剩两个字 */
+    .searchbar { flex-wrap: wrap; }
+    .searchbar .sbox { flex: 1 0 100%; order: -1; }
+    .searchbar .keyfilter { font-size: 11.5px; padding: 8px 9px; }
+    .searchbar .viewtog { margin-left: auto; }
   }
   /* 版本角标：右下角极小字，不响应点击，用于快速分辨新旧版 */
-  .ver { position: fixed; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10px; color: rgba(120,130,145,.45); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
+  /* 版本角标挪到**右上角** —— 原来在右下角，toast 改到底部弹出后会被压住。
+     右上角是空区（页签那一行的外侧），不挡任何内容。 */
+  .ver { position: fixed; right: 10px; top: calc(6px + env(safe-area-inset-top)); font-size: 10px; color: rgba(120,130,145,.42); z-index: 200; pointer-events: none; font-variant-numeric: tabular-nums; }
+  html[data-theme="dark"] .ver { color: rgba(190,180,210,.35); }
   /* 被门户 iframe 嵌入时：顶部安全区由门户顶栏负责，本页不再重复避让（防止标题上方出现大段空白） */
   html.in-frame header { padding-top: 14px; }
+
+/* ============================================================
+   深色主题 · 开关控制（html[data-theme="dark"]）
+   设计参考 mydoip.com 产品中心：底 rgb(22,11,35) / 卡 rgb(27,10,49)
+   描边 rgba(187,124,228,.3) / 圆角 3.75px / 渐变标题 #fff→#a3a3a3
+   ============================================================ */
+html[data-theme="dark"] {
+  --text: #f0eef4;
+  --muted: #9d95ad;
+  --line: rgba(187,124,228,.22);
+  --primary: #bb7ce4;
+  --primary-dark: #d8a8f5;
+  --danger: #ff6b6b;
+  --card: #1b0a31;
+  --card-2: #22103c;
+  --page: #160b23;
+  --grad-title: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
+  --grad-rainbow: linear-gradient(90deg, #ff0000, #d077ff, #07abf7, #07f79b, #36f401);
+  color-scheme: dark;
+}
+html[data-theme="dark"] body {
+  background: var(--page) !important;
+  background-image: none !important;   /* 去掉浅色宣纸图 */
+  color: var(--text);
+}
+/* 紫云星图（多层 radial-gradient 复刻，不引外部图） */
+html[data-theme="dark"] body::before {
+  /* 原来浅色模式用 ::before 当宣纸蒙层（z-index:0，盖在 body 背景上）。
+     深色下改成星云层 —— 必须保留 position/z-index 的语义，
+     否则会盖住 .wrap 里的内容（浅色时 z-index:0 + .wrap z-index:1 才不挡）。 */
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 78% -6%, rgba(140,60,220,.30), transparent 62%),
+    radial-gradient(700px 420px at 18% 4%,  rgba(60,80,220,.22),  transparent 64%),
+    radial-gradient(1000px 600px at 50% 108%, rgba(200,70,220,.16), transparent 66%),
+    radial-gradient(420px 300px at 92% 62%, rgba(40,190,220,.14), transparent 70%),
+    var(--page);
+}
+html[data-theme="dark"] body::after {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+  background-image:
+    radial-gradient(1.2px 1.2px at 12% 18%, rgba(255,255,255,.9), transparent),
+    radial-gradient(1px 1px at 32% 62%, rgba(255,255,255,.7), transparent),
+    radial-gradient(1.4px 1.4px at 55% 24%, rgba(255,255,255,.8), transparent),
+    radial-gradient(1px 1px at 68% 74%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1.3px 1.3px at 82% 38%, rgba(255,255,255,.85), transparent),
+    radial-gradient(1px 1px at 22% 86%, rgba(255,255,255,.55), transparent),
+    radial-gradient(1.1px 1.1px at 44% 44%, rgba(255,255,255,.7), transparent),
+    radial-gradient(1px 1px at 90% 84%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1px 1px at 8% 52%, rgba(255,255,255,.5), transparent),
+    radial-gradient(1.2px 1.2px at 76% 12%, rgba(255,255,255,.75), transparent);
+}
+
+/* 顶栏 */
+html[data-theme="dark"] header {
+  background: rgba(22,11,35,.72);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(187,124,228,.16);
+  box-shadow: none;
+}
+html[data-theme="dark"] .head-top h1 {
+  background: var(--grad-title);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  font-weight: 700; letter-spacing: .5px;
+}
+html[data-theme="dark"] .head-cnt { color: var(--muted); }
+html[data-theme="dark"] .verse {
+  background: var(--grad-rainbow);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent !important;
+  font-weight: 600; letter-spacing: 2px;
+}
+/* 按钮 */
+html[data-theme="dark"] .tb {
+  background: rgba(187,124,228,.08);
+  border: 1px solid rgba(187,124,228,.28);
+  color: #e2d8f0;
+  border-radius: 4px;
+}
+html[data-theme="dark"] .tb:hover { border-color: rgba(187,124,228,.7); background: rgba(187,124,228,.16); }
+html[data-theme="dark"] .tb.pri {
+  background: linear-gradient(90deg, #7b2ff7, #bb7ce4);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 0 18px rgba(123,47,247,.35);
+}
+/* 搜索框 */
+html[data-theme="dark"] .searchbar input {
+  background: rgba(27,10,49,.85);
+  border: 1px solid rgba(187,124,228,.28);
+  color: var(--text);
+  border-radius: 4px;
+}
+html[data-theme="dark"] .searchbar input::placeholder { color: #7d7490; }
+html[data-theme="dark"] .searchbar input:focus {
+  border-color: rgba(187,124,228,.75); box-shadow: 0 0 0 2px rgba(187,124,228,.18);
+}
+html[data-theme="dark"] .sicon { opacity: .6; }
+html[data-theme="dark"] .sclr { color: var(--muted); }
+/* 视图切换 */
+html[data-theme="dark"] .viewtog {
+  background: rgba(27,10,49,.8); border-color: rgba(187,124,228,.28); border-radius: 4px;
+}
+html[data-theme="dark"] .viewtog button { color: var(--muted); }
+html[data-theme="dark"] .viewtog button.on {
+  background: linear-gradient(90deg, #7b2ff7, #bb7ce4); color: #fff;
+}
+/* 分类页签 */
+html[data-theme="dark"] .chip {
+  background: transparent;
+  border: 1px solid rgba(187,124,228,.28);
+  color: #cfc4dd;
+  border-radius: 4px; font-weight: 600;
+}
+html[data-theme="dark"] .chip:hover { border-color: rgba(187,124,228,.7); color: #fff; }
+html[data-theme="dark"] .chip.on {
+  background: linear-gradient(90deg, #7b2ff7, #bb7ce4);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 0 14px rgba(123,47,247,.3);
+}
+html[data-theme="dark"] .cats .more {
+  background: transparent; border: 1px solid rgba(187,124,228,.28);
+  color: var(--muted); border-radius: 4px;
+}
+/* 年份条 */
+html[data-theme="dark"] .yrbar {
+  background: linear-gradient(180deg, rgba(22,11,35,.96) 72%, rgba(22,11,35,.82));
+  border-bottom: 1px solid rgba(187,124,228,.14);
+}
+html[data-theme="dark"] .yrbar .yb {
+  background: rgba(27,10,49,.8); border-color: rgba(187,124,228,.28);
+  color: #cfc4dd; border-radius: 4px; font-weight: 600;
+}
+html[data-theme="dark"] .yrbar .yb:hover { border-color: rgba(187,124,228,.75); color: #fff; }
+html[data-theme="dark"] .yrbar .yb.on {
+  background: linear-gradient(90deg, #7b2ff7, #bb7ce4); border-color: transparent; color: #fff;
+}
+html[data-theme="dark"] .yrbar .nav {
+  background: rgba(27,10,49,.8); border-color: rgba(187,124,228,.28);
+  color: var(--muted); border-radius: 4px;
+}
+/* 总览带 */
+html[data-theme="dark"] .ovbar {
+  background: rgba(27,10,49,.78);
+  border: 1px solid rgba(187,124,228,.24);
+  border-radius: 4px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+html[data-theme="dark"] .ovbar .ov-h .t { color: #e8e0f2; }
+html[data-theme="dark"] .ovbar .ov-h .n,
+html[data-theme="dark"] .ovbar .ov-h .tip { color: var(--muted); }
+html[data-theme="dark"] .ov-scale { border-bottom-color: rgba(187,124,228,.2); }
+html[data-theme="dark"] .ov-scale span { color: var(--muted); }
+html[data-theme="dark"] .ov-bar {
+  background: linear-gradient(180deg, rgba(187,124,228,.9), rgba(123,47,247,.6));
+  border-color: rgba(187,124,228,.95);
+}
+html[data-theme="dark"] .ov-bar.ov-b2 {
+  background: linear-gradient(180deg, rgba(7,171,247,.85), rgba(7,171,247,.5));
+  border-color: rgba(7,171,247,.9);
+}
+html[data-theme="dark"] .ov-bar.ov-b3 {
+  background: linear-gradient(180deg, rgba(7,247,155,.8), rgba(54,244,1,.5));
+  border-color: rgba(7,247,155,.9);
+}
+html[data-theme="dark"] .ov-bar:hover { filter: brightness(1.25); }
+html[data-theme="dark"] .ov-legend { color: var(--muted); }
+/* 时间轴卡片 */
+/* **年份标题：渐变字效果下放到 .num，.yr 自己保留不透明底** ——
+   原来直接在 .yr 上用 background-clip:text，把整行的遮挡底色也一起裁掉了，
+   吸顶时下方卡片会从年份标题行里透出来。 */
+html[data-theme="dark"] .yr {
+  color: #efe8f7;
+  background: linear-gradient(180deg, rgba(22,11,35,.97) 62%, rgba(22,11,35,.84));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom-color: rgba(187,124,228,.2);
+}
+html[data-theme="dark"] .yr .num {
+  background: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent !important;
+}
+html[data-theme="dark"] .yr .cnt { color: var(--muted); }
+/* 竖线时间轴的竖线是 `.seg::before`（不是 .seg-wrap::before —— 后者 content:none，规则空转） */
+html[data-theme="dark"] .seg::before {
+  background: linear-gradient(180deg, rgba(187,124,228,.5), rgba(187,124,228,.12));
+}
+html[data-theme="dark"] .ev {
+  background: var(--card);
+  border: 1px solid rgba(187,124,228,.24);
+  border-radius: 4px;
+  box-shadow: none;
+  margin-bottom: 10px;
+}
+html[data-theme="dark"] .ev:hover {
+  border-color: rgba(187,124,228,.7);
+  box-shadow: 0 0 20px rgba(123,47,247,.22);
+}
+html[data-theme="dark"] .ev-title {
+  color: #f4f0f8;
+  background: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent !important;
+  font-weight: 600;
+}
+/* **深色：时间段卡片恢复深色底** ——
+   浅色规则 `.ev.span-ev .ev-body` 用的是
+   `linear-gradient(90deg, rgba(191,154,125,.06), #fff 40%)` —— 终点是**白色**。
+   深色下若不覆盖，就是「白底 + 白→灰渐变字」= 几乎看不见。
+   而时间段事件恰是本工具的主数据类型，这条最要命。 */
+html[data-theme="dark"] .ev.span-ev .ev-body {
+  background: linear-gradient(90deg, rgba(187,124,228,.12), var(--card) 45%);
+  border-left-color: rgba(187,124,228,.65);
+}
+/* 白→灰渐变字在白底上看不见，深色下改成偏亮的渐变 */
+html[data-theme="dark"] .ev.span-ev .ev-title {
+  background: linear-gradient(180deg, #ffffff 20%, #d6cbe4 80%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent !important;
+}
+html[data-theme="dark"] .ev-meta .ev-d { color: var(--muted); }
+html[data-theme="dark"] .ev-note { color: #b9aec9; }
+html[data-theme="dark"] .tag {
+  background: rgba(187,124,228,.15);
+  color: #d9c2f5;
+  border-radius: 3px;
+  border: 1px solid rgba(187,124,228,.25);
+}
+html[data-theme="dark"] .tag.lock-tag {
+  background: rgba(255,214,120,.13); color: #ffd98a; border-color: rgba(255,214,120,.28);
+}
+html[data-theme="dark"] .tag.span-tag {
+  background: rgba(7,171,247,.13); color: #8fd4ff; border-color: rgba(7,171,247,.28);
+}
+html[data-theme="dark"] .op {
+  background: rgba(187,124,228,.1);
+  border: 1px solid rgba(187,124,228,.3);
+  color: #d4c6e6; border-radius: 3px;
+}
+html[data-theme="dark"] .op:hover { background: rgba(187,124,228,.24); color: #fff; }
+html[data-theme="dark"] .op.del { color: #ff9a9a; border-color: rgba(255,107,107,.3); }
+html[data-theme="dark"] .op.del:hover { background: rgba(255,107,107,.18); }
+html[data-theme="dark"] .op.del.locked { color: #7d7490; border-color: rgba(125,116,144,.3); }
+/* 列表 */
+html[data-theme="dark"] .listview th {
+  background: rgba(27,10,49,.9); color: var(--muted); border-bottom-color: rgba(187,124,228,.28);
+}
+html[data-theme="dark"] .listview td { border-bottom-color: rgba(187,124,228,.12); color: #e6e0ee; }
+html[data-theme="dark"] .listview tr:hover td { background: rgba(187,124,228,.07); }
+html[data-theme="dark"] .listview .lv-n,
+html[data-theme="dark"] .listview .lv-d { color: var(--muted); }
+html[data-theme="dark"] .listview .lv-t { color: #f0eaf6; }
+html[data-theme="dark"] mark { background: rgba(187,124,228,.35); color: #fff; }
+/* 弹窗 */
+html[data-theme="dark"] .mask { background: rgba(10,5,18,.82); backdrop-filter: blur(6px); }
+html[data-theme="dark"] .mask .card {
+  background: var(--card-2); color: var(--text);
+  border: 1px solid rgba(187,124,228,.3); border-radius: 6px;
+}
+html[data-theme="dark"] .mask .card-title { color: #f0eaf6; }
+html[data-theme="dark"] .mask label { color: #cfc4dd; }
+html[data-theme="dark"] .mask .hint { color: var(--muted); }
+html[data-theme="dark"] .mask input,
+html[data-theme="dark"] .mask textarea,
+html[data-theme="dark"] .mask select {
+  background: rgba(27,10,49,.9); color: var(--text);
+  border: 1px solid rgba(187,124,228,.3); border-radius: 4px;
+}
+html[data-theme="dark"] .mask input:focus,
+html[data-theme="dark"] .mask textarea:focus { border-color: rgba(187,124,228,.75); }
+html[data-theme="dark"] .mask .btn {
+  background: rgba(187,124,228,.12); color: #e2d8f0;
+  border: 1px solid rgba(187,124,228,.3); border-radius: 4px;
+}
+html[data-theme="dark"] .mask .btn:hover { background: rgba(187,124,228,.24); }
+/* **密码输入框：ID 选择器特异性 (1,0,0) 高于上面的 `.mask input` (0,2,2)**，
+   深色规则被压过 → 白底 + 近白字 = 看不见输入内容。必须用 ID 提升特异性。 */
+html[data-theme="dark"] #pw-input,
+html[data-theme="dark"] #pw-input:focus {
+  background: rgba(27,10,49,.94) !important;
+  color: var(--text) !important;
+  border-color: rgba(187,124,228,.4) !important;
+}
+html[data-theme="dark"] .mask .btn.pri {
+  background: linear-gradient(90deg,#7b2ff7,#bb7ce4); color: #fff; border-color: transparent;
+}
+/* 导入预览：浅色规则的标题是深棕 #3a3128，深色下不可读 */
+html[data-theme="dark"] .pv-item .t { color: #e6dff0; }
+html[data-theme="dark"] .pv-item .d,
+html[data-theme="dark"] .pv-item .m { color: var(--muted); }
+html[data-theme="dark"] .pv-list,
+html[data-theme="dark"] .pv-item { border-color: rgba(187,124,228,.18); }
+html[data-theme="dark"] .empty { color: var(--muted); }
+html[data-theme="dark"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+html[data-theme="dark"] ::-webkit-scrollbar-track { background: rgba(27,10,49,.5); }
+html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(187,124,228,.3); border-radius: 3px; }
+html[data-theme="dark"] .toast {
+  background: var(--card-2); border: 1px solid rgba(187,124,228,.35); color: #eee7f6;
+}
+
+/* ============================================================
+   主题切换开关
+   ============================================================ */
+.theme-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--line); background: rgba(187,124,228,.08);
+  color: var(--muted); font-size: 14px; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  transition: color .15s, border-color .15s, background .15s;
+  line-height: 1;
+}
+.theme-btn:hover { color: var(--primary); border-color: var(--primary); }
+html[data-theme="dark"] .theme-btn {
+  background: rgba(187,124,228,.14); border-color: rgba(187,124,228,.32); color: #d9c2f5;
+}
+
+
+/* ===== 顶部品牌条 + 页签（仿 mydoip 顶栏）===== */
+.brandbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0 7px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.brandbar .brand {
+  font-size: 13px; font-weight: 700; letter-spacing: .4px; flex: none;
+  background: linear-gradient(180deg, #2b2620 25%, #6b5f52 85%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+html[data-theme="dark"] .brandbar .brand {
+  background: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
+  /* **必须补 background-clip: text** —— 上面用 `background` 简写时，
+     background-clip 会被重置成 border-box，渐变不再裁剪成文字，
+     整块渐变直接铺满元素变成白灰色方块（实测 clip=border-box）。 */
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.brandbar .tabs { display: flex; gap: 4px; margin-left: auto; }
+.brandbar .tab {
+  background: transparent; border: none; cursor: pointer; font-family: inherit;
+  font-size: 12.5px; font-weight: 700; color: var(--muted);
+  padding: 5px 11px; border-radius: 4px; position: relative;
+  transition: color .15s, background .15s;
+}
+.brandbar .tab:hover { color: var(--primary); background: var(--primary-soft, rgba(191,154,125,.08)); }
+.brandbar .tab.on { color: var(--primary); background: rgba(191,154,125,.13); }
+html[data-theme="dark"] .brandbar .tab { color: #a99fb8; }
+html[data-theme="dark"] .brandbar .tab:hover { color: #e8dff4; background: rgba(187,124,228,.1); }
+html[data-theme="dark"] .brandbar .tab.on { color: #fff; background: rgba(187,124,228,.16); }
+.brandbar .tab.on::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+  width: 22px; height: 2px; border-radius: 1px;
+  background: linear-gradient(90deg, #7b2ff7, #bb7ce4);
+}
+/* 大标题：渐变字 */
+.hero-title {
+  font-size: 25px !important; font-weight: 700 !important;
+  letter-spacing: .5px; margin: 4px 0 2px !important;
+  /* **浅色模式下必须用深色渐变** —— 原站的白→灰渐变是给深底设计的，
+     直接搬到浅色宣纸底上几乎看不见（白字在白底）。 */
+  background: linear-gradient(180deg, #2b2620 25%, #6b5f52 85%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent !important;
+}
+html[data-theme="dark"] .hero-title {
+  background: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent !important;
+}
+
+/* ===== 章节视图：产品卡网格 ===== */
+.chapter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 10px 0 4px; }
+.ch-card {
+  background: var(--card, #fff);
+  border: 1px solid rgba(187,124,228,.3);
+  border-radius: 3.75px;
+  padding: 15px;
+  position: relative;
+  transition: border-color .18s, box-shadow .18s, transform .18s;
+}
+.ch-card:hover {
+  border-color: rgba(187,124,228,.75);
+  box-shadow: 0 0 26px rgba(123,47,247,.24);
+  transform: translateY(-1px);
+}
+.ch-card .ch-h { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+.ch-card .ch-t {
+  font-size: 16px; font-weight: 700; letter-spacing: .3px; flex: 1; min-width: 0;
+  background: linear-gradient(180deg, #2b2620 25%, #6b5f52 85%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+html[data-theme="dark"] .ch-card .ch-t {
+  background: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.ch-card .ch-badge {
+  flex: none; font-size: 10px; font-weight: 700; letter-spacing: .4px;
+  padding: 2.5px 8px; border-radius: 3px;
+  background: rgba(187,124,228,.14); color: #d9c2f5;
+  border: 1px solid rgba(187,124,228,.3);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* **浅色模式下这套紫粉是反的** —— 浅紫字压在浅紫底上，对比度约 1.3:1，几乎看不见。
+   浅色用深紫字 + 更实的底。 */
+html[data-theme="light"] .ch-card .ch-badge {
+  background: rgba(107,63,160,.10); color: #5d338f; border-color: rgba(107,63,160,.30);
+}
+/* 浅色下卡片描边用主题的暖色线，别用紫色 */
+html[data-theme="light"] .ch-card { border-color: var(--line); }
+.ch-card .ch-sub { font-size: 11px; color: var(--muted); margin-bottom: 9px; }
+.ch-card .ch-desc {
+  font-size: 11.25px; line-height: 1.57; color: var(--text); opacity: .82;
+  margin-bottom: 11px;
+}
+.ch-card .ch-tl {
+  height: 44px; background: rgba(0,0,0,.16); border-radius: 3px;
+  position: relative; overflow: hidden; margin-bottom: 9px;
+}
+html[data-theme="light"] .ch-card .ch-tl { background: rgba(0,0,0,.045); }
+.ch-card .ch-lane { position: absolute; left: 0; right: 0; height: 9px; }
+.ch-card .ch-lane.l0 { top: 6px; }
+.ch-card .ch-lane.l1 { top: 17px; }
+.ch-card .ch-lane.l2 { top: 25px; }
+.ch-card .ch-lane.l3 { top: 33px; }
+.ch-card .ch-card-dot { position: absolute; top: 22px; width: 5px; height: 5px; border-radius: 50%; }
+.ch-card .ch-bar { position: absolute; top: 0; height: 9px; border-radius: 2px; }
+.ch-card .ch-tl-note {
+  font-size: 9.5px; color: var(--muted); opacity: .7; margin: -4px 0 9px;
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.ch-card .ch-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 9px; }
+.ch-card .ch-legend span { font-size: 10.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.ch-card .ch-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.ch-card .ch-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding-top: 10px; border-top: 1px solid rgba(187,124,228,.16);
+}
+html[data-theme="light"] .ch-card .ch-foot { border-top-color: var(--line); }
+.ch-card .ch-link {
+  font-size: 10.5px; color: var(--primary); cursor: pointer;
+  background: none; border: none; padding: 0; font-family: inherit;
+  transition: opacity .15s;
+}
+.ch-card .ch-link:hover { opacity: .75; text-decoration: underline; }
+.ch-card .ch-nums { margin-left: auto; display: flex; gap: 10px; font-size: 10.5px; color: var(--muted); }
+.ch-card .ch-nums b { color: var(--primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* 骨架分类选择行 */
+.ch-picker {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 10px 0 2px; font-size: 12px; color: var(--muted);
+}
+.ch-picker button {
+  background: transparent; border: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-weight: 600; padding: 4px 10px;
+  border-radius: 4px; cursor: pointer; font-family: inherit;
+}
+.ch-picker button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ch-picker button .pk-d { font-size: 9.5px; opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.ch-picker button.on .pk-d { opacity: .85; }
+html[data-theme="dark"] .ch-picker button { background: rgba(27,10,49,.8); border-color: rgba(187,124,228,.28); color: #cfc4dd; }
+html[data-theme="dark"] .ch-picker button.on { background: linear-gradient(90deg,#7b2ff7,#bb7ce4); border-color: transparent; color: #fff; }
+
+
+/* ===== 第二维度：重要程度 =====
+   编码方式 = 左边框粗细 + ★ 角标（不占用颜色维度，颜色留给分类） */
+.ev.key-ev { border-left: 3px solid var(--primary) !important; }
+  .ev .key-tag {
+    background: rgba(255,210,74,.18); color: #a87c00; border-color: rgba(209,155,0,.3);
+  }
+  html[data-theme="dark"] .ev .key-tag {
+    background: rgba(255,210,74,.14); color: #ffd24a; border-color: rgba(255,210,74,.32);
+  }
+html[data-theme="dark"] .ev.key-ev { border-left-color: #ffd24a !important; }
+.ev .key-star {
+  color: #ffd24a; font-size: 12px; margin-right: 4px;
+  text-shadow: 0 0 8px rgba(255,210,74,.5);
+}
+.ch-card.key-ch { border-left: 3px solid #ffd24a; }
+.ch-card .ch-star { color: #ffd24a; margin-right: 4px; }
+/* 列表视图里的重要标记 */
+.lv-t .key-star { color: #d19b00; }
+html[data-theme="dark"] .lv-t .key-star { color: #ffd24a; }
+/* 编辑弹窗里的「重要」勾选 */
+.key-pick {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px;
+  cursor: pointer; font-size: 13.5px; user-select: none;
+}
+.key-pick:hover { border-color: var(--primary); }
+.key-pick input { width: 16px; height: 16px; accent-color: #d19b00; cursor: pointer; }
+.key-pick .kp-txt b { color: var(--text); }
+.key-pick .kp-txt span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.key-pick.on { border-color: #ffd24a; background: rgba(255,210,74,.07); }
+html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); background: rgba(255,210,74,.08); }
+
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
+    <!-- 顶部品牌条 + 主视图页签 -->
+    <div class="brandbar">
+      <span class="brand">⏳ 时光自撰集</span>
+      <nav class="tabs" role="tablist">
+        <button class="tab" data-view="chapter" role="tab">章节</button>
+        <button class="tab" data-view="axis" role="tab">时间轴</button>
+        <button class="tab" data-view="list" role="tab">列表</button>
+        <button class="tab" data-view="graph" role="tab">图谱</button>
+      </nav>
+    </div>
     <div class="head-top">
-      <h1>⏳ 时光自撰集</h1>
+      <button class="theme-btn" id="theme-btn" title="切换深浅色" aria-label="切换深浅色">☾</button>
+      <h1 class="hero-title">我的时光轴</h1>
       <span style="display:flex;align-items:baseline;gap:2px">
         <span class="head-cnt" id="head-cnt">0 条</span>
         <button class="yr-all" id="yr-all-btn" style="display:none">收起全部</button>
@@ -301,11 +1099,54 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
       <button class="tb" id="sync-btn">⚙ 云端</button>
       <button class="tb" id="clear-btn" style="color:var(--danger);border-color:rgba(192,80,60,.3)">清空</button>
     </div>
+    <div class="searchbar">
+      <div class="sbox">
+        <span class="sicon">🔍</span>
+        <input type="search" id="q" placeholder="搜索事件 / 备注 / 分类…" autocomplete="off">
+        <button class="sclr" id="q-clr" style="display:none" title="清空">✕</button>
+      </div>
+      <button class="keyfilter" id="key-filter" title="只看重要事件（人生节点）">★ 只看重要</button>
+      <button class="keyfilter icon" id="rule-btn" title="重要判定规则：编辑关键词 / 判定设置" aria-label="重要判定规则">⚙</button>
+      <div class="viewtog">
+        <button id="v-axis" class="on">时间轴</button>
+        <button id="v-list">列表</button>
+      </div>
+    </div>
+    <div class="srch-hint" id="srch-hint" style="display:none"></div>
     <div class="cats" id="cats"></div>
   </header>
 
+  <!-- 时间轴总览带：所有时间段事件一览（拍板②） -->
+  <div class="ovbar" id="ovbar" style="display:none"></div>
+
+  <!-- 年份快捷检索：一根横向年份条，点一下直达该年 -->
+  <div class="yrbar" id="yrbar" style="display:none">
+    <button class="nav" id="yr-prev" title="更早的年份">‹</button>
+    <div class="track" id="yr-track"></div>
+    <button class="nav" id="yr-next" title="更新的年份">›</button>
+  </div>
+
   <div class="axis" id="axis"></div>
+
+  <!-- 关联图谱 -->
+  <div class="axis" id="graph-wrap" style="display:none">
+    <div class="graph-panel">
+      <div class="graph-bar">
+        <button class="tb" id="graph-reheat" title="清空筛选条件并重新计算布局（回到完整图谱）">↻ 重新布局</button>
+        <button class="tb" id="graph-mode" title="切换拖拽联动强度">联动：近处强</button>
+        <button class="tb" id="graph-clear" title="清除搜索 / 分类 / 只看重要等筛选条件" style="display:none">✕ 清除筛选</button>
+        <span class="gl-stat" id="graph-stat"></span>
+      </div>
+      <svg id="graph-svg"></svg>
+      <div class="graph-legend" id="graph-legend"></div>
+      <div class="graph-tip">
+        <b>玩法：</b>按住任意圆点拖动 —— 它的<b>直接关联</b>被强联动拉近并高亮，<b>二度关联</b>轻微跟随，三度以外几乎不动；松手后整张图缓缓回弹。<br>
+        <b>节点：</b>大圆＝年份（大小按记录数），中圆＝分类标签；边＝该年出现过该分类。<b>点击年份</b>切到列表看该年记录，点击分类按分类筛选。
+      </div>
+    </div>
+  </div>
 </div>
+<div class="graph-pop" id="graph-pop"></div>
 
 <!-- 新增/编辑 -->
 <div class="mask" id="edit-mask">
@@ -327,7 +1168,11 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     </div>
     <div class="fld"><label>事件</label><input type="text" id="e-name" placeholder="如：居住在北京清河宝盛西里"></div>
     <div class="fld"><label>分类</label><select id="e-cat"></select></div>
-    <div class="fld"><label>备注（可选）</label><textarea id="e-note" placeholder="想补充的细节…"></textarea></div>
+    <div class="fld"><label>备注（可选）</label><textarea id="e-note" placeholder="想补充的细节…（可换行，多行会分行显示）"></textarea></div>
+    <label class="key-pick" id="e-key-pick" title="标记为人生节点 / 重要时刻">
+      <input type="checkbox" id="e-key">
+      <span class="kp-txt"><b>★ 重要事件</b><span>手动标记：勾选＝重要，取消勾选＝不重要；完全不碰则交给关键词规则判定</span></span>
+    </label>
     <div class="btns">
       <button class="btn" id="edit-cancel">取消</button>
       <button class="btn pri" id="edit-save">保存</button>
@@ -383,6 +1228,42 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   </div>
 </div>
 
+<!-- 重要判定规则 -->
+<div class="mask" id="rule-mask">
+  <div class="card">
+    <div class="card-title">⚙ 重要判定规则</div>
+    <div class="card-tip">
+      「重要」有两条来源：<b>你手动标记</b>（最高优先级，永远生效）＋<b>关键词规则</b>（自动兜底）。<br>
+      规则只认下面这份关键词表，<b>不再按时间跨度自动判定</b>。
+    </div>
+    <div class="fld">
+      <label>关键词表（命中即视为重要，一行一个）</label>
+      <textarea id="rule-words" spellcheck="false" style="min-height:132px"></textarea>
+    </div>
+    <div class="fld">
+      <label>排除词（命中则整条判为不重要，一行一个，可留空）</label>
+      <textarea id="rule-exclude" spellcheck="false" style="min-height:56px"></textarea>
+    </div>
+    <div class="rule-stat" id="rule-stat"></div>
+    <div class="btns">
+      <button class="btn" id="rule-cancel">关闭</button>
+      <button class="btn" id="rule-default">恢复默认词表</button>
+      <button class="btn pri" id="rule-save">保存</button>
+    </div>
+    <button class="btn" id="rule-recalc" style="width:100%;margin-top:9px">把规则命中的记录标为手动重要</button>
+    <button class="btn danger" id="rule-clear-manual" style="width:100%;margin-top:7px">清除全部手动标记（回到纯规则）</button>
+    <div class="rule-tip">
+      <b>怎么用：</b>改完关键词点「保存」，页面上的判定<b>立刻跟着变</b> ——
+      未标记的记录是<b>实时</b>按当前词表算的，没有缓存，改词即时生效。<br>
+      <b>「把规则命中的记录标为手动重要」</b>：当你认可当前判定时用它固化 ——
+      固化后即使以后改关键词表，这些记录仍然是重要的（已手动标「不重要」的不会被改动）。<br>
+      <b>手动优先：</b>在事件编辑框里勾选／取消「★ 重要事件」，就是在<b>手动表态</b>，规则永远不会覆盖它。<br>
+      <b>排除词</b>优先级最高：只要标题里出现排除词，整条记录就判为不重要 —— 适合挡掉「上线」「成立」这类词在长句里的误伤。<br>
+      <b>跨设备</b>：词表会写进云端表格的「规则」工作表，换设备拉数据时一起同步，判定结果保持一致。
+    </div>
+  </div>
+</div>
+
 <!-- 密码 -->
 <div class="mask" id="pw-mask">
   <div class="card" style="width:min(330px,100%)">
@@ -407,11 +1288,54 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
    ============================================================ */
 const KEY = 'time_events_v1';
 const SHEET_NAME = 'events';
+const RULES_SHEET = '规则';        // 规则词表工作表（跟着数据走，解决跨设备判定不一致）
 const CLEAR_PW = '870825';
 const $ = id => document.getElementById(id);
 const CATS = ['观演', '学业', '工作', '居住', '家庭', '旅行', '其他'];
+/* ============================================================
+   重要程度规则（v27 重做）
+   —— key    : 1=手动重要 / 0=手动不重要 / 缺失=未表态（交给规则）
+   —— keyRule: 规则判定缓存，只有「按规则重新判定」或数据迁移时才写入
+   —— 规则只看关键词表（已去掉「跨 2 年即重要」的时长规则）
+   ============================================================ */
+const RULES_KEY = 'time_keyrules_v1';   // 用户自定义关键词表
+const DATA_VER_KEY = 'time_datav';      // 数据语义版本（用于旧数据迁移）
+const DATA_VER = '2';
+/* 默认正向词表 —— 只收「高置信度的人生节点」。
+   容易误伤的词（上线 / 成立 / 第一名 / 发布会）**已从表里移除**：
+   它们不是人生节点，留在表里只会把普通记录错标成重要。
+   需要的话可以在 ⚙ 规则里自己加，或改用「排除词」精确挡掉。 */
+const KEY_WORDS_DEFAULT = [
+  '结婚', '离婚', '订婚', '婚礼', '怀孕', '出生', '去世', '逝世', '离世',
+  '入学', '开学', '毕业', '考研', '读研', '博士', '留学',
+  '入职', '离职', '辞职', '跳槽', '升职', '转正', '裁员', '失业', '退休',
+  '创业', '融资', '上市', '倒闭',
+  '搬家', '搬进', '搬出', '落户', '买房', '卖房', '装修',
+  '确诊', '住院', '手术', '康复', '车祸',
+  '获奖', '冠军', '夺冠',
+];
+/* 默认排除词留空 —— 排除词是「整条否决」语义，默认启用容易误伤正常句子。
+   想挡「上线」这类词，在排除词里写一行「上线」即可。 */
+const EXCLUDE_DEFAULT = [];
+let keyRules = { words: KEY_WORDS_DEFAULT.slice(), exclude: EXCLUDE_DEFAULT.slice() };
 let DATA = [];
 let curCat = 'ALL';
+/* ===== 查看体验改版：新增状态 ===== */
+let curQ = '';        // 搜索关键词
+let curView = 'chapter'; // 'chapter'(主) | 'axis' | 'list' | 'graph'
+/* 第二维度筛选：只看重要事件 */
+let onlyKey = false;
+let openEvId = null;  // 手机端点开的卡片
+/* 视图锁定标志（v27 拆成两个 —— 原来混在一起会自相矛盾）：
+     viewPinned  = 用户**手动选过视图页签** → 搜索/筛选不再自动切走
+     filterOpen  = 用户**手动开过筛选**（只看重要）→ 只影响提示，不影响视图切换
+   原来两者共用一个标志：开了「只看重要」就等于「锁住章节视图」，
+   于是章节视图里筛出 0 条章节，页面写着「没有可作为章节的记录」，
+   上方提示却写着「找到 N 条重要的记录」—— 自相矛盾（实测截图确认）。 */
+let viewPinned = false;  // 用户手动点过视图页签
+let filterOpen = false;  // 用户手动开过筛选
+let curListCache = null; // 当前筛选后的记录（总览带用它，保证与列表一致）
+let catsMoreOpen = false; // 分类栏「更多」是否展开
 
 /* ---------- 解析器 ---------- */
 const CAT_RULES = [
@@ -494,21 +1418,383 @@ function parseText(text) {
  * 字段白名单 + 日期格式白名单 + 分类白名单 + 文本长度上限，
  * 保证渲染层拿到的永远是安全字符串。 */
 const EV_MAX_TITLE = 200, EV_MAX_NOTE = 2000;
+
+/* ============================================================
+   主题切换（深色 / 浅色）
+   - 默认深色（用户拍板）
+   - 选择存 localStorage，换设备/清缓存后回到深色
+   - **必须在首次渲染前应用**，否则会闪一下浅色
+   ============================================================ */
+const THEME_KEY = 'time_theme_v1';
+function applyTheme(t) {
+  const dark = (t !== 'light');
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const btn = document.getElementById('theme-btn');
+  if (btn) {
+    btn.textContent = dark ? '☀' : '☾';
+    btn.title = dark ? '切换到浅色' : '切换到深色';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  // 同步手机状态栏/系统 UI 颜色
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#160b23' : '#f4f1ec');
+  return dark;
+}
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+  // 默认深色；用户明确选过浅色才用浅色
+  applyTheme(saved === 'light' ? 'light' : 'dark');
+  const btn = document.getElementById('theme-btn');
+  if (!btn) return;
+  btn.onclick = () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const next = isDark ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+    // 主题切换会影响 sticky 偏移（header 高度变了）→ 重新测量
+    if (typeof syncStickyTop === 'function') syncStickyTop();
+    if (typeof render === 'function') render();
+  };
+}
+
+
+/* ============================================================
+   章节视图 —— 主视图
+   骨架分类自动识别：跨年段数量最多、且总跨度最大的那个分类。
+   一张卡 = 一个章节（一个住处 / 一段时期），卡内是迷你时间轴。
+   ============================================================ */
+let chCat = '';            // 章节骨架分类（空 = 自动）
+const CH_COLORS = {
+  '居住': '#bb7ce4', '工作': '#ff9a5a', '家庭': '#ff6b9d',
+  '学业': '#5ab0ff', '观演': '#2fd8a8', '旅行': '#ffd24a', '其他': '#9d95ad',
+};
+/* 章节骨架的评分规则（v24 修正）：
+   原版只按「条数」排序 → 旅行类记录最多（46 条）就选旅行，
+   但旅行多是三五天的短期行程，撑不起「章节」这个概念。
+   改成**时长加权**：
+     · 总时长（所有跨年段年数之和）是主权重 —— 真正撑起人生的是长时段
+     · 条数次之
+     · 平均时长 < 1 年的分类直接排除（那是行程/事件，不是章节）
+   这样「居住 20 段、平均 1.7 年」会赢过「旅行 46 段、平均 0.3 年」。 */
+function pickChapterCat(list) {
+  const agg = {};
+  list.forEach(e => {
+    if (!e.span || !e.from || !e.to || e.from === e.to) return;
+    // **必须用精确月数，不能只用年份差** ——
+    // 「2013-06 → 2013-09」按年份差算是 0+1 = 1 年（假的），
+    // 会让一堆几天的短期行程混进「平均 ≥1 年」的分类里，
+    // 结果骨架仍被「旅行 46 条」抢走（实测踩过）。
+    const mo = monthsBetween(e.from, e.to);
+    if (mo == null) return;
+    const a = agg[e.cat] || (agg[e.cat] = { n: 0, mo: 0, avg: 0, max: 0, score: 0 });
+    a.n++; a.mo += mo;
+    if (mo > a.max) a.max = mo;          // 该分类里最长的一段
+  });
+  let keys = Object.keys(agg);
+  if (!keys.length) return '';
+  keys.forEach(k => {
+    const a = agg[k];
+    a.avg = a.mo / a.n;                       // 平均时长（月）
+    // **综合评分 = 总时长 × 根号条数** ——
+    // 只看总时长：「学业」1 段 27 个月 > 「居住」20 段共 30 个月 → 错选学业；
+    // 只看条数：「旅行」46 段短期行程 > 「居住」20 段 → 错选旅行。
+    // 根号条数是关键：条数参与但不让「一堆短期行程」压过「多段长时段」。
+    a.score = a.mo * Math.sqrt(a.n);
+  });
+  // **门槛看「最长的一段」而不是「平均时长」** ——
+  // 用平均会误杀：「居住」20 段里有些只住了 8 个月，平均 11.2 个月 < 12，
+  // 结果被排除，反而选中了「家庭」2 段（刚好平均 12 个月）。
+  // 只要这个分类里**有一段够长**（≥1 年），它就有资格当章节骨架。
+  const longEnough = keys.filter(k => agg[k].max >= 12);
+  const pool = longEnough.length ? longEnough : keys;
+  pool.sort((a, b) => agg[b].score - agg[a].score || agg[b].mo - agg[a].mo || agg[b].n - agg[a].n);
+  return pool[0];
+}
+/** 两个日期之间的月数（含小数月），无效返回 null */
+function monthsBetween(from, to) {
+  const p1 = /^(\d{4})(?:-(\d{1,2}))?/.exec(String(from || ''));
+  const p2 = /^(\d{4})(?:-(\d{1,2}))?/.exec(String(to || ''));
+  if (!p1 || !p2) return null;
+  const y1 = +p1[1], m1 = p1[2] ? +p1[2] : 1;
+  const y2 = +p2[1], m2 = p2[2] ? +p2[2] : 1;
+  if (!isFinite(y1) || !isFinite(y2)) return null;
+  return Math.max(1, (y2 - y1) * 12 + (m2 - m1) + 1);
+}
+/* 日期 → 年份小数（用于按真实比例定位） */
+function yearFrac(d) {
+  if (!d || d.length < 7) return NaN;
+  const y = parseInt(d.slice(0, 4), 10), m = parseInt(d.slice(5, 7), 10);
+  const dd = d.length >= 10 ? parseInt(d.slice(8, 10), 10) : 1;
+  if (!isFinite(y) || !isFinite(m)) return NaN;
+  return y + (m - 1) / 12 + (dd - 1) / 365;
+}
+/* 章节卡时间轴的窗口范围说明 */
+function winNote(ch, yMin, yMax) {
+  const f1 = yearFrac(ch.from), f2 = yearFrac(ch.to);
+  const chDur = Math.max(0.25, f2 - f1);
+  // **span 必须与 windowX 一致** —— 原来用 `yMax - yMin`，
+  // 全局只有一年时被夹成 0 → 显示「2010.03 – 2010.03」，与实际窗口不符。
+  const span = Math.max(1, yMax - yMin);
+  let w = Math.min(Math.max(chDur * 3, span * 0.14), span);
+  let lo = f1 - (w - chDur) / 2;
+  if (lo < yMin) lo = yMin;
+  if (lo + w > yMax + 1) lo = yMax + 1 - w;
+  const fmt = v => {
+    let y = Math.floor(v);
+    let m = Math.round((v - y) * 12);
+    if (m === 12) { y += 1; m = 0; }   // 进位：12 月要变成次年 1 月，不是「2010.12」
+    return m ? `${y}.${String(m).padStart(2, '0')}` : `${y}`;
+  };
+  return `${fmt(lo)} – ${fmt(lo + w)}`;
+}
+function renderChapters(list, years) {
+  const box = $('axis');
+  const cat = chCat || pickChapterCat(list);
+  const chapters = list
+    .filter(e => e.span && e.cat === cat && e.from && e.to && e.from !== e.to)
+    .sort((a, b) => a.from.localeCompare(b.from));
+
+  // 骨架分类切换器 —— **必须在空态分支之前构造** ——
+  // 原来空态直接 return，picker 根本不渲染：用户手动选错骨架后
+  // 既换不了骨架、也看不到别的内容，只能改筛选条件绕出去。
+  const allSpans0 = list.filter(e => e.span && e.from && e.to && e.from !== e.to);
+  const cats = {};
+  allSpans0.forEach(e => {
+    const mo = monthsBetween(e.from, e.to) || 0;
+    const a = cats[e.cat] || (cats[e.cat] = { n: 0, mo: 0 });
+    a.n++; a.mo += mo;
+  });
+  const catKeys = Object.keys(cats).sort((a, b) => cats[b].mo - cats[a].mo || cats[b].n - cats[a].n);
+  const pickerHtml = `<div class="ch-picker">
+    <span>章节骨架</span>
+    <button data-cc="auto" class="${chCat ? '' : 'on'}">自动（${esc(cat || '无')}）</button>
+    ${catKeys.map(k => {
+      const a = cats[k];
+      const yrs = (a.mo / 12).toFixed(1);
+      const avgMo = Math.round(a.mo / Math.max(1, a.n));
+      const weak = avgMo < 12;
+      return `<button data-cc="${esc(k)}" class="${chCat === k ? 'on' : ''}" title="${esc(k)}：${a.n} 段 · 共 ${yrs} 年 · 平均 ${avgMo} 个月${weak ? '（短期行程较多，不适合作章节骨架）' : ''}">`
+        + `${esc(k)} ${a.n}<span class="pk-d">${yrs}年</span></button>`;
+    }).join('')}
+  </div>`;
+  const bindPicker = () => {
+    box.querySelectorAll('.ch-picker button').forEach(b => {
+      b.onclick = () => { chCat = (b.dataset.cc === 'auto') ? '' : b.dataset.cc; render(); };
+    });
+  };
+
+  if (!chapters.length) {
+    box.innerHTML = pickerHtml + `<div class="empty">
+      <div class="ico">📖</div>
+      <div class="t">没有可作为章节的记录</div>
+      <div class="d">当前筛选下没有「${esc(cat || '该分类')}」的时间段记录。<br>可以换个骨架分类，或放宽筛选条件。</div>
+    </div>`;
+    bindPicker();
+    return;
+  }
+  const yNums = years.map(y => parseInt(y, 10)).filter(y => isFinite(y));
+  const yMin = Math.min.apply(null, yNums), yMax = Math.max.apply(null, yNums);
+  const span = Math.max(1, yMax - yMin);
+  const X = f => ((f - yMin) / span) * 100;
+  /* **章节卡内的时间轴用「自适应窗口」** —— 若一律用全局 16 年轴，
+     一段只持续 3 个月的旅行在轴上只占 1.5% 宽，
+     里面的嵌套条会挤成一团完全看不清。
+     做法：每章的窗口 = 本章时长 × 3（留出章内其它状态的空间），
+     最小为全局跨度的 14%，并居中夹在全局范围内。
+     这样短章节也能看清内部结构，长章节仍保持全局视角。 */
+  function windowX(f, f1, f2) {
+    const chDur = Math.max(0.25, f2 - f1);
+    let w = Math.min(Math.max(chDur * 3, span * 0.14), span);
+    let lo = f1 - (w - chDur) / 2;      // 居中
+    if (lo < yMin) lo = yMin;
+    if (lo + w > yMax + 1) lo = yMax + 1 - w;
+    return ((f - lo) / w) * 100;
+  }
+  const allSpans = list.filter(e => e.span && e.from && e.to && e.from !== e.to);
+  const singles = list.filter(e => !e.span || e.from === e.to);
+
+  const cards = chapters.map((ch, i) => {
+    const f1 = yearFrac(ch.from), f2 = yearFrac(ch.to);
+    const y1 = parseInt(ch.from.slice(0, 4), 10), y2 = parseInt(ch.to.slice(0, 4), 10);
+    // 时长用精确月数（跨 3 个月的行程不该显示成「1 年」）
+    const durMo = monthsBetween(ch.from, ch.to) || 1;
+    const durTxt = durMo >= 12 ? (Math.round(durMo / 12 * 10) / 10) + ' 年' : durMo + ' 个月';
+    const inner = allSpans.filter(e => e !== ch && yearFrac(e.from) < f2 && yearFrac(e.to) > f1);
+    const innerSingles = singles.filter(e => { const f = yearFrac(e.from); return f >= f1 && f <= f2; });
+    // 泳道：重叠的排不同行
+    const lanes = []; const placed = [];
+    inner.forEach(e => {
+      const a = yearFrac(e.from), b = yearFrac(e.to);
+      let li = lanes.findIndex(endY => endY <= a);
+      if (li === -1) { li = lanes.length; lanes.push(b); } else lanes[li] = b;
+      placed.push({ e, li, a, b });
+    });
+    const cnt = {};
+    inner.forEach(e => cnt[e.cat] = (cnt[e.cat] || 0) + 1);
+    // 章节内的重要事件数（含本章自身）
+    const nKey = (evKey(ch) === 1 ? 1 : 0) + inner.filter(e => evKey(e) === 1).length
+               + innerSingles.filter(e => evKey(e) === 1).length;
+    const cntTxt = Object.keys(cnt).map(k => `${cnt[k]} 段${k}`).join(' · ');
+    const legend = Object.keys(cnt).map(k =>
+      `<span><i style="background:${CH_COLORS[k] || CH_COLORS['其他']}"></i>${esc(k)}</span>`).join('');
+    // 迷你时间轴
+    let tl = '';
+    const cc = CH_COLORS[cat] || '#bb7ce4';
+    const wx = f => windowX(f, f1, f2);
+    tl += `<div class="ch-lane l0"><div class="ch-bar" style="left:${wx(f1).toFixed(2)}%;width:${Math.max(1.5, wx(f2) - wx(f1)).toFixed(2)}%;background:linear-gradient(90deg,${cc},rgba(123,47,247,.55));border:1px solid ${cc}"></div></div>`;
+    // **按 li 真正分行** —— 原来 li 算了却没用，全部画在 l1 一条泳道上，
+    // 同章里互相重叠的时间段会叠成一条（看起来像只有一段状态）。
+    placed.forEach(p => {
+      const c = CH_COLORS[p.e.cat] || CH_COLORS['其他'];
+      const l = Math.max(0, wx(p.a)), r = Math.min(100, wx(p.b));
+      const lane = Math.min(p.li, 2);   // 最多 3 条泳道，超过的仍归到第 3 条
+      tl += `<div class="ch-lane l${1 + lane}"><div class="ch-bar" style="left:${l.toFixed(2)}%;width:${Math.max(1.2, r - l).toFixed(2)}%;background:${c};opacity:.85"></div></div>`;
+    });
+    innerSingles.forEach(e => {
+      const c = CH_COLORS[e.cat] || CH_COLORS['其他'];
+      tl += `<div class="ch-card-dot" style="left:calc(${wx(yearFrac(e.from)).toFixed(2)}% - 2px);background:${c}"></div>`;
+    });
+    const desc = innerSingles.length
+      ? innerSingles.slice(0, 2).map(e => esc(e.title)).join('　·　')
+      : (inner.length ? '这段时期只有持续的记录' : '平静的一段');
+    const place = String(ch.title || '').split('·').pop().trim() || String(ch.title || '');
+    const isKey = evKey(ch) === 1;
+    return `<div class="ch-card${isKey ? ' key-ch' : ''}" data-ch-id="${esc(ch.id)}">
+      <div class="ch-h">
+        <span class="ch-t">${isKey ? '<span class="ch-star">★</span>' : ''}${esc(place)}</span>
+        <span class="ch-badge">${esc(ch.from.slice(0, 7))} → ${esc(ch.to.slice(0, 7))}</span>
+      </div>
+      <div class="ch-sub">第 ${i + 1} 章 · ${esc(cat)} · 持续 ${durTxt}${cntTxt ? ' · ' + esc(cntTxt) : ''}</div>
+      <div class="ch-desc">${desc}</div>
+      <div class="ch-tl">${tl}</div>
+      <div class="ch-tl-note">轴：${winNote(ch, yMin, yMax)}</div>
+      ${legend ? `<div class="ch-legend">${legend}</div>` : ''}
+      <div class="ch-foot">
+        <button class="ch-link" data-ch-year="${y1}">查看该年记录 →</button>
+        <span class="ch-nums">
+          <span>记录 <b>${innerSingles.length + inner.length + 1}</b></span>
+          <span>高光 <b>${innerSingles.length}</b></span>
+          ${nKey ? `<span>重要 <b>${nKey}</b></span>` : ''}
+        </span>
+      </div>
+    </div>`;
+  }).join('');
+
+  box.innerHTML = pickerHtml + `<div class="chapter-grid">${cards}</div>`;
+  bindPicker();
+  box.querySelectorAll('.ch-link').forEach(b => {
+    b.onclick = () => { gotoYear(b.dataset.chYear); };
+  });
+}
+
+
+/* ============================================================
+   第二维度：重要程度（key）
+   —— 0 普通 / 1 重要
+   自动推断覆盖三类来源：新增时按用户勾选、导入的老数据按规则算、
+   云端同步下来的按规则算（外部没有这个字段时）。
+   ============================================================ */
+/** 关键词表读写（localStorage；损坏时回落默认） */
+function loadRules() {
+  try {
+    const raw = localStorage.getItem(RULES_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && Array.isArray(o.words) && o.words.length) {
+        return {
+          words: o.words.map(x => String(x)).filter(Boolean),
+          exclude: (Array.isArray(o.exclude) ? o.exclude : []).map(x => String(x)).filter(Boolean),
+        };
+      }
+    }
+  } catch (e) { console.warn('重要规则读取失败，用默认词表', e); }
+  return { words: KEY_WORDS_DEFAULT.slice(), exclude: EXCLUDE_DEFAULT.slice() };
+}
+function saveRules() {
+  try { localStorage.setItem(RULES_KEY, JSON.stringify(keyRules)); }
+  catch (e) { console.warn('重要规则保存失败', e); }
+}
+/** 推断是否重要 —— **只看关键词，不看时间跨度**（v27）
+ *  1) 命中排除词 → 整条否决（0）
+ *  2) 命中关键词表 → 重要（1）
+ *  3) 都没命中 → 普通（0）
+ *  注意：这个结果**不会自动写进数据**，
+ *  只有「按规则重新判定」按钮或旧数据迁移才会固化（keyRule）。 */
+function inferKey(e) {
+  if (!e) return 0;
+  const t = String(e.title == null ? '' : e.title);
+  if (!t) return 0;
+  // **不区分大小写** —— 用户自加英文词（如 live / PhD）时，
+  // 标题写「Live 演唱会」原来匹配不到。搜索那边（matchQ）本来就不区分，
+  // 两边行为不一致会让人以为规则失灵。
+  const tl = t.toLowerCase();
+  const ex = keyRules.exclude || [];
+  for (let i = 0; i < ex.length; i++) {
+    if (ex[i] && tl.indexOf(String(ex[i]).toLowerCase()) !== -1) return 0;
+  }
+  const ws = keyRules.words || [];
+  for (let i = 0; i < ws.length; i++) {
+    if (ws[i] && tl.indexOf(String(ws[i]).toLowerCase()) !== -1) return 1;
+  }
+  return 0;
+}
+/** 统一取「是否重要」—— **手动 > 实时规则**
+ *  · key = 1/0：用户手动表态，规则永远不覆盖
+ *  · key 缺失（未表态）：按**当前词表实时推断**
+ *    → 这正是「改词后老数据能重新判定」的实现方式：规则是纯函数，
+ *      每次渲染现算，不读任何缓存。
+ *  · keyRule：只是「上次按规则判定」的**快照**，
+ *    仅用于写进 Excel 留档（换设备时规则判定能对上），
+ *    **不参与显示判定** —— 否则就退化成 v26 那个「固化进 localStorage、
+ *    改规则也救不回旧数据」的坑。 */
+function evKey(e) {
+  if (!e) return 0;
+  if (e.key === 1 || e.key === true || e.key === '1') return 1;
+  if (e.key === 0 || e.key === false || e.key === '0') return 0;
+  return inferKey(e);
+}
+/** 这条记录是不是「手动表态」的（用于统计与「重新判定」时跳过） */
+function isManualKey(e) {
+  if (!e) return false;
+  return e.key === 1 || e.key === true || e.key === '1'
+      || e.key === 0 || e.key === false || e.key === '0';
+}
+
 function sanitizeEvent(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
   if (!id) return null;
   const from = normDatePart(raw.from);
-  const to = normDatePart(raw.to) || from;
+  let to = normDatePart(raw.to) || from;
+  // **倒挂收敛** —— 外部数据（Excel / 云端）能造出「2015 → 2010」，
+  // 渲染时轴上会出现起止颠倒的条目。倒挂时收敛成单日。
+  if (from && to && to < from) to = from;
   return {
     id,
     from,
     to,
     sortKey: (typeof raw.sortKey === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw.sortKey)) ? raw.sortKey.slice(0, 10) : (from || ''),
-    span: !!raw.span,
+    // **span 必须从 from/to 推导，不能信任外部传入的值** ——
+    // 外部数据（Excel / 云端）若把单日记录标成 span=true，
+    // 渲染时就会显示成「2024-09-09 → 2024-09-09 1天」这种自相矛盾的东西。
+    span: !!(from && to && from !== to),
     title: String(raw.title == null ? '' : raw.title).slice(0, EV_MAX_TITLE),
     cat: CATS.includes(raw.cat) ? raw.cat : '其他',
     note: String(raw.note == null ? '' : raw.note).slice(0, EV_MAX_NOTE),
+    // **第二维度：重要程度（v27 语义）**
+    //   key = 1 手动重要 / 0 手动不重要 / 缺失 = 未表态（交给规则实时判定）
+    // 注意：**这里绝不能再自动推断、也不缓存规则结果**——
+    // v26 把 inferKey 的结果固化写进 localStorage，
+    // 导致改了规则也救不回旧数据。v27 改为「未表态 = 缺失」，
+    // 判定永远现算，改关键词表立刻全局生效。
+    key: (raw.key === 1 || raw.key === true || raw.key === '1') ? 1
+       : (raw.key === 0 || raw.key === false || raw.key === '0') ? 0
+       : undefined,
+    // 旧版（v26）判定结果的备份，迁移时留底，正常流程不读它
+    keyLegacy: (raw.keyLegacy === 1 || raw.keyLegacy === true) ? 1
+             : (raw.keyLegacy === 0 || raw.keyLegacy === false) ? 0
+             : undefined,
   };
 }
 function loadLocal() {
@@ -528,34 +1814,88 @@ function loadLocal() {
     return [];
   }
   if (!Array.isArray(parsed)) return [];
+  // **旧数据迁移（v27）**
+  //   v26 的 key 字段是「最终判定结果」（手动和规则推断混在一起），
+  //   已经固化在 localStorage 里。v27 改成「key=手动表态 / keyRule=规则缓存」，
+  //   所以这里必须把旧 key 拆开：
+  //     · 旧 key=1 → 清空（变未表态），由新规则（只认关键词）实时判定
+  //     · 旧 key=0 → 同样清空（变未表态），交给新规则
+  //   旧判定留底到 keyLegacy，需要时可恢复。
+  //   这样「跨 2 年就重要」的旧判定被彻底废掉（用户明确要求只看关键词），
+  //   同时手动标过、且标题命中关键词的记录仍然显示重要。
+  migrateKeySemantics(parsed);
   const out = [];
   for (const it of parsed) { const e = sanitizeEvent(it); if (e) out.push(e); }
   return out;
+}
+/** 旧数据语义迁移 —— 只做一次（靠 DATA_VER_KEY 标记） */
+function migrateKeySemantics(list) {
+  let ver = '';
+  try { ver = localStorage.getItem(DATA_VER_KEY) || ''; } catch (e) {}
+  if (ver === DATA_VER) return false;
+  let touched = false;
+  for (const it of list) {
+    if (!it || typeof it !== 'object') continue;
+    const oldKey = it.key;
+    if (oldKey === undefined) continue;
+    delete it.key;                       // 旧 key 是「最终判定」，不能当手动表态
+    delete it.keyRule;                   // v26→v27 中间方案留下的字段，一并清掉
+    // **保留一份旧判定备份** —— v26 里「手动标的」和「规则推断的」混在同一个
+    // key=1 里，迁移后前者无法区分（标题不含关键词时那条会丢手动身份）。
+    // 留个底，万一需要可以按 keyLegacy 手工恢复。
+    it.keyLegacy = (oldKey === 1 || oldKey === true || oldKey === '1') ? 1 : 0;
+    touched = true;
+  }
+  if (touched) {
+    // **必须先写数据、写成功后才置迁移标记** ——
+    // 反过来（先置标记再写数据）时，一旦这次写入失败（配额将满时
+    // 小写入成功、大写入失败就会命中），标记已生效 → 下次启动直接跳过迁移，
+    // 旧 v26 的 key 会被 sanitizeEvent 当成**手动表态**，
+    // 于是「规则推断」被永久固化成手动标记 —— 正是本次要根治的病。
+    const ok = safeSet(KEY, JSON.stringify(list));
+    if (!ok) {
+      console.error('时光数据迁移写入失败，迁移标记未置位，下次启动会重试');
+      return false;
+    }
+    console.info('时光数据已迁移到 v27 语义（key=手动 / 规则实时判定）');
+  }
+  // 数据落盘（或无需迁移）后才置标记
+  try { localStorage.setItem(DATA_VER_KEY, DATA_VER); } catch (e) {}
+  return touched;
 }
 let syncTimer = null;
 function persist(arr, silent, noPush) {
   // 入库前再过一次清洗 —— 任何写入路径（新增/编辑/云端合并）都统一走这里，
   // 保证 localStorage 里存的永远是安全结构。
   DATA = (Array.isArray(arr) ? arr : []).map(sanitizeEvent).filter(Boolean);
-  try { safeSet(KEY, JSON.stringify(DATA)); } catch (e) {
-    console.error('time 写入本机存储失败（可能超出配额）', e);
+  // **必须看 safeSet 的返回值** —— safeSet 内部已经 try/catch 并 return false，
+  // 不会再抛异常，所以外层写 try{ safeSet(...) }catch{} 是**死代码**，
+  // catch 永远不执行 → 写入失败时提示永不显示，
+  // 用户看着「✓ 已更新」以为存好了，其实数据没落盘（配额满时静默丢数据）。
+  const ok = safeSet(KEY, JSON.stringify(DATA));
+  if (!ok) {
+    console.error('time 写入本机存储失败（可能超出配额）');
     if (!silent) toast('⚠️ 写入本机存储失败，可能是浏览器存储空间已满');
   }
-  if (noPush) return;                          // 静默拉取场景：只更新本地，不回写云端
+  if (noPush) return ok;                        // 静默拉取场景：只更新本地，不回写云端
   if (ghReady()) {                             // 有 Token：自动写回云端 Excel
     if (syncTimer) clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
-      const ok = await ghPush(DATA);
-      if (ok) toast('☁ 已同步到云端');
+      const pushed = await ghPush(DATA);
+      if (pushed) toast('☁ 已同步到云端');
     }, 600);
   }
+  return ok;
 }
 function save(arr, msg) {
-  persist(arr);
+  // **写入失败时不要弹「✓ 已保存」** —— 提示会被覆盖成成功的样子，
+  // 用户以为存好了，实际数据没落盘（配额满时最常见）。
+  // 失败提示由 persist 弹出，这里直接跳过成功文案。
+  const ok = persist(arr);
   render();
-  if (msg) toast(msg);
+  if (msg && ok) toast(msg);
+  return ok;
 }
-
 /* ---------- 工具 ---------- */
 let toastTimer = null;
 function toast(msg) {
@@ -580,6 +1920,396 @@ function catCounts(arr) {
   return m;
 }
 
+
+/* ============================================================
+   关联图谱引擎（v28）
+   —— 节点：年份（大圆，大小=该年记录数）+ 分类标签（中圆）
+   —— 边：  该年出现过该分类；另加年份↔年份的淡边做时间骨架
+   —— 拖拽：按住节点拖动时，按「跳数」分层联动
+             1 跳强联动 / 2 跳微动 / 3 跳极微 → 远处几乎不动
+             松手后整张图缓缓回弹到平衡位置
+   —— 全部用原生 SVG + 自写力导向，不引外部库（离线可用、体积为零）
+   ============================================================ */
+const GN = { nodes: [], links: [], alpha: 1, raf: 0, drag: null, mode: 1, W: 0, H: 0, timer: null };
+const GNS = 'http://www.w3.org/2000/svg';
+/** 分类配色 —— 与页面其它地方的分类色一致 */
+const G_CAT_COLOR = {
+  '观演': '#e08ad2', '学业': '#6fb3f0', '工作': '#7ed3a4', '居住': '#f0b45e',
+  '家庭': '#e8737f', '旅行': '#8fd6c4', '其他': '#9d95ad',
+};
+function gCatColor(c) { return G_CAT_COLOR[c] || '#9d95ad'; }
+
+/** 由记录列表构建图谱数据 */
+function buildGraphData(list) {
+  const byYear = new Map(), byCat = new Map();
+  for (const e of list) {
+    const y = yearOf(e.sortKey || e.from);
+    if (!y || y === '未知') continue;
+    if (!byYear.has(y)) byYear.set(y, { id: 'y' + y, type: 'year', label: y, count: 0, cats: new Set() });
+    const yn = byYear.get(y); yn.count++; yn.cats.add(e.cat);
+    if (!byCat.has(e.cat)) byCat.set(e.cat, { id: 'c' + e.cat, type: 'cat', label: e.cat, count: 0, years: new Set() });
+    const cn = byCat.get(e.cat); cn.count++; cn.years.add(y);
+  }
+  const nodes = [...byYear.values(), ...byCat.values()];
+  const links = [];
+  for (const yn of byYear.values()) for (const c of yn.cats) links.push({ s: yn.id, t: 'c' + c });
+  // 年份按时间顺序串一条淡边（时间骨架），让图有"编年"的形状
+  const ys = [...byYear.keys()].sort();
+  for (let i = 0; i < ys.length - 1; i++) links.push({ s: 'y' + ys[i], t: 'y' + ys[i + 1], weak: true });
+  return { nodes, links };
+}
+
+/** 初始化图谱 DOM 与模拟状态 */
+function initGraph(list) {
+  const svg = $('graph-svg');
+  if (!svg) return;
+  GN.W = 0; GN.H = 0;
+  svg.innerHTML = '';
+  const gRoot = document.createElementNS(GNS, 'g');
+  const gLinks = document.createElementNS(GNS, 'g');
+  const gNodes = document.createElementNS(GNS, 'g');
+  gRoot.appendChild(gLinks); gRoot.appendChild(gNodes);
+  svg.appendChild(gRoot);
+  GN.gLinks = gLinks; GN.gNodes = gNodes;
+
+  const box = svg.getBoundingClientRect();
+  GN.W = Math.max(320, box.width || 800);
+  GN.H = Math.max(280, box.height || 460);
+  svg.setAttribute('viewBox', `0 0 ${GN.W} ${GN.H}`);
+  // **有效绘图区**（四周留边距）—— 节点按这个区域居中，
+  // 否则圆环按整块画布算，节点会贴边甚至被标签挤出视野。
+  const PADX = 58, PADY = 42;
+  GN.cx = GN.W / 2; GN.cy = GN.H / 2;
+  GN.rx = Math.max(60, GN.W / 2 - PADX);
+  GN.ry = Math.max(60, GN.H / 2 - PADY);
+
+  const { nodes, links } = buildGraphData(list);
+  if (!nodes.length) {
+    $('graph-stat').textContent = '';
+    $('graph-legend').innerHTML = '';
+    // **空态要用 SVG 的 <text>** —— 往 <svg> 里插 HTML 是不渲染的，
+    // 之前用 insertAdjacentHTML 插 div，结果什么都看不见（实测）。
+    const t1 = document.createElementNS(GNS, 'text');
+    t1.setAttribute('x', GN.W / 2); t1.setAttribute('y', GN.H / 2 - 8);
+    t1.setAttribute('text-anchor', 'middle');
+    t1.setAttribute('font-size', '14');
+    t1.setAttribute('fill', 'var(--muted)');
+    t1.textContent = list.length ? '当前筛选下没有可成图的记录' : '还没有记录';
+    const t2 = document.createElementNS(GNS, 'text');
+    t2.setAttribute('x', GN.W / 2); t2.setAttribute('y', GN.H / 2 + 16);
+    t2.setAttribute('text-anchor', 'middle');
+    t2.setAttribute('font-size', '12');
+    t2.setAttribute('fill', 'var(--muted)');
+    t2.setAttribute('opacity', '.7');
+    t2.textContent = list.length ? '放宽筛选条件，或切到其他视图' : '点「+ 新增事件」记一笔，或点「导入」批量导入';
+    gRoot.appendChild(t1); gRoot.appendChild(t2);
+    return;
+  }
+
+  // **初始布局：年份沿圆周按时间顺序排，分类在内圈** ——
+  // 随机撒点会让前几秒"乱飞"，按结构起手既好看又快收敛。
+  const yrs = nodes.filter(n => n.type === 'year').sort((a, b) => a.label.localeCompare(b.label));
+  const cts = nodes.filter(n => n.type === 'cat');
+  GN.nodes = nodes.map(n => {
+    let x, y;
+    if (n.type === 'year') {
+      const i = yrs.indexOf(n);
+      const ang = -Math.PI / 2 + (i / Math.max(1, yrs.length)) * Math.PI * 2;
+      x = GN.cx + Math.cos(ang) * GN.rx; y = GN.cy + Math.sin(ang) * GN.ry;
+    } else {
+      const i = cts.indexOf(n);
+      const ang = -Math.PI / 2 + (i / Math.max(1, cts.length)) * Math.PI * 2;
+      const rr = 0.55;
+      x = GN.cx + Math.cos(ang) * GN.rx * rr; y = GN.cy + Math.sin(ang) * GN.ry * rr;
+    }
+    // 记录数很少的分类是"边缘角色"，放到外圈，不跟中心抢位置
+    if (n.type === 'cat' && n.count <= 1) {
+      const i = cts.indexOf(n);
+      const ang = -Math.PI / 2 + ((i + 0.5) / Math.max(1, cts.length)) * Math.PI * 2;
+      x = GN.cx + Math.cos(ang) * GN.rx * 1.12; y = GN.cy + Math.sin(ang) * GN.ry * 1.12;
+    }
+    return Object.assign({}, n, {
+      x, y, vx: 0, vy: 0,
+      r: n.type === 'year' ? 11 + Math.sqrt(n.count) * 4.6 : 8 + Math.sqrt(n.count) * 1.6,
+    });
+  });
+  const byId = new Map(GN.nodes.map(n => [n.id, n]));
+  GN.links = links.map(l => Object.assign({}, l, { s: byId.get(l.s), t: byId.get(l.t) }))
+                   .filter(l => l.s && l.t);
+
+  buildGraphDom();
+  renderGraphLegend();
+  $('graph-stat').textContent =
+    `${yrs.length} 个年份 · ${cts.length} 个分类 · ${GN.links.length} 条关联 · ${list.length} 条记录`;
+  // **有筛选时显示「清除筛选」入口** —— 顶部搜索框/分类栏在图谱上方，
+  // 用户容易忘了自己筛过，图谱只剩几个点却不知道为什么。
+  const hasFilter = !!(curQ.trim() || curCat !== 'ALL' || onlyKey);
+  const cb = $('graph-clear');
+  if (cb) cb.style.display = hasFilter ? '' : 'none';
+  if (hasFilter) {
+    const parts = [];
+    if (curQ.trim()) parts.push('搜「' + curQ.trim() + '」');
+    if (curCat !== 'ALL') parts.push('分类 ' + curCat);
+    if (onlyKey) parts.push('只看重要');
+    $('graph-stat').textContent += ' · 已筛选：' + parts.join(' · ');
+  }
+  GN.alpha = 1;
+  startGraphLoop();
+}
+
+/** 建 SVG 节点与边 */
+function buildGraphDom() {
+  GN.gLinks.innerHTML = ''; GN.gNodes.innerHTML = '';
+  for (const n of GN.nodes) {
+    const g = document.createElementNS(GNS, 'g');
+    g.style.cursor = 'grab';
+    const c = document.createElementNS(GNS, 'circle');
+    c.setAttribute('r', n.r);
+    c.setAttribute('fill', n.type === 'year' ? 'rgba(187,124,228,.42)' : gCatColor(n.label));
+    c.setAttribute('stroke', n.type === 'year' ? 'rgba(220,180,255,.85)' : 'rgba(255,255,255,.55)');
+    c.setAttribute('stroke-width', n.type === 'year' ? 1.6 : 1);
+    const t = document.createElementNS(GNS, 'text');
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('dy', n.r + 13);
+    t.setAttribute('font-size', n.type === 'year' ? 13 : 11.5);
+    t.setAttribute('fill', n.type === 'year' ? 'var(--text)' : 'var(--muted)');
+    t.textContent = n.label;
+    g.appendChild(c); g.appendChild(t);
+    GN.gNodes.appendChild(g);
+    n.el = g; n.circle = c; n.text = t;
+  }
+  for (const l of GN.links) {
+    const el = document.createElementNS(GNS, 'line');
+    el.setAttribute('stroke', 'rgba(150,110,210,.28)');
+    el.setAttribute('stroke-width', '1');
+    GN.gLinks.appendChild(el);
+    l.el = el;
+  }
+}
+
+function renderGraphLegend() {
+  const cats = GN.nodes.filter(n => n.type === 'cat');
+  $('graph-legend').innerHTML =
+    `<span><i style="background:rgba(187,124,228,.75)"></i><b>年份</b>（大圆，大小＝记录数）</span>` +
+    cats.map(c => `<span><i style="background:${gCatColor(c.label)}"></i>${esc(c.label)}</span>`).join('') +
+    `<span class="gl-sp">联动强度：<b id="graph-mode-txt">${['近处强联动', '全图分层跟随', '只拉直接邻居'][GN.mode - 1]}</b></span>`;
+}
+
+/** 一帧物理模拟 */
+function graphStep() {
+  const N = GN.nodes, L = GN.links;
+  // 斥力（O(n²)，节点数是「年份数+分类数」量级，几十到一百多，完全够用）
+  for (let i = 0; i < N.length; i++) {
+    for (let j = i + 1; j < N.length; j++) {
+      const a = N[i], b = N[j];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let d2 = dx * dx + dy * dy;
+      if (d2 < 1) d2 = 1;
+      const d = Math.sqrt(d2);
+      const rep = 15000 / d2;
+      const ux = dx / d, uy = dy / d;
+      a.vx -= ux * rep; a.vy -= uy * rep;
+      b.vx += ux * rep; b.vy += uy * rep;
+    }
+  }
+  // 弹簧（边）
+  for (const l of L) {
+    const a = l.s, b = l.t;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    const rest = l.weak ? 150 : 118;
+    const k = l.weak ? 0.006 : 0.034;
+    const f = (d - rest) * k;
+    const ux = dx / d, uy = dy / d;
+    a.vx += ux * f; a.vy += uy * f;
+    b.vx -= ux * f; b.vy -= uy * f;
+  }
+  // 弱中心引力（只防飞出画布，不往中间硬聚）
+  for (const n of N) {
+    n.vx += (GN.cx - n.x) * 0.00055;
+    n.vy += (GN.cy - n.y) * 0.00055;
+  }
+  // ★ 拖拽联动 —— 按跳数分层施加额外吸引力
+  if (GN.drag) {
+    const hops = graphHops(GN.drag.id);
+    for (const n of N) {
+      if (n === GN.drag) continue;
+      const h = hops.get(n.id);
+      if (h === undefined || h === 0) continue;
+      const dx = GN.drag.x - n.x, dy = GN.drag.y - n.y;
+      const d = Math.max(1, Math.hypot(dx, dy));
+      const ux = dx / d, uy = dy / d;
+      let mag = h === 1 ? 0.42 : h === 2 ? 0.11 : 0.03;
+      if (GN.mode === 2) mag = h === 1 ? 0.42 : h === 2 ? 0.20 : 0.08;
+      if (GN.mode === 3 && h > 1) mag = 0;
+      n.vx += ux * mag * 10; n.vy += uy * mag * 10;
+    }
+  }
+  // 积分 + 阻尼 + 边界
+  for (const n of N) {
+    if (n === GN.drag) { n.vx = 0; n.vy = 0; continue; }
+    n.vx *= 0.86; n.vy *= 0.86;
+    n.x += n.vx * GN.alpha; n.y += n.vy * GN.alpha;
+    const m = n.r + 22;
+    n.x = Math.max(m, Math.min(GN.W - m, n.x));
+    n.y = Math.max(m, Math.min(GN.H - m, n.y));
+  }
+  GN.alpha *= 0.985;
+  if (GN.alpha < 0.004) GN.alpha = 0.004;
+  graphPaint();
+}
+function graphPaint() {
+  for (const l of GN.links) {
+    l.el.setAttribute('x1', l.s.x); l.el.setAttribute('y1', l.s.y);
+    l.el.setAttribute('x2', l.t.x); l.el.setAttribute('y2', l.t.y);
+  }
+  for (const n of GN.nodes) n.el.setAttribute('transform', `translate(${n.x},${n.y})`);
+}
+function graphLoop() {
+  graphStep();
+  GN.raf = requestAnimationFrame(graphLoop);
+}
+function startGraphLoop() {
+  if (GN.raf) cancelAnimationFrame(GN.raf);
+  GN.raf = requestAnimationFrame(graphLoop);
+}
+/** 图热：重新加热模拟（拖拽后回弹、重新布局、窗口变化都用它） */
+function graphKick(a, reset) {
+  // **reset=true 时强制重置**（重新布局按钮用）——
+  // 原来只有 Math.max，点「重新布局」时如果 alpha 已被模拟降到 0.1，
+  // max(0.1, 1) = 1 看着没问题；但若传进来的 a 小于当前值就完全没反应，
+  // 语义不明确。改成显式区分「升温」与「重置」。
+  GN.alpha = reset ? (a == null ? 1 : a) : Math.max(GN.alpha, a == null ? 0.55 : a);
+  startGraphLoop();
+}
+
+/** 从某节点出发求各节点的跳数（BFS，最多 3 跳） */
+function graphHops(id) {
+  const hops = new Map([[id, 0]]);
+  const q = [id];
+  while (q.length) {
+    const cur = q.shift();
+    const d0 = hops.get(cur);
+    if (d0 >= 3) continue;
+    for (const l of GN.links) {
+      const other = l.s.id === cur ? l.t : (l.t.id === cur ? l.s : null);
+      if (!other || hops.has(other.id)) continue;
+      hops.set(other.id, d0 + 1); q.push(other.id);
+    }
+  }
+  return hops;
+}
+
+/* ---------- 拖拽 ---------- */
+function graphPoint(ev) {
+  const svg = $('graph-svg');
+  const r = svg.getBoundingClientRect();
+  const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+  const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+  return {
+    x: (cx - r.left) * GN.W / (r.width || GN.W),
+    y: (cy - r.top) * GN.H / (r.height || GN.H),
+  };
+}
+function graphPick(x, y) {
+  let best = null, bd = 1e9;
+  for (const n of GN.nodes) {
+    const d = Math.hypot(n.x - x, n.y - y);
+    if (d < n.r + 10 && d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+function graphDragStart(ev) {
+  const p = graphPoint(ev);
+  const n = graphPick(p.x, p.y);
+  if (!n) return;
+  ev.preventDefault();
+  GN.drag = n;
+  $('graph-svg').classList.add('grabbing');
+  graphKick(0.5);
+  graphHighlight(n);
+}
+function graphDragMove(ev) {
+  if (!GN.drag) return;
+  ev.preventDefault();
+  const p = graphPoint(ev);
+  GN.drag.x = p.x; GN.drag.y = p.y;
+  graphKick(0.35);
+}
+function graphDragEnd() {
+  if (!GN.drag) return;
+  GN.drag = null;
+  $('graph-svg').classList.remove('grabbing');
+  graphKick(0.35);      // 松手回弹
+  graphClearHighlight();
+}
+/** 拖拽时高亮关联（1 跳金边、2 跳淡金） */
+function graphHighlight(n) {
+  const hops = graphHops(n.id);
+  for (const l of GN.links) {
+    const ha = hops.get(l.s.id), hb = hops.get(l.t.id);
+    const both = ha !== undefined && hb !== undefined;
+    const near = both && (ha === 1 || hb === 1);
+    l.el.setAttribute('stroke', near ? 'rgba(255,210,74,.85)' : 'rgba(150,110,210,.2)');
+    l.el.setAttribute('stroke-width', near ? '2.2' : '1');
+  }
+  for (const m of GN.nodes) {
+    const h = hops.get(m.id);
+    const on = h !== undefined && h <= 2;
+    m.circle.setAttribute('stroke', h === 0 ? '#ffd24a' : on ? 'rgba(255,210,74,.9)' : 'rgba(255,255,255,.25)');
+    m.circle.setAttribute('stroke-width', h === 0 ? 2.6 : on ? 1.8 : 0.8);
+    if (on) m.text.setAttribute('fill', 'var(--text)');
+  }
+}
+function graphClearHighlight() {
+  for (const l of GN.links) {
+    l.el.setAttribute('stroke', 'rgba(150,110,210,.28)');
+    l.el.setAttribute('stroke-width', '1');
+  }
+  for (const m of GN.nodes) {
+    m.circle.setAttribute('stroke', m.type === 'year' ? 'rgba(220,180,255,.85)' : 'rgba(255,255,255,.55)');
+    m.circle.setAttribute('stroke-width', m.type === 'year' ? 1.6 : 1);
+    m.text.setAttribute('fill', m.type === 'year' ? 'var(--text)' : 'var(--muted)');
+  }
+}
+
+/* ---------- 点击 ---------- */
+function graphClick(ev) {
+  const p = graphPoint(ev);
+  const n = graphPick(p.x, p.y);
+  if (!n) return;
+  if (n.type === 'year') {
+    // 点年份 → 切到列表视图并只看那年
+    curView = 'list'; viewPinned = true;
+    curCat = 'ALL'; curQ = n.label;
+    $('q').value = n.label; $('q-clr').style.display = '';
+    syncViewTabs(); render();
+    toast(`已切到列表 · ${n.label} 年`);
+  } else {
+    // 点分类 → 按分类筛选
+    curCat = (curCat === n.label) ? 'ALL' : n.label;
+    render();
+    toast(curCat === 'ALL' ? '已取消分类筛选' : `已筛选分类：${n.label}`);
+  }
+}
+
+/* ---------- 悬浮提示 ---------- */
+function graphHover(ev) {
+  const pop = $('graph-pop');
+  if (!pop) return;
+  if (GN.drag) { pop.classList.remove('show'); return; }
+  const p = graphPoint(ev);
+  const n = graphPick(p.x, p.y);
+  if (!n) { pop.classList.remove('show'); return; }
+  pop.innerHTML = n.type === 'year'
+    ? `<b>${esc(n.label)} 年</b><span>${n.count} 条记录 · 关联 ${n.cats.size} 个分类</span>`
+    : `<b>${esc(n.label)}</b><span>${n.count} 条记录 · 跨 ${n.years.size} 年</span>`;
+  const w = 250;
+  pop.style.left = Math.min(window.innerWidth - w, (ev.touches ? ev.touches[0].clientX : ev.clientX) + 14) + 'px';
+  pop.style.top = ((ev.touches ? ev.touches[0].clientY : ev.clientY) + 16) + 'px';
+  pop.classList.add('show');
+}
+
 /* ---------- 渲染 ---------- */
 function renderCats() {
   const counts = catCounts(DATA);
@@ -592,32 +2322,248 @@ function renderCats() {
     b.onclick = () => { curCat = key; render(); };
     return b;
   };
+  // **按数量降序取前 4** —— 原来按 CATS 固定顺序，
+  // 最常用的分类可能被折进「更多」里（用户得先点开才看得到）。
+  const active = CATS.filter(c => counts[c]).sort((a, b) => counts[b] - counts[a]);
+  const MAX_VISIBLE = 4;                     // 最多直显 4 个，其余折进「更多」
+  const visible = active.slice(0, MAX_VISIBLE);
+  const hidden = active.slice(MAX_VISIBLE);
   box.appendChild(mk('ALL', '全部', DATA.length));
-  CATS.forEach(c => { if (counts[c]) box.appendChild(mk(c, c, counts[c])); });
+  visible.forEach(c => box.appendChild(mk(c, c, counts[c])));
+  if (!hidden.length) return;
+  // 「更多」按钮：点开显示剩余分类
+  const mb = document.createElement('button');
+  mb.className = 'more' + (hidden.includes(curCat) ? ' on' : '');
+  mb.textContent = (catsMoreOpen ? '收起' : `更多 ${hidden.length}`);
+  mb.onclick = () => { catsMoreOpen = !catsMoreOpen; renderCats(); };
+  box.appendChild(mb);
+  if (catsMoreOpen) hidden.forEach(c => box.appendChild(mk(c, c, counts[c])));
+}
+
+/* ===== 改版辅助函数 ===== */
+/* 计算时间段持续天数（含首尾）—— 时间段事件的核心信息 */
+function spanDays(ev) {
+  if (!ev.span) return 0;
+  const a = new Date(ev.from + 'T00:00:00');
+  const b = new Date(ev.to + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return 0;
+  return Math.round((b - a) / 86400000) + 1;
+}
+/* 关键词高亮（先转义再插标记，避免 XSS） */
+function hl(text, q) {
+  const raw = String(text == null ? '' : text);
+  if (!q) return esc(raw);
+  // **高亮必须先转义再插标记** —— 直接拿原文做正则再插 <mark> 会让
+  // 用户文本里的 < > & 变成可执行 HTML（XSS）。
+  // 这里改成「按关键词切段 → 逐段 esc → 命中段包 <mark>」，
+  // 天然避开「转义后 & 被拆散」导致的高亮错位问题。
+  const terms = q.split(/\s+/).filter(Boolean)
+    .map(t => t.toLowerCase())
+    .filter(Boolean);
+  if (!terms.length) return esc(raw);
+  const lower = raw.toLowerCase();
+  // 找出所有命中区间
+  const hits = [];
+  terms.forEach(t => {
+    let i = lower.indexOf(t);
+    while (i !== -1) { hits.push([i, i + t.length]); i = lower.indexOf(t, i + t.length); }
+  });
+  if (!hits.length) return esc(raw);
+  hits.sort((a, b) => a[0] - b[0]);
+  // 合并重叠区间
+  const merged = [];
+  hits.forEach(h => {
+    const last = merged[merged.length - 1];
+    if (last && h[0] <= last[1]) { if (h[1] > last[1]) last[1] = h[1]; }
+    else merged.push(h.slice());
+  });
+  let out = '', pos = 0;
+  merged.forEach(([a, b]) => {
+    out += esc(raw.slice(pos, a));
+    out += '<mark>' + esc(raw.slice(a, b)) + '</mark>';
+    pos = b;
+  });
+  out += esc(raw.slice(pos));
+  return out;
+}
+/* 搜索过滤：命中 标题 / 备注 / 分类 */
+function matchQ(ev, q) {
+  if (!q) return true;
+  // **按空格分词，与高亮函数 hl() 保持一致** ——
+  // 原来用整串 includes，搜「居住 工作」永远 0 结果，
+  // 但 hl() 是按分词高亮的（说明分词是设计意图）。
+  const terms = String(q).toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  // **加上日期字段** —— 原来只搜标题/备注/分类，
+  // 于是搜「2011」这种年份**永远搜不到任何记录**（实测：2 条 2011 年的记录，
+  // 搜「2011」返回 0 条）。而图谱视图点年份节点正是靠搜年份来定位记录，
+  // 不搜日期就点不开。日期三种粒度都带上：2011 / 2011-04 / 2011-04-01。
+  const hay = ((ev.title || '') + '\n' + (ev.note || '') + '\n' + (ev.cat || '') +
+               '\n' + (ev.from || '') + '\n' + (ev.to || '')).toLowerCase();
+  // **任一词命中即算匹配（OR 语义）** ——
+  // 原来用 every()（AND 语义），搜「居住 工作」会要求同一条记录同时含两词，
+  // 实际几乎永远 0 结果。而高亮函数 hl() 是把两词都标出来，
+  // 说明设计意图是「这几个词里任一命中即可」。AND 语义下高亮也就没意义了。
+  return terms.some(t => hay.includes(t));
 }
 
 function render() {
   const cnt = $('head-cnt');
+  // **DOM 重建后旧的 open 状态已失效** —— 不清的话，
+  // openEvId 仍指向旧卡片，点它会走「收起」分支（而它本来就没展开），
+  // 表现为「重渲染后第一次点击没反应，必须点第二次」。
+  openEvId = null;
   if (!DATA.length) {
     cnt.textContent = '0 条';
     $('cats').innerHTML = '';
+    // **必须把总览带 / 年份条 / 提示行一起清掉** ——
+    // 提前 return 会让它们残留：点「清空全部」后总览带还挂着指向已删记录的横条，
+    // 年份条和「收起全部」按钮也还在但点击无效。
+    $('ovbar').style.display = 'none';
+    $('ovbar').innerHTML = '';
+    $('yrbar').style.display = 'none';
+    $('yr-all-btn').style.display = 'none';
+    $('srch-hint').style.display = 'none';
+    $('axis').style.display = '';
     $('axis').innerHTML = `<div class="empty">
       <div class="ico">⏳</div>
       <div class="t">还没有记录</div>
       <div class="d">点「+ 新增事件」记一笔，或点「导入」批量粘贴历史事件</div>
     </div>`;
+    // **图谱视图即使没数据也要显示空态** —— 原来这里直接隐藏容器，
+    // 于是「清空全部」后切到图谱页签，页面什么都没有（连工具条都不见），
+    // 用户以为功能坏了。改成显示容器 + 空态提示。
+    if (GN.raf) { cancelAnimationFrame(GN.raf); GN.raf = 0; }
+    if (curView === 'graph') {
+      $('graph-wrap').style.display = '';
+      initGraph([]);
+    } else {
+      $('graph-wrap').style.display = 'none';
+    }
     return;
   }
-  const list = sortDesc(curCat === 'ALL' ? DATA : DATA.filter(e => e.cat === curCat));
+  const q = curQ.trim();
+  let catList = curCat === 'ALL' ? DATA : DATA.filter(e => e.cat === curCat);
+  // **第二维度筛选：只看重要** —— 与搜索、分类筛选叠加
+  if (onlyKey) catList = catList.filter(e => evKey(e) === 1);
+  const list = q ? catList.filter(e => matchQ(e, q)) : catList;
+  curListCache = list;   // 供 renderOvBar 使用（总览带跟随筛选）
+
+  applyDefaultCollapse();          // 首次进入默认折叠旧年份
+  if (!collapsedYears) collapsedYears = new Set();
+  // 搜索 / 筛选状态下自动展开所有命中年份 —— 否则「搜到了却看不到结果」
+  if (q || curCat !== 'ALL') {
+    const hit = new Set(list.map(e => yearOf(e.sortKey)));
+    [...collapsedYears].forEach(y => { if (hit.has(y)) collapsedYears.delete(y); });
+  }
   const years = [...new Set(list.map(e => yearOf(e.sortKey)))].sort((a, b) => b.localeCompare(a));
-  cnt.textContent = curCat === 'ALL'
-    ? `${DATA.length} 条 · 跨 ${years.length} 年`
-    : `${list.length} 条`;
+  const isFilt = q || curCat !== 'ALL' || onlyKey;
+  cnt.textContent = isFilt
+    ? `${list.length} / ${DATA.length} 条${q ? ` · 搜「${q}」` : ''}${onlyKey ? ' · 只看重要' : ''}`
+    : `${DATA.length} 条 · 跨 ${years.length} 年`;
+
+  // 搜索在章节视图下看不到结果 → 自动切到时间轴
+  // （章节视图只渲染章节卡，不渲染单条记录，搜到了也看不见）
+  // **但用户手动点过「视图页签」后就不能再自动切走** —— 否则搜索期间章节页签完全点不动，
+  // 而且清空搜索后用户被永久踢出主视图（实测：点章节 → 立刻被弹回 axis）。
+  // 「只看重要」也要切 —— 否则章节视图里筛出 0 条章节，
+  // 页面显示「没有可作为章节的记录」而上方提示写着「找到 N 条」，自相矛盾。
+  // **注意**：判据是 viewPinned（手动选视图），**不是** filterOpen（手动开筛选）——
+  // 开了筛选不等于用户想留在章节视图。
+  if ((q || onlyKey) && curView === 'chapter' && !viewPinned) {
+    curView = 'axis';
+    syncViewTabs();
+  }
+
+  // 搜索提示行
+  const hint = $('srch-hint');
+  if (q || onlyKey) {
+    hint.style.display = 'block';
+    const kTxt = onlyKey ? '重要' : '';
+    const qTxt = q ? `匹配「<b>${esc(q)}</b>」` : '';
+    const join = (qTxt && kTxt) ? ' 且 ' : '';
+    hint.innerHTML = list.length
+      ? `找到 <b>${list.length}</b> 条${qTxt}${join}${kTxt}的记录`
+      : `没有${qTxt}${join}${kTxt}的记录`;
+  } else {
+    hint.style.display = 'none';
+  }
 
   renderCats();
 
   const axis = $('axis');
   axis.innerHTML = '';
+  // 从图谱视图切走时要把容器藏起来并停掉动画循环
+  if (curView !== 'graph') {
+    $('graph-wrap').style.display = 'none';
+    $('axis').style.display = '';
+    if (GN.raf) { cancelAnimationFrame(GN.raf); GN.raf = 0; }
+  }
+
+  // 章节视图（主视图）
+  if (curView === 'chapter') {
+    $('yrbar').style.display = 'none';
+    $('ovbar').style.display = 'none';
+    $('yr-all-btn').style.display = 'none';   // 无年份块 → 按钮无意义
+    renderChapters(list, years);
+    return;
+  }
+
+  // 关联图谱视图
+  if (curView === 'graph') {
+    $('yr-all-btn').style.display = 'none';
+    $('yrbar').style.display = 'none';
+    $('ovbar').style.display = 'none';
+    $('axis').style.display = 'none';
+    $('graph-wrap').style.display = '';
+    // **视图切换时重建图谱** —— 上一张图的节点位置对新数据没有意义，
+    // 而且筛选变了（年份/分类集合不同）必须重算。
+    initGraph(list);
+    return;
+  }
+
+  // 列表视图
+  if (curView === 'list') {
+    $('yr-all-btn').style.display = 'none';   // 同上
+    $('yrbar').style.display = 'none';
+    $('ovbar').style.display = 'none';
+    if (!list.length) {
+      axis.innerHTML = '<div class="empty"><div class="ico">🔍</div><div class="t">没有匹配的记录</div></div>';
+      return;
+    }
+    const rows = list.map(ev => {
+      const lk = isLocked(ev);
+      const d = spanDays(ev);
+      const dateCell = ev.span
+        ? `${esc(ev.from)} → ${esc(ev.to)}${d ? ` <b>${d}天</b>` : ''}`
+        : esc(ev.from);
+      const note1 = oneLine(ev.note || '');
+      return `<tr>
+        <td class="lv-main">
+          <div class="lv-r1">
+            <span class="lv-d">${dateCell}</span>
+            <span class="lv-t">${evKey(ev) === 1 ? '<span class="key-star">★</span>' : ''}${hl(ev.title, q)}</span>
+          </div>
+          <div class="lv-r2">
+            <span class="tag">${esc(ev.cat)}</span>
+            ${note1 ? `<span class="lv-n">${hl(note1.slice(0, 80), q)}</span>` : ''}
+            <span class="lv-act">
+              <button class="op" data-act="edit" data-id="${esc(ev.id)}">编辑</button>
+              <button class="op del${lk ? ' locked' : ''}" data-act="del" data-id="${esc(ev.id)}">删除</button>
+            </span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+    axis.innerHTML = `<div class="tbl-scroll"><table class="listview">
+      <tbody>${rows}</tbody></table></div>`;
+    bindAxisEvents(axis);
+    return;
+  }
+
+  renderOvBar(years);      // 时间轴总览带
+  renderYrBar(years);      // 年份快捷检索条
+  syncStickyTop();
 
   years.forEach(y => {
     const items = list.filter(e => yearOf(e.sortKey) === y);
@@ -638,18 +2584,26 @@ function render() {
     items.forEach(ev => {
       const d = document.createElement('div');
       d.className = 'ev' + (ev.span ? ' span-ev' : '');
-      const dateTxt = ev.span ? `${ev.from} → ${ev.to}` : ev.from;
+      d.dataset.eid = ev.id;
+      const dd = spanDays(ev);
+      // 元信息压缩：单日只显示日期；时间段显示 起→止 + 持续天数
+      const dateTxt = ev.span
+        ? `${esc(ev.from)} → ${esc(ev.to)}${dd ? ` <b>${dd}天</b>` : ''}`
+        : esc(ev.from);
       const lk = isLocked(ev);
+      // **第二维度：重要程度** —— 左边框 3px 实心 + 标题前 ★
+      const isKey = evKey(ev) === 1;
+      if (isKey) d.classList.add('key-ev');
       d.innerHTML = `
-        <div class="ev-body">
+        <div class="ev-body" title="点击展开编辑 / 删除">
           <div class="ev-meta">
-            <span class="ev-d">${esc(dateTxt)}</span>
-            ${ev.span ? '<span class="tag span-tag">时间段</span>' : ''}
+            <span class="ev-d">${dateTxt}</span>
             <span class="tag">${esc(ev.cat)}</span>
-            ${lk ? '<span class="tag lock-tag" title="超过一年的记录不可删除，编辑不受限">🔒 已保护</span>' : ''}
+            ${isKey ? '<span class="tag key-tag" title="重要事件">★ 重要</span>' : ''}
+            ${lk ? '<span class="tag lock-tag" title="超过一年的记录不可删除，编辑不受限">🔒</span>' : ''}
           </div>
-          <div class="ev-title">${esc(ev.title)}</div>
-          ${ev.note ? `<div class="ev-note">${esc(ev.note)}</div>` : ''}
+          <div class="ev-title">${isKey ? '<span class="key-star">★</span>' : ''}${hl(ev.title, curQ.trim())}</div>
+          ${ev.note ? `<div class="ev-note">${hl(ev.note, curQ.trim())}</div>` : ''}
           <div class="ev-ops">
             <button class="op" data-act="edit" data-id="${esc(ev.id)}">编辑</button>
             <button class="op del${lk ? ' locked' : ''}" data-act="del" data-id="${esc(ev.id)}"
@@ -663,6 +2617,11 @@ function render() {
 
   updateYrAllBtn();
 
+  bindAxisEvents(axis);
+}
+
+/* 事件绑定抽成独立函数（列表视图复用） */
+function bindAxisEvents(axis) {
   axis.onclick = e => {
     const op = e.target.closest('.op');
     if (op) {
@@ -671,7 +2630,18 @@ function render() {
       return;
     }
     const yr = e.target.closest('.yr');
-    if (yr) toggleYear(yr.closest('.yg'));
+    if (yr) { toggleYear(yr.closest('.yg')); return; }
+    // 点卡片正文（不是按钮）→ 展开/收起操作区（手机端主要交互）
+    const body = e.target.closest('.ev-body');
+    if (body) {
+      const ev = body.parentElement;
+      const id = ev.dataset.eid;
+      if (openEvId === id) { ev.classList.remove('open'); openEvId = null; }
+      else {
+        axis.querySelectorAll('.ev.open').forEach(x => x.classList.remove('open'));
+        ev.classList.add('open'); openEvId = id;
+      }
+    }
   };
   axis.onkeydown = e => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('yr')) {
@@ -683,9 +2653,23 @@ function render() {
 
 /* ---------- 年份折叠（本机记忆） ---------- */
 const YR_COLLAPSE_KEY = 'time_yr_collapsed_v1';
-let collapsedYears = new Set((() => {
-  try { return JSON.parse(localStorage.getItem(YR_COLLAPSE_KEY)) || []; } catch (e) { return []; }
-})());
+/* 默认只展开最近 1 年，其余折叠（首屏不再是一堵卡片墙） */
+/* null = 用户还没手动设过 → 走默认折叠策略（只展开最近一年） */
+let collapsedYears = (() => {
+  try {
+    const raw = localStorage.getItem(YR_COLLAPSE_KEY);
+    if (raw != null) return new Set(JSON.parse(raw) || []);   // 用户手动设过 → 尊重用户选择
+  } catch (e) {}
+  return null;
+})();
+/* 默认折叠策略 —— 只展开最近 1 年，更早的年份收起。
+   首屏不再是一堵卡片墙；要翻旧年点年份标题或顶部的年份快捷检索条即可。 */
+function applyDefaultCollapse() {
+  if (collapsedYears !== null) return;                  // 用户已有偏好，不干预
+  const yrs = [...new Set(DATA.map(e => yearOf(e.sortKey)))].sort((a, b) => b.localeCompare(a));
+  const keep = yrs[0];                                 // 最近一年展开
+  collapsedYears = new Set(yrs.filter(y => y !== keep));
+}
 function persistCollapsed() {
   try { safeSet(YR_COLLAPSE_KEY, JSON.stringify([...collapsedYears])); } catch (e) {}
 }
@@ -695,6 +2679,7 @@ function applyYearEl(g, c) {
 }
 function toggleYear(g) {
   const y = g.dataset.year;
+  if (!collapsedYears) collapsedYears = new Set();
   const c = !collapsedYears.has(y);
   if (c) collapsedYears.add(y); else collapsedYears.delete(y);
   applyYearEl(g, c);
@@ -707,10 +2692,263 @@ function updateYrAllBtn() {
   btn.style.display = gs.length > 1 ? '' : 'none';
   btn.textContent = gs.every(g => g.classList.contains('collapsed')) ? '展开全部' : '收起全部';
 }
+/* ===== 时间轴总览带 =====
+   把所有「时间段事件」（from ≠ to）按真实年份比例画成横条。
+   一眼看清：每段时期占多长、在哪几年、彼此有没有重叠、中间断在哪。
+   单日事件不占位（它们本来就是某一天的事）。 */
+const OV_MIN_SPAN = 1;      // 至少跨 1 年才值得上总览带
+/* **不截断** —— 早期版本写死「最多画 6 条，其余折叠成一句话」，
+   结果用户有 16 段跨年时间段时，那 10 条既看不到也点不到，
+   反而违背了「方便查看」的初衷。现在全部画出，
+   条数多了就让总览带自身可滚动（见 .ov-lanes 的 max-height）。 */
+const OV_MAX_LANES = 200;    // 防御性上限，正常情况下不会触发
+
+function renderOvBar(years) {
+  const box = $('ovbar');
+  // **用筛选后的 list，而不是全量 DATA** ——
+  // 原来用 DATA，搜索后总览带仍画全部横条（提示说「找到 1 条」但带上有 3 根），
+  // 点被筛掉的条目会静默失效。
+  const spans = (typeof curListCache !== 'undefined' && curListCache ? curListCache : DATA)
+    .filter(e => e.span && e.from && e.to && e.from !== e.to)
+    .map(e => {
+      const a = new Date(e.from + 'T00:00:00'), b = new Date(e.to + 'T00:00:00');
+      if (isNaN(a) || isNaN(b)) return null;
+      return { ev: e, y1: a.getFullYear(), y2: b.getFullYear(), a, b };
+    })
+    .filter(x => x && (x.y2 - x.y1) >= OV_MIN_SPAN)
+    .sort((p, q) => p.y1 - q.y1 || (q.y2 - q.y1) - (p.y2 - p.y1));
+  if (!spans.length) { box.style.display = 'none'; return; }
+  box.style.display = '';
+
+  // **yearOf() 返回的是字符串**（'2024'）—— 必须转成数字再算比例。
+  // 踩过的坑：直接用字符串做 `for (let y = yMin; y <= yMax; y += step)`，
+  // 字符串比较 '20161' <= '2024' 恒为真 → 死循环 → 内存溢出 → 页面崩溃。
+  // 只要有一条跨年时间段记录就会触发（实测整个浏览器标签页崩溃）。
+  const yMin = parseInt(years[years.length - 1], 10);
+  const yMax = parseInt(years[0], 10);
+  if (!isFinite(yMin) || !isFinite(yMax)) { box.style.display = 'none'; return; }
+  const span = Math.max(1, yMax - yMin);
+  // **百分比必须夹在 0~100** —— 横条右边界用「结束年+1」表示
+  // （结束年整年都算在内），若不夹住，最后一条会算出 >100% 的宽度而溢出容器。
+  const pct = y => Math.max(0, Math.min(100, ((y - yMin) / span) * 100));
+
+  // 泳道分配：重叠的放不同行（endY 必须是数字，否则比较永远成立）
+  const lanes = [];       // lanes[i] = 该行最后一根条的结束年
+  const placed = spans.map(sp => {
+    let li = lanes.findIndex(endY => endY < sp.y1);
+    if (li === -1) { li = lanes.length; lanes.push(sp.y2); }
+    else lanes[li] = sp.y2;
+    return { ...sp, li };
+  });
+  const shown = placed.slice(0, OV_MAX_LANES);
+  const hidden = placed.length - shown.length;   // 正常恒为 0
+
+  // 刻度
+  const ticks = [];
+  const step = span > 8 ? 2 : 1;
+  for (let y = yMin; y <= yMax; y += step) ticks.push(y);
+  if (ticks[ticks.length - 1] !== yMax) ticks.push(yMax);
+
+  // 按泳道分行渲染（重叠的年份会落到不同行）
+  const laneCount = Math.max(...shown.map(p => p.li)) + 1;
+  const lanesHtml = [];
+  for (let i = 0; i < laneCount; i++) {
+    const rowBars = shown.filter(p => p.li === i).map(p => {
+      const left = pct(p.y1);
+      // 结束年 +1 表示「结束年整年都算在内」，但必须夹在 yMax 之内 ——
+      // 否则最后一个条会算出 >100% 的宽度，横向溢出容器。
+      const right = pct(p.y2 + 1);
+      const w = Math.max(1.2, right - left);
+      const bg = i % 3 === 0 ? '' : (i % 3 === 1 ? ' ov-b2' : ' ov-b3');
+      const yrs = (p.y2 - p.y1 + 1) + '年';
+      // 标签优先级：够宽 → 标题 + 年数；中窄 → 标题（截断）；很窄 → 只显示年数。
+      // **不能只显示「2年」** —— 那看不出是哪段时期，等于白画。
+      const titleTxt = esc(p.ev.title);
+      const showLabel = w > 14 ? titleTxt + ' · ' + yrs
+                    : w > 6 ? titleTxt
+                    : w > 3 ? yrs : '';
+      return `<div class="ov-bar${bg}" data-id="${esc(p.ev.id)}"
+        style="left:${left.toFixed(2)}%;width:${w.toFixed(2)}%"
+        title="${esc(p.ev.title)}（${esc(p.ev.from)} → ${esc(p.ev.to)}，${yrs}）">${showLabel}</div>`;
+    }).join('');
+    lanesHtml.push(`<div class="ov-lane">${rowBars}</div>`);
+  }
+
+  box.innerHTML = `
+    <div class="ov-h">
+      <span class="t">时期总览</span>
+      <span class="n">${spans.length} 段时间跨度</span>
+      <span class="tip">点横条可跳到那条记录</span>
+    </div>
+    <div class="ov-scale">${ticks.map(y =>
+      `<span style="left:${pct(y).toFixed(2)}%">${y}</span>`).join('')}</div>
+    <div class="ov-lanes">${lanesHtml.join('')}</div>
+    ${hidden > 0 ? `<div class="ov-legend">还有 ${hidden} 条未显示（向上滚动查看）</div>` : ''}`;
+}
+
+/* 点总览带的横条 → 跳到那条记录 */
+$('ovbar').addEventListener('click', e => {
+  const bar = e.target.closest('.ov-bar');
+  if (!bar) return;
+  const ev = DATA.find(x => x.id === bar.dataset.id);
+  if (!ev) return;
+  const y = yearOf(ev.sortKey);
+  gotoYear(y);
+  setTimeout(() => {
+    // **id 必须 CSS.escape** —— 含引号的 id 会让 querySelector 抛 SyntaxError，
+    // 导致总览带跳转静默失效。
+    const card = document.querySelector(`.ev[data-eid="${CSS.escape(ev.id)}"]`);
+    if (card) {
+      card.classList.add('open');
+      card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      card.classList.add('flash');
+      setTimeout(() => card.classList.remove('flash'), 1700);
+    }
+  }, 420);
+});
+
+/* ===== sticky 偏移动态测量 =====
+   header 高度会随「搜索栏有无内容 / 分类栏是否换行 / 安全区」变化，
+   写死 148px 会让年份条和年份标题错位（实测 header 实际 243px）。
+   这里每次渲染后重新测量，写进 --yr-top。 */
+function syncStickyTop() {
+  const h = document.querySelector('header');
+  if (!h) return;
+  const root = document.documentElement;
+  root.style.setProperty('--yr-top', Math.round(h.getBoundingClientRect().height) + 'px');
+  // 年份条自身高度（它也吸顶，年份标题要让开它）
+  const bar = document.getElementById('yrbar');
+  const bh = bar && getComputedStyle(bar).display !== 'none'
+    ? Math.round(bar.getBoundingClientRect().height) : 0;
+  root.style.setProperty('--yrbar-h', bh + 'px');
+}
+window.addEventListener('resize', syncStickyTop);
+
+/* ===== 年份快捷检索 ===== */
+/* 一根常驻的横向年份条：一眼看全部年份，点一下直达并展开那一年。
+   解决「只能展开收起」—— 收起后就找不回来了，得靠肉眼在长长的轴上找。 */
+let yrActive = null;          // 当前定位的年份
+function renderYrBar(years) {
+  const bar = $('yrbar');
+  if (!years.length) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const track = $('yr-track');
+  const counts = {};
+  DATA.forEach(e => { const y = yearOf(e.sortKey); counts[y] = (counts[y] || 0) + 1; });
+  // **先渲染再测量** —— 原来在 innerHTML 替换之前算 atEnd/atStart，
+  // 用的是「替换前」的内容尺寸 → 状态永久错乱（实测切回全部年份后
+  // scrollWidth 明显溢出但左右按钮都是 disabled，用户只能手指划）。
+  const keepScroll = track.scrollLeft;
+  track.innerHTML = years.map(y =>
+    `<button class="yb${yrActive === y ? ' on' : ''}" data-y="${y}">${y}<span class="c">${counts[y] || 0}</span></button>`
+  ).join('');
+  track.scrollLeft = keepScroll;   // 重建后恢复横向滚动位置
+  track.querySelectorAll('.yb').forEach(b => {
+    b.onclick = () => gotoYear(b.dataset.y);
+  });
+  updateYrNav();
+}
+/** 年份条左右按钮的可用状态（必须在内容渲染后调用） */
+function updateYrNav() {
+  const track = $('yr-track');
+  if (!track) return;
+  const prev = $('yr-prev'), next = $('yr-next');
+  if (prev) prev.disabled = track.scrollLeft <= 4;
+  if (next) next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
+}
+/* 跳到某年：展开它、滚动到它、闪一下提示「你在这」 */
+function gotoYear(y) {
+  yrActive = y;
+  // 展开该年（若折叠）
+  if (collapsedYears && collapsedYears.has(y)) {
+    collapsedYears.delete(y);
+    persistCollapsed();
+  }
+  render();
+  // 等 DOM 更新完再滚。
+  // **必须用双 rAF（而不是单 rAF）** —— 单 rAF 只等一帧，此时
+  // sticky 高度（--yr-top / --yrbar-h）还没重新测量，
+  // 滚动偏移算出来是旧值，目标年滚不到位。
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const g = document.querySelector(`.yg[data-year="${y}"]`);
+    if (!g) return;
+    // 滚到目标年。用「先算 offset 再 scrollTo」而不是 scrollIntoView ——
+    // 实测移动端模拟下 scrollIntoView({behavior:'smooth'}) 经常不生效
+    // （scrollY 保持 0），而 scrollTo 即时滚动是可靠的。
+    // 先用 scroll-margin 对齐过的 offset 手算，减去吸顶高度（header + 年份条）。
+    const cs = getComputedStyle(document.documentElement);
+    const stickyH = (parseInt(cs.getPropertyValue('--yr-top')) || 0)
+                 + (parseInt(cs.getPropertyValue('--yrbar-h')) || 0);
+    const target = g.getBoundingClientRect().top + window.pageYOffset - stickyH - 6;
+    const maxY = Math.max(0, document.body.scrollHeight - window.innerHeight);
+    window.scrollTo({ top: Math.min(Math.max(0, target), maxY), behavior: 'auto' });
+    g.classList.add('flash');
+    setTimeout(() => g.classList.remove('flash'), 1700);
+    // 年份条里同步高亮 + 把该年滚进视野
+    document.querySelectorAll('#yr-track .yb').forEach(b => b.classList.toggle('on', b.dataset.y === String(y)));
+    const btn = document.querySelector(`#yr-track .yb[data-y="${y}"]`);
+    if (btn) btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }));
+}
+$('yr-prev').onclick = () => { $('yr-track').scrollLeft -= 160; };
+$('yr-next').onclick = () => { $('yr-track').scrollLeft += 160; };
+$('yr-track').addEventListener('scroll', updateYrNav);   // 滚动时同步按钮状态
+
+/* ===== 搜索框 ===== */
+const qEl = $('q');
+let qTimer = null;
+qEl.addEventListener('input', () => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => {
+    curQ = qEl.value;
+    $('q-clr').style.display = curQ ? 'block' : 'none';
+    render();
+  }, 140);   // 输入防抖，避免每敲一个字就全量重排
+});
+$('q-clr').onclick = () => {
+  qEl.value = ''; curQ = '';
+  $('q-clr').style.display = 'none';
+  // 清空搜索后，若视图是被搜索自动切走的（用户没手动选过），回主视图
+  // （只看重要也一并解除 —— 否则筛选清空后还停在时间轴上）
+  if (!viewPinned && curView === 'axis') { curView = 'chapter'; syncViewTabs(); }
+  if (!onlyKey) filterOpen = false;
+  render(); qEl.focus();
+};
+/* ===== 视图切换 ===== */
+/* 第二维度：只看重要 */
+$('key-filter').onclick = () => {
+  onlyKey = !onlyKey;
+  $('key-filter').classList.toggle('on', onlyKey);
+  filterOpen = onlyKey;   // 只记录「开过筛选」，**不动 viewPinned**
+    // 原来这里设 viewPinned = true，等于「开筛选就锁住章节视图」，
+    // 于是筛选后章节视图显示「没有可作为章节的记录」而上方写着「找到 N 条」，自相矛盾。
+  render();
+};
+$('v-axis').onclick = () => { curView = 'axis'; $('v-axis').classList.add('on'); $('v-list').classList.remove('on'); syncViewTabs(); render(); };
+$('v-list').onclick = () => { curView = 'list'; $('v-list').classList.add('on'); $('v-axis').classList.remove('on'); syncViewTabs(); render(); };
+/* 顶部品牌条页签（主视图切换） */
+function syncViewTabs() {
+  document.querySelectorAll('.brandbar .tab').forEach(x => x.classList.toggle('on', x.dataset.view === curView));
+  $('v-axis').classList.toggle('on', curView === 'axis');
+  $('v-list').classList.toggle('on', curView === 'list');
+}
+document.querySelectorAll('.brandbar .tab').forEach(b => {
+  b.onclick = () => {
+    curView = b.dataset.view;
+    viewPinned = true;          // 用户主动选的视图，不再被搜索自动切走
+    syncViewTabs();
+    render();
+    // 章节视图不需要年份条；切回时恢复
+    if (curView !== 'axis') { $('yrbar').style.display = 'none'; $('ovbar').style.display = 'none'; }
+  };
+});
+syncViewTabs();
+
 $('yr-all-btn').onclick = () => {
   const gs = [...document.querySelectorAll('#axis .yg')];
   if (!gs.length) return;
   const collapseTo = !gs.every(g => g.classList.contains('collapsed'));
+  if (!collapsedYears) collapsedYears = new Set();
   gs.forEach(g => {
     const y = g.dataset.year;
     if (collapseTo) collapsedYears.add(y); else collapsedYears.delete(y);
@@ -728,7 +2966,10 @@ let editingId = null;
 function openEdit(ev) {
   editingId = ev ? ev.id : null;
   $('edit-title').textContent = ev ? '编辑事件' : '新增事件';
-  const today = new Date().toISOString().slice(0, 10);
+  // **本地日期，不是 UTC** —— toISOString() 取的是 UTC，
+  // 东八区凌晨 0–8 点会算成「昨天」，新增事件的默认日期差一天。
+  const _now = new Date();
+  const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
   // 已有记录：能识别为完整日期就回填日期框，否则回填文本框
   const isFull = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
   $('e-from').value = ev ? (isFull(ev.from) ? ev.from : '') : today;
@@ -740,6 +2981,19 @@ function openEdit(ev) {
   const sel = $('e-cat');
   sel.innerHTML = CATS.map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = ev ? ev.cat : '其他';
+  // **第二维度：重要程度** —— 已有记录回填其 key；新增时留空（不预设，
+  // 由 inferKey 规则在读数据时推断，避免用户被「默认勾上」误导）
+  const kp = $('e-key-pick');
+  const kc = $('e-key');
+  if (kp && kc) {
+    // 勾选框显示的是**最终判定结果**（手动或规则命中都会打勾），
+    // 用户不动它 → 保存时保留原有 key 状态（不覆盖手动表态）。
+    kc.checked = ev ? (evKey(ev) === 1) : false;
+    // **touched 只有用户真的点了才置 1** —— v26 在 openEdit 里直接置 '1'，
+    // 导致「编辑一条没标记的记录」也会被写成 key=0（手动不重要）。
+    kc.dataset.touched = '0';
+    kp.classList.toggle('on', kc.checked);
+  }
   $('edit-mask').classList.add('show');
 }
 function closeEdit() { $('edit-mask').classList.remove('show'); editingId = null; }
@@ -764,10 +3018,13 @@ function saveEdit() {
   const span = !!(to && to !== from);          // 结束≠开始 → 自动时间段
   if (!to) to = from;
   if (span) {
-    const fa = from.length, ta = to.length;
-    if (fa === ta && from > to) { toast('开始日期不能晚于结束日期'); return; }
-    if (fa !== ta && to.startsWith(from.slice(0, Math.min(fa, ta))) && fa > ta) {
-      toast('开始日期不能晚于结束日期'); return;   // 如 2010-05 开始到 2010 结束
+    // **统一用小数年份比较** —— 原来只在长度相同时才做字符串比较，
+    // 「开始 2010-05 / 结束 2009」这种长度不同的倒挂能通过校验
+    // （实测保存后轴上显示「2010-05-01 → 2009-01-01」）。
+    // yearFrac 天然处理 4/7/10 位三种粒度。
+    const f1 = yearFrac(from), f2 = yearFrac(to);
+    if (!isFinite(f1) || !isFinite(f2) || f1 > f2) {
+      toast('开始日期不能晚于结束日期'); return;
     }
   }
   const title = $('e-name').value.trim();
@@ -778,8 +3035,32 @@ function saveEdit() {
                 : from.length === 7 ? from + '-00' : from;
 
   const isEdit = !!editingId;                   // 先固化编辑态（closeEdit 会清空它）
+  // **第二维度：重要程度（v27）**
+  //  - 用户**动过**勾选框 → key = 勾选?1:0（手动表态，规则永远不覆盖）
+  //  - 用户**没动**过 → 保留原来的 key 状态：
+  //      编辑已有记录 → 沿用原 key（1 / 0 / 缺失）
+  //      新增记录     → 缺失（未表态，交给规则实时判定）
+  //
+  // **坑（实测踩到）**：编辑框里的勾选框显示的是「最终判定结果」，
+  // 规则命中的记录打开时是**勾上**的。如果直接按 checked 判定，
+  // 保存一次就把「规则判定」固化成「手动标记」——
+  // 之后改关键词表，这条记录再也跟着变（正是 v26 要根治的毛病）。
+  // 所以**必须先看 touched**：用户没碰过，就不许写 key。
+  const kc = $('e-key');
+  let key;
+  if (kc && kc.dataset.touched === '1') key = kc.checked ? 1 : 0;
+  else if (isEdit) {
+    const prev = DATA.find(x => x.id === editingId);
+    key = (prev && (prev.key === 1 || prev.key === true)) ? 1
+        : (prev && (prev.key === 0 || prev.key === false)) ? 0
+        : undefined;
+  } else key = undefined;
+  // **带上 keyLegacy** —— v26 旧判定的留底。saveEdit 用新对象整体替换旧记录，
+  // 不带这个字段就会把唯一的恢复途径弄丢（v26 里手动/推断本就无法区分）。
+  const prevRec = isEdit ? DATA.find(x => x.id === editingId) : null;
   const obj = { id: editingId || ('e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
-                from, to, sortKey, span, title, note, cat };
+                from, to, sortKey, span, title, note, cat, key,
+                keyLegacy: prevRec ? prevRec.keyLegacy : undefined };
   const next = isEdit ? DATA.map(x => x.id === obj.id ? obj : x)
                       : DATA.concat([obj]);
   const msg = isEdit ? `✓ 已更新「${title}」` : `✓ 已记录「${title}」`;
@@ -827,9 +3108,13 @@ function openImport() {
 function closeImport() { $('import-mask').classList.remove('show'); pendingImport = null; }
 function previewImport() {
   const text = $('import-text').value;
-  const box = $('import-preview');
-  if (!text.trim()) { box.innerHTML = ''; $('import-confirm').disabled = true; return; }
+  if (!text.trim()) { $('import-preview').innerHTML = ''; $('import-confirm').disabled = true; pendingImport = null; return; }
   const { items, bad } = parseText(text);
+  showImportPreview(items, bad, '');
+}
+/** 渲染导入预览 —— 文本导入与 Excel 结构化导入共用 */
+function showImportPreview(items, bad, tip) {
+  const box = $('import-preview');
   pendingImport = items;
   if (!items.length) {
     box.innerHTML = `<div class="pv-bad">没有解析出任何有效记录，请检查格式</div>`;
@@ -839,11 +3124,11 @@ function previewImport() {
   const years = [...new Set(items.map(e => yearOf(e.sortKey)))];
   box.innerHTML = `
     <div class="pv-sum">解析出 ${items.length} 条 · 跨 ${years.length} 年${bad.length ? ` · ${bad.length} 行无法识别` : ''}</div>
-    <div class="pv-hint">请为每条选择分类（默认「其他」）</div>
+    <div class="pv-hint">请为每条选择分类（默认「其他」）${tip ? ' · ' + tip : ''}</div>
     <div class="pv-list">${items.map((e, i) => `
       <div class="pv-item">
         <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
-        <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(e.note) : ''}</span>
+        <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
         <select class="pv-cat" data-i="${i}">${CATS.map(c => `<option value="${c}"${c === e.cat ? ' selected' : ''}>${c}</option>`).join('')}</select>
       </div>`).join('')}</div>
     ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
@@ -871,7 +3156,28 @@ $('import-file').onchange = e => {
   rd.onload = ev => {
     try {
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+      // 表格里带了「规则」工作表 → 一并读回词表（换设备时判定才对得上）
+      const fileRules = readRulesFromBook(wb);
+      if (fileRules) {
+        keyRules = fileRules;
+        saveRules();
+        toast('✓ 已同时导入规则词表');
+      }
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      // **结构化识别** —— 表头里有「事件/标题」列且列数 ≥4 时，按列解析：
+      //   这样才能正确带上「分类」和「重要(手动)」两列。
+      //   （原来一律把每行拼成一句话再解析，导致分类和重要标记被混进标题 ——
+      //    导出的表格再导入，标题里会多出「★」和分类名。）
+      const head = (rows[0] || []).map(c => String(c == null ? '' : c).trim());
+      const structured = head.length >= 4 && head.some(h => /^(事件|标题|事项|title|记录)$/i.test(h));
+      if (structured) {
+        const items = rowsToEvents(rows);
+        const bad = [];
+        showImportPreview(items, bad, '按表格列导入');
+        toast('✓ 已读取 Excel，请确认预览');
+        return;
+      }
+      // 回退：用户自制的「每行一条」小表
       const lines = rows.map(r => r.filter(c => c !== '' && c != null).join(' ')).filter(x => x.trim());
       $('import-text').value = lines.join('\n');
       previewImport();
@@ -884,13 +3190,10 @@ $('import-file').onchange = e => {
 /* ---------- 导出 ---------- */
 function exportXlsx() {
   if (!DATA.length) { toast('没有记录可导出'); return; }
-  const rows = [['开始日期', '结束日期', '事件', '分类', '备注']];
-  sortDesc(DATA).forEach(e => rows.push([e.from, e.to, e.title, e.cat, e.note]));
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 13 }, { wch: 13 }, { wch: 34 }, { wch: 8 }, { wch: 24 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'events');
-  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  // 与云端表格保持同一套结构（含「重要(手动)」列 + 「规则」工作表），
+  // 否则往返会丢手动标记，且换设备后判定结果对不上
+  // **buildXlsx 返回的已经是 xlsx 二进制**（内部已 XLSX.write），别再套一层
+  const buf = buildXlsx(DATA);
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1004,11 +3307,39 @@ function b64ToBuf(b64) {
   return bytes.buffer;
 }
 /* 数据 <-> xlsx 行 */
+/* Excel「重要」列的取值判定
+ *   v27 语义：这一列存的是**手动标记**
+ *     ★ = 手动标为重要   ☆ = 手动标为不重要   空 = 未表态（交给规则）
+ *   旧表格（表头是「重要」）里 ★ 表示「最终判定为重要」，
+ *   导入时按「未表态」处理 → 交给新规则重新判，避免把旧推断固化成手动。 */
+function kcIsKey(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return false;
+  return t === '★' || /^(是|y|yes|true|1|重要)$/i.test(t);
+}
+function kcIsNotKey(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return false;
+  return t === '☆' || /^(否|no|n|false|0|不重要|普通)$/i.test(t);
+}
 function rowsToEvents(rows) {
   const out = [];
+  // **按表头判断各列语义**（三张表都能读）：
+  //   「重要(手动)」= 用户手动表态（v27 新列）→ 写进 key（最高优先级）
+  //   「重要」      = v26 旧列，存的是「最终判定」→ **不写 key**，
+  //                   只当规则快照留档，避免把旧推断固化成手动表态
+  //   「规则判定」  = v27 新列，规则快照 → 写进 keyRule（留档，不影响显示）
+  const head = (rows[0] || []).map(c => String(c == null ? '' : c).trim());
+  const colManual = head.indexOf('重要(手动)');
+  const colLegacy = head.indexOf('重要');
+  const colRule = head.indexOf('规则判定');
   rows.forEach((r, i) => {
     if (i === 0) return;                       // 表头
-    const [from, to, title, cat, note] = r;
+    const from0 = r[0], to0 = r[1], title0 = r[2], cat0 = r[3], note0 = r[4];
+    const keyCell = colManual >= 0 ? r[colManual] : '';
+    const legacyCell = colLegacy >= 0 ? r[colLegacy] : '';
+    const ruleCell = colRule >= 0 ? r[colRule] : '';
+    const from = from0, to = to0, title = title0, cat = cat0, note = note0;
     if (!from && !title) return;
     const f = String(from || '').trim(), t = String(to || f || '').trim();
     out.push({
@@ -1023,15 +3354,34 @@ function rowsToEvents(rows) {
       title: String(title || '(未命名)'),
       cat: CATS.includes(cat) ? cat : '其他',
       note: String(note || ''),
+      // 「重要(手动)」列 → key（手动表态，最高优先级）
+      //   ★ = 手动重要 / ☆ = 手动不重要 / 空 = 未表态（交给规则实时判定）
+      key: (colManual >= 0)
+        ? (kcIsKey(keyCell) ? 1 : (kcIsNotKey(keyCell) ? 0 : undefined))
+        : undefined,
+      // 「规则判定」列 = 纯文档用途（记录导出当时的规则结果，便于人工查看），
+      // **不参与判定也不写入 key** —— 导入方的规则可能与导出方不同，
+      // 一旦写进 key 就成了「手动表态」，反而覆盖了对方的规则。
+      // 同理，旧表的「重要」列（v26 的最终判定）也不写 key。
     });
   });
   return out;
 }
 /* 日期字段白名单化：只放行 YYYY / YYYY-MM / YYYY-MM-DD，其它一律降级为 YYYY-01-01。
  * 这既堵掉注入，也让 sortKey 的比较逻辑始终成立。 */
+/* 单行化 —— 用于「一行放不下」的摘要场景（导入预览）。
+ * 换行折成空格，避免把卡片布局撑乱；卡片正文渲染不用它（那里要保留换行）。 */
+function oneLine(s) {
+  return String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ').trim();
+}
 function normDatePart(s) {
   const v = String(s == null ? '' : s).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  // **校验月/日范围** —— '2010-13-45' 原样放行会让 yearFrac 算出 2011.12
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const mo = +v.slice(5, 7), dd = +v.slice(8, 10);
+    if (mo >= 1 && mo <= 12 && dd >= 1 && dd <= 31) return v;
+    return v.slice(0, 7) + '-01';   // 非法月日 → 收敛到当月 1 号
+  }
   if (/^\d{4}-\d{2}$/.test(v)) return v + '-01';
   if (/^\d{4}$/.test(v)) return v + '-01-01';
   if (!v) return '';
@@ -1044,16 +3394,61 @@ function normDatePart(s) {
   return '';
 }
 function eventsToRows(arr) {
-  const rows = [['开始日期', '结束日期', '事件', '分类', '备注']];
-  sortDesc(arr).forEach(e => rows.push([e.from, e.to, e.title, e.cat, e.note]));
+  // 末两列：
+  //   「重要(手动)」= ★ 手动重要 / ☆ 手动不重要 / 空 未表态
+  //       —— 手动标记必须单独一列，否则往返后「手动标重要但规则没命中」的记录会丢手动身份
+  //   「规则判定」  = ★ / 空 —— **当前词表实时算出的结果**，纯文档用途
+  //       （记录导出当时规则怎么判的，方便人工核对；导入方不拿它当手动标记）
+  // 表头带后缀，是为了让导入端认出这是新语义；旧表格第 6 列表头是「重要」。
+  const rows = [['开始日期', '结束日期', '事件', '分类', '备注', '重要(手动)', '规则判定']];
+  sortDesc(arr).forEach(e => {
+    const k = (e.key === 1 || e.key === true) ? '★'
+            : (e.key === 0 || e.key === false) ? '☆' : '';
+    const rk = inferKey(e) ? '★' : '';
+    rows.push([e.from, e.to, e.title, e.cat, e.note, k, rk]);
+  });
   return rows;
 }
 function buildXlsx(arr) {
   const ws = XLSX.utils.aoa_to_sheet(eventsToRows(arr));
-  ws['!cols'] = [{ wch: 13 }, { wch: 13 }, { wch: 34 }, { wch: 8 }, { wch: 24 }];
+  ws['!cols'] = [{ wch: 13 }, { wch: 13 }, { wch: 34 }, { wch: 8 }, { wch: 24 }, { wch: 11 }, { wch: 9 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
+  // **规则词表跟着数据一起走** —— 只存本机的话，
+  // 换台设备导入后未表态记录的判定结果会与原设备不一致（词表不同）。
+  // 写进同一份 Excel/云端表格的第二个工作表，任何设备拉下来都能对齐。
+  // 格式：**每行一个词**（纵向），与规则面板的 textarea 一一对应，读写都好核对。
+  const rs = XLSX.utils.aoa_to_sheet([
+    ['类型', '词'],
+    ['关键词', (keyRules.words || [])[0] || ''],
+    ...(keyRules.words || []).slice(1).map(w => ['关键词', w]),
+    ['排除词', (keyRules.exclude || [])[0] || ''],
+    ...(keyRules.exclude || []).slice(1).map(w => ['排除词', w]),
+  ]);
+  rs['!cols'] = [{ wch: 10 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, rs, RULES_SHEET);
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+/** 从工作簿里读回规则词表（没有该表就返回 null，调用方保留本地词表） */
+function readRulesFromBook(wb) {
+  try {
+    const ws = wb.Sheets[RULES_SHEET];
+    if (!ws) return null;
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const words = [], exclude = [];
+    let mode = '';
+    for (const r of rows) {
+      const type = String(r[0] == null ? '' : r[0]).trim();
+      const val = String(r[1] == null ? '' : r[1]).trim();
+      if (type === '关键词') { mode = 'w'; if (val) words.push(val); continue; }
+      if (type === '排除词') { mode = 'e'; if (val) exclude.push(val); continue; }
+      if (!val) continue;
+      if (mode === 'w') words.push(val);
+      else if (mode === 'e') exclude.push(val);
+    }
+    if (!words.length && !exclude.length) return null;
+    return { words, exclude };
+  } catch (e) { return null; }
 }
 async function ghPull() {
   const r = await fetch(ghApi() + `?t=${Date.now()}`, { headers: ghHeaders() });
@@ -1061,9 +3456,16 @@ async function ghPull() {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const j = await r.json();
   GH.sha = j.sha;
+  const wb = XLSX.read(b64ToBuf(j.content), { type: 'array' });
+  // **同步规则词表** —— 云端表格里的「规则」表是权威版本，
+  // 拉下来后本机词表跟着改，换设备时判定结果才对得上。
+  const remoteRules = readRulesFromBook(wb);
+  if (remoteRules) {
+    keyRules = remoteRules;
+    saveRules();
+  }
   return rowsToEvents(XLSX.utils.sheet_to_json(
-    XLSX.read(b64ToBuf(j.content), { type: 'array' }).Sheets[SHEET_NAME],
-    { header: 1, defval: '' }));
+    wb.Sheets[SHEET_NAME], { header: 1, defval: '' }));
 }
 async function ghPush(arr) {
   // 云端已有文件但本地没拿到 sha → 先补拉，避免 422 "sha wasn't supplied"
@@ -1122,6 +3524,8 @@ async function doPull(silent) {
       : '连接 GitHub 失败：' + e.message + '（本机数据不受影响）';
     $('sync-msg').textContent = hint;
     $('sync-msg').style.color = 'var(--danger)';
+  // 失败时标红；下次成功必须重置，否则成功提示也一直显示红色
+  syncMsgIsErr = true;
     console.warn('ghPull 失败:', e.message);
   }
 }
@@ -1129,6 +3533,7 @@ function openSync() {
   $('gh-token').value = GH.token; $('gh-owner').value = GH.owner || 'sumer0825';
   $('gh-repo').value = GH.repo || 'Sumer'; $('gh-branch').value = GH.branch || 'main';
   $('gh-path').value = GH.path || 'data/time.xlsx';
+  $('sync-msg').style.color = '';   // 成功时重置（失败时标红，成功后不还原）
   $('sync-msg').textContent = ghReady() ? '当前已连接'
     : (window.navigator.standalone ? '⚠️ 主屏幕模式使用独立存储：请在此重新配置 Token，保存后数据自动从云端拉回' : '');
   $('gh-disconnect').style.display = ghReady() ? '' : 'none';
@@ -1171,10 +3576,190 @@ $('sync-save').onclick = async () => {
   }
 };
 
+/* ---------- 重要判定规则面板（v27） ---------- */
+function parseWordList(s) {
+  return String(s == null ? '' : s)
+    .split(/[\n\r,，、;；]+/)
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+function ruleStatHtml() {
+  const total = DATA.length;
+  let manual = 0, rule = 0;
+  for (const e of DATA) {
+    if (isManualKey(e)) { if (evKey(e) === 1) manual++; continue; }
+    if (inferKey(e)) rule++;      // 未表态的：按**当前**词表实时判定
+  }
+  return `共 <b>${total}</b> 条记录 · 判定为重要 <span class="rs-hi">${manual + rule}</span> 条`
+       + `（手动 <b>${manual}</b> · 关键词规则 <b>${rule}</b>）`
+       + (rule ? `　<a href="#" id="rule-lock" style="color:var(--primary)">固化这 ${rule} 条 →</a>` : '');
+}
+/** 在统计行里挂「固化」快捷入口 */
+function bindRuleLock() {
+  const a = $('rule-lock');
+  if (!a) return;
+  a.onclick = e => { e.preventDefault(); $('rule-recalc').click(); };
+}
+function updateRuleStat() {
+  // 用弹窗里**尚未保存**的词表做预览统计
+  const saved = keyRules;
+  keyRules = { words: parseWordList($('rule-words').value), exclude: parseWordList($('rule-exclude').value) };
+  $('rule-stat').innerHTML = ruleStatHtml();
+  keyRules = saved;
+  bindRuleLock();
+}
+function openRules() {
+  $('rule-words').value = keyRules.words.join('\n');
+  $('rule-exclude').value = keyRules.exclude.join('\n');
+  updateRuleStat();
+  $('rule-mask').classList.add('show');
+}
+function closeRules() { $('rule-mask').classList.remove('show'); }
+$('rule-btn').onclick = openRules;
+$('rule-cancel').onclick = closeRules;
+$('rule-mask').onclick = e => { if (e.target === $('rule-mask')) closeRules(); };
+$('rule-words').oninput = updateRuleStat;
+$('rule-exclude').oninput = updateRuleStat;
+$('rule-default').onclick = () => {
+  $('rule-words').value = KEY_WORDS_DEFAULT.join('\n');
+  $('rule-exclude').value = EXCLUDE_DEFAULT.join('\n');
+  updateRuleStat();
+  toast('已填入默认词表，点「保存」生效');
+};
+$('rule-save').onclick = () => {
+  const words = parseWordList($('rule-words').value);
+  if (!words.length) { toast('关键词表不能为空'); return; }
+  keyRules = { words, exclude: parseWordList($('rule-exclude').value) };
+  saveRules();
+  updateRuleStat();
+  render();
+  toast('✓ 规则已保存，未标记的记录已按新规则重判');
+};
+$('rule-recalc').onclick = () => {
+  if (!DATA.length) { toast('还没有记录'); return; }
+  // **把规则命中的记录固化成「手动重要」** —— 用户认可当前判定时用这个。
+  // 固化后即使以后改关键词表，这些记录仍然是重要的。
+  // 已手动标过「不重要」的**不动**（尊重手动表态）。
+  const hits = DATA.filter(e => !isManualKey(e) && inferKey(e) === 1);
+  if (!hits.length) { toast('当前规则没有命中任何未标记的记录'); return; }
+  const next = DATA.map(e => (!isManualKey(e) && inferKey(e) === 1)
+    ? Object.assign({}, e, { key: 1 })
+    : e);
+  save(next, `✓ 已把 ${hits.length} 条规则命中的记录标为手动重要`);
+  updateRuleStat();
+};
+$('rule-clear-manual').onclick = () => {
+  const n = DATA.filter(isManualKey).length;
+  if (!n) { toast('当前没有手动标记的记录'); return; }
+  if (!confirm(`确定清除 ${n} 条记录的**手动标记**？\n\n清除后这些记录改由关键词规则自动判定。`)) return;
+  const next = DATA.map(e => {
+    const c = Object.assign({}, e);
+    delete c.key;
+    return c;
+  });
+  save(next, `✓ 已清除 ${n} 条手动标记，回到纯规则判定`);
+  updateRuleStat();
+};
+
+/** 清空全部筛选条件（搜索 / 分类 / 只看重要）
+ *  —— 图谱上的「重新布局」与「清除筛选」都走这里。
+ *  注意要同步 UI：搜索框的值、清除按钮的显隐、分类 chip 的选中态，
+ *  否则界面和数据会不一致（搜着词但框里是空的）。 */
+function clearAllFilters() {
+  const had = !!(curQ.trim() || curCat !== 'ALL' || onlyKey);
+  curQ = '';
+  curCat = 'ALL';
+  onlyKey = false;
+  const qEl = $('q');
+  if (qEl) qEl.value = '';
+  const qc = $('q-clr');
+  if (qc) qc.style.display = 'none';
+  const kf = $('key-filter');
+  if (kf) kf.classList.remove('on');
+  return had;
+}
+
+/* ---------- 图谱视图：事件绑定 ---------- */
+(function bindGraph() {
+  const svg = $('graph-svg');
+  if (!svg) return;
+  let moved = false, downX = 0, downY = 0;
+  svg.addEventListener('mousedown', e => { moved = false; downX = e.clientX; downY = e.clientY; graphDragStart(e); });
+  svg.addEventListener('touchstart', e => { moved = false; downX = e.touches[0].clientX; downY = e.touches[0].clientY; graphDragStart(e); }, { passive: false });
+  window.addEventListener('mousemove', e => {
+    if (GN.drag) { moved = true; graphDragMove(e); }
+  });
+  window.addEventListener('touchmove', e => { if (GN.drag) { moved = true; graphDragMove(e); } }, { passive: false });
+  window.addEventListener('mouseup', e => {
+    const wasDrag = GN.drag;
+    graphDragEnd();
+    // **拖动过就不要触发点击** —— 否则拖完松手会误跳到别的视图
+    if (wasDrag && (Math.abs(e.clientX - downX) > 4 || Math.abs(e.clientY - downY) > 4)) return;
+    if (!moved) graphClick(e);
+  });
+  window.addEventListener('touchend', e => {
+    const wasDrag = GN.drag;
+    graphDragEnd();
+    if (wasDrag) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (t && !moved) graphClick({ clientX: t.clientX, clientY: t.clientY, touches: [t] });
+  });
+  svg.addEventListener('mousemove', graphHover);
+  svg.addEventListener('touchstart', graphHover, { passive: true });
+  svg.addEventListener('mouseleave', () => $('graph-pop').classList.remove('show'));
+
+  // **「重新布局」= 清空筛选条件 + 重建完整图 + 重排** ——
+  // 原来只调 graphKick(1,true)（纯重排），但如果搜索框里有词 / 分类已筛选，
+  // 图谱本来就只剩几条记录，重排这几条毫无意义 ——
+  // 用户看到的是「点了没反应」，按钮名不副实（实测：搜「2010」后图谱只有
+  // 1 个节点 1 条关联，点重新布局还是 1 个节点）。
+  $('graph-reheat').onclick = () => {
+    const had = clearAllFilters();
+    // 清了筛选要重建图谱（节点集合变了），否则还是旧的那几个点
+    if (had) {
+      render();                       // render → 图谱分支 → initGraph(完整数据)
+      graphKick(1, true);
+      toast('↻ 已清除筛选条件并重新布局');
+    } else {
+      graphKick(1, true);
+      toast('↻ 重新计算布局');
+    }
+  };
+  // **独立的「清除筛选」按钮** —— 只清条件、不重排布局
+  $('graph-clear').onclick = () => {
+    if (!clearAllFilters()) { toast('当前没有筛选条件'); return; }
+    render();
+    toast('✓ 已清除筛选条件');
+  };
+  $('graph-mode').onclick = () => {
+    GN.mode = GN.mode === 1 ? 2 : GN.mode === 2 ? 3 : 1;
+    renderGraphLegend();
+    toast('联动强度：' + ['近处强联动', '全图分层跟随', '只拉直接邻居'][GN.mode - 1]);
+  };
+  // 窗口变化 → 重新布局（画布尺寸变了）
+  let rzT = null;
+  window.addEventListener('resize', () => {
+    if (curView !== 'graph') return;
+    clearTimeout(rzT);
+    rzT = setTimeout(() => { initGraph(curListCache.length ? curListCache : DATA); }, 220);
+  });
+})();
+
 /* ---------- 初始化 ---------- */
 $('add-btn').onclick = () => openEdit(null);
 $('edit-cancel').onclick = closeEdit;
 $('edit-save').onclick = saveEdit;
+/* 「重要事件」勾选框：勾上时高亮容器 */
+(function () {
+  const kp = $('e-key-pick'), kc = $('e-key');
+  if (!kp || !kc) return;
+  const sync = () => { kp.classList.toggle('on', kc.checked); kc.dataset.touched = '1'; };
+  kc.addEventListener('change', sync);
+  kp.addEventListener('click', e => { if (e.target !== kc) { e.preventDefault(); kc.checked = !kc.checked; sync(); } });
+  // 初始只同步外观，**不置 touched** —— touched 代表「用户真的动过」，
+  // 页面加载时置 1 会让每条记录一打开编辑框就被当成手动表态。
+  kp.classList.toggle('on', kc.checked);
+})();
 $('edit-mask').onclick = e => { if (e.target === $('edit-mask')) closeEdit(); };
 $('import-btn').onclick = openImport;
 $('import-cancel').onclick = closeImport;
@@ -1208,11 +3793,13 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
+initTheme();          // 主题开关（深色默认，须在首次 render 前）
+keyRules = loadRules();   // 关键词表必须先加载：旧数据迁移要用它重算
 DATA = loadLocal();
 loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v21</div>
+<div class="ver">v29</div>
 </body>
 </html>

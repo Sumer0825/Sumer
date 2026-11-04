@@ -157,7 +157,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 21, 'weight.html': 35, 'budget.html': 30, 'storage.html': 27, 'ledger.html': 19, 'analysis.html': 23, 'daily.html': 4 };
+const TOOLS_VER = { 'time.html': 29, 'weight.html': 35, 'budget.html': 37, 'storage.html': 27, 'ledger.html': 19, 'analysis.html': 23, 'daily.html': 4 };
 
 TOOLS.forEach((t, i) => {
   if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里

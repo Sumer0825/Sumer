@@ -36,6 +36,16 @@
                   border-radius:50%;background:#9b8fd0}
   .chg .tag{display:inline-block;font-size:10.5px;font-weight:700;color:#5a4fb0;
             background:#ece9f9;border-radius:4px;padding:1px 6px;margin-right:7px;vertical-align:1px}
+  /* 历史折叠区：默认收起，只有点开才展开，避免页面被几十条改动撑长 */
+  .chg details{margin-top:12px;padding-top:10px;border-top:1px dashed #ddd8ec}
+  .chg summary{cursor:pointer;font-size:12.5px;color:#7d74a0;list-style:none;
+               display:flex;align-items:center;gap:6px;user-select:none}
+  .chg summary::-webkit-details-marker{display:none}
+  .chg summary::before{content:'▸';font-size:11px;transition:transform .15s;display:inline-block}
+  .chg details[open] summary::before{transform:rotate(90deg)}
+  .chg summary:hover{color:#5a4fb0}
+  .chg summary b{color:#5a4fb0;font-weight:700}
+  .chg details ul{margin-top:9px;max-height:320px;overflow-y:auto}
   .tip{margin-top:14px;font-size:12px;color:#a09aae;text-align:center}
 </style>
 </head>
@@ -45,72 +55,159 @@
   <div class="sub">GitHub Pages 整包覆盖上传用</div>
 
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v94.zip</div>
-    <div class="meta" id="meta">🆕 最新 v94：33 个文件 · 1730 KB</div>
+    <div class="nm" id="nm">sumer-pages-v108.zip</div>
+    <div class="meta" id="meta">🆕 最新 v108：33 个文件 · 1787 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="/dl" download="sumer-pages-v94.zip">⬇ 下载 sumer-pages-v94.zip</a>
+  <a class="btn" id="dl" href="/dl" download="sumer-pages-v108.zip">⬇ 下载 sumer-pages-v108.zip</a>
 
   <div class="chg">
-    <h2>本次更新</h2>
+    <h2 id="chg-title">本次更新 · v108</h2>
     <ul id="chg">
-      <li><span class=tag>安全</span>标记文件路径白名单：原先填「data/ledger.json」就能直接覆盖账本原件（不可逆丢数据），现只允许写三个标记文件，越界自动改回并提示</li>
-      <li><span class=tag>安全</span>收支记录器、体重记录器补上 HTML 转义函数：备注列里放一行标签就能在渲染历史时执行脚本（同源页面的 GitHub Token 就在浏览器里）</li>
-      <li><span class=tag>安全</span>物品柜的图片地址加协议白名单（只放行 data:/blob:/https:），挡住能直接执行脚本的伪协议</li>
-      <li><span class=tag>安全</span>物品柜、时光记录器的外部数据入库前逐条校验（字段白名单 + 长度上限），云端同步与 JSON 导入不再整包塞进数据库</li>
-      <li><span class=tag>安全</span>体重记录的时段字段加白名单（早/中/晚），旧数据里的异常值自动降级</li>
-      <li><span class=tag>安全</span>六个工具的云端同步路径加白名单：只能写 data/ 目录，且不能覆盖别的工具的数据文件或账本原件</li>
-      <li><span class=tag>安全</span>Service Worker 清理缓存时只删本应用自己的缓存，不再连带清掉同域下其它站点的缓存</li>
-      <li><span class=tag>安全</span>第三方库（SheetJS）改为独立带版本号的缓存，发新版不会继续命中旧库</li>
-      <li><span class=tag>安全</span>体重记录器的配置键改为独立命名空间，不再与其它工具共用同一个键</li>
-      <li><span class=tag>修复</span>导入文件加大小上限（表格 20MB / 图片 8MB），超大文件不再卡死页面</li>
-      <li><span class=tag>修复</span>浏览器存储写满时给出明确提示，不再静默丢数据</li>
-      <li><span class=tag>修复</span>本机数据格式损坏时不再直接显示为空，原始内容会备份到带 _corrupt 后缀的键里，可手工找回</li>
-      <li><span class=tag>新增</span>高消费补上翻页器：原先「每页 30/60/120」只是硬截断，超出的记录直接看不到；现在有首页/上一页/页码/下一页/末页 + 跳页</li>
-      <li><span class=tag>新增</span>高消费顶部四类统计可点击：点「其他 57 笔」直接只列那 57 笔，标错了好找；勾「仅显示已标记」后另有类型筛选条</li>
-      <li><span class=tag>修复</span>标记保护的「修改密码」按钮点了没反应（改密码功能原先在界面上不可达）</li>
-      <li><span class=tag>修复</span>高消费列表为空时，顶部四类统计点不动（按钮看着能点其实没绑事件）</li>
-      <li><span class=tag>修复</span>金额门槛滑块拖回原值会永久脱离「大额消费清单」阈值的联动</li>
-      <li><span class=tag>修复</span>账本读空后周度层仍显示上一次的旧图表</li>
-      <li><span class=tag>修复</span>年粒度下矩阵图例把「占比」列误说成涨跌（表头已改名为「占比」）</li>
-      <li><span class=tag>修复</span>单年视图下矩阵表格与下方结论用了两套时间跨度</li>
-      <li><span class=tag>修复</span>单年视图下数据总览的口径说明整段消失</li>
-      <li><span class=tag>优化</span>高消费区渲染提速：一次遍历算完所有口径 + 排序缓存 + 指纹预计算 + 滑块 rAF 节流（6912 条账单下单次渲染 1.4ms）</li>
-      <li><span class=tag>修复</span>修复「标记存了但页面不显示」：备注里的换行符（）经浏览器解析属性时被改写成 
-，导致标记键写入与读取对不上；现已统一归一，并让指纹不再经过 HTML 属性传递（历史标记会自动恢复显示）</li>
-      <li><span class=tag>新增</span>高消费新增第四类「其他」（排在最后，房租/还款/学费等刚性支出，不计入「可省的」）</li>
-      <li><span class=tag>新增</span>高消费新增「仅显示已标记」勾选框，与「隐藏已标记」互斥，方便回头查询已分类的账</li>
-      <li><span class=tag>优化</span>标记同步面板可折叠：标题栏加「✕ 收起」，入口按钮文案随状态切换</li>
-      <li><span class=tag>优化</span>标记同步面板改为「② 不该花的」标签页内就地展开，不再像新增了一个 tab</li>
-      <li><span class=tag>新增</span>标记保护：取消标记、更改标记需输入密码（首次标记免密码），密码不明文存并随标记同步到云端</li>
-      <li><span class=tag>新增</span>「不该花的」标记支持跨设备同步：在该标签页内填 GitHub Token，标记写入仓库独立文件，标记后自动上传</li>
-      <li><span class=tag>优化</span>标记键改为内容指纹（跨设备对得上）并带时间戳，多设备合并以新为准</li>
-      <li><span class=tag>优化</span>周度账观改为按年查看：只列明细年（该年支出&gt;100笔），不再一次铺开所有年份</li>
-      <li><span class=tag>修复</span>明细年门槛统一为每年支出&gt;100笔，并排除每年仅1笔的年度汇总年</li>
-      <li><span class=tag>优化</span>周度图轴标签稀疏化且与柱图共用滚动容器，修正标签与柱子错位</li>
-      <li><span class=tag>优化</span>周度结余图改为基线居中的发散柱（绿上红下），超支周一眼可见</li>
-      <li><span class=tag>修复</span>周度账观改为与分类分析同源（读账本明细按周聚合），金额保留小数不再被抹零</li>
-      <li><span class=tag>清理</span>全项目零引用文件清理：移出 3 个无引用文件，新增自动巡检闸门</li>
-      <li><span class=tag>新增</span>快捷方式 / 书签栏 / 标签栏专用 icon（浏览器 .ico 多档尺寸）</li>
-      <li><span class=tag>优化</span>本月每日记录表头吸顶，滚动时锁定日期 / 星期 / 实际 / 预算 / 备注</li>
-      <li><span class=tag>修复</span>删除按钮满屏误显示：收紧为「仅录入当天可删」，并一次性迁移旧脏数据</li>
-      <li><span class=tag>优化</span>记录范围说明改排版：第一行加粗上色，第二行改中性灰并倾斜</li>
-      <li><span class=tag>重命名</span>门户「收支规划局」→「刚需日用账」，副标题「追踪每日底线刚需开销」</li>
-      <li><span class=tag>修复</span>删除判定支持「当天补录历史日期」：录入当天可删，过天即禁</li>
-      <li><span class=tag>新增</span>Excel 导出新增第 5 列「录入日」，删除权限随录入日期持久化</li>
-      <li><span class=tag>优化</span>账单透视镜「② 不该花的」改为「② 高消费」，三类：家庭采购 / 个人置物 / 冲动消费</li>
-      <li><span class=tag>优化</span>高消费按钮由 2 个改 3 个，统计、口径、页面文案全部按三类重写</li>
-      <li><span class=tag>优化</span>「③ 可省的」只计个人置物 + 冲动消费，家庭采购属刚需不计入</li>
-      <li><span class=tag>新增</span>账单透视镜「② 高消费」新增金额门槛筛选，默认跟随「大额消费清单」阈值，可独立设定</li>
-      <li><span class=tag>优化</span>账单透视镜背景图换成 assets/bg-ledger.png 平铺</li>
-      <li><span class=tag>重命名</span>账本透视 → 历年收支簿（门户卡片、页面标题、导出文件名同步；数据层 ledger-p612 / data/ledger.json 不变）</li>
-      <li><span class=tag>优化</span>门户按钮「历史账单导入与分析」改为「历年收支导入与分析」</li>
-      <li><span class=tag>新增</span>账单透视镜「② 高消费」新增第四类「其他」，排在最后，用于房租/还款/学费等刚性支出</li>
-      <li><span class=tag>优化</span>「其他」不计入「③ 可省的」年省额（刚性支出砍不掉，计入会让年可省虚高）</li>
-      <li><span class=tag>优化</span>高消费四类统计、徽章、按钮配色与文案同步（其他用灰色系区分）</li>
-      <li><span class=tag>新增</span>账单透视镜「② 高消费」新增「仅显示已标记」勾选框，只显示标记过的交易，方便回头查询</li>
-      <li><span class=tag>优化</span>「仅显示已标记」与「隐藏已标记」互斥（勾一个自动取消另一个），都不勾默认显示全部</li>
+      <li><span class=tag>优化</span>刚需日用账的提醒条从页面最底部移到「记一笔」卡片正上方 —— 原来在窄屏单列时提醒落在最下面，用户正要填账时根本看不到，等于白提醒</li>
+      <li><span class=tag>优化</span>提醒文案同步改为指向前方（&quot;往下记一笔&quot;），并去掉「在下方」这类会因位置变动而失效的表述</li>
     </ul>
+    <details id="chg-hist-box">
+      <summary>更早的更新（<b id="chg-hist-n">134</b> 条）</summary>
+      <ul id="chg-hist">
+        <li><span class=tag>优化</span>刚需日用账改成左右分栏布局（与体重记录工具一致）：左边放切换页签/记一笔/预警，右边放概览/柱图/预算/每日记录，表格和图表不再被挤窄</li>
+        <li><span class=tag>优化</span>刚需日用账页面加宽到 1080px，顶部的切换页签不再横贯整页，手机端仍自动单列显示</li>
+        <li><span class=tag>修复</span>刚需日用账左右分栏后，左栏的日期框和金额框被撑成两个大块（高度 110-140px）—— 现在恢复为正常的一行高度，并排得更紧凑</li>
+        <li><span class=tag>优化</span>刚需日用账界面视觉打磨：顶部页签从「灰底格子里的三块拼贴」改成三个独立药丸，月份翻页按钮改圆形，记一笔/预算设置两行的输入框与按钮统一高度和圆角</li>
+        <li><span class=tag>修复</span>刚需日用账输入框用键盘 Tab 聚焦时看不到焦点位置（原来只写了 outline:none 却没有替代样式）</li>
+        <li><span class=tag>优化</span>刚需日用账新增悬停反馈（按钮、页签、翻页按钮、输入框聚焦光晕），桌面端不再没有指针响应</li>
+        <li><span class=tag>新增</span>刚需日用账两个页签中间新增「两账合计」栏，一眼看到当月总实际支出、总预算、已用百分比和结余</li>
+        <li><span class=tag>新增</span>合计栏跟随当前浏览的月份，翻月份、记一笔、改预算都会实时更新</li>
+        <li><span class=tag>修复</span>刚需日用账「今日实际」没填时按预算显示（如显示 60.00 并标注「未填·按预算计」），看起来像真花了钱 —— 现在没填就是 0</li>
+        <li><span class=tag>修复</span>刚需日用账三处口径不一致：概览「累计实际」未填不计入，但周柱状图未填却按花满算，同一个月份两个数字对不上、柱子永远顶满预算线</li>
+        <li><span class=tag>优化</span>刚需日用账周柱状图的「实际」柱只画真实已录入金额（预算柱不变），未填的天不再假装花完</li>
+        <li><span class=tag>优化</span>刚需日用账概览说明改为「未填按 0 计」，今日剩余与进度条在未填时显示全额与 0%</li>
+        <li><span class=tag>新增</span>刚需日用账新增「非刚需」页签：两本账分开记，页签上直接显示各自金额</li>
+        <li><span class=tag>新增</span>刚需日用账非刚需预算独立记录（每月总预算），与刚需的日预算完全分开，互不影响</li>
+        <li><span class=tag>修复</span>刚需日用账点「清空本月」没反应（报变量未定义，密码框不弹）</li>
+        <li><span class=tag>修复</span>刚需日用账导出表格时「只有非刚需记录」的月份会整月丢失</li>
+        <li><span class=tag>修复</span>刚需日用账同一天记了刚需和非刚需时，删一条会连带删掉另一条</li>
+        <li><span class=tag>修复</span>刚需日用账翻到别的月份时，页签上的金额还是本月的数字</li>
+        <li><span class=tag>修复</span>刚需日用账分账后，刚需的「累计实际」会被非刚需串账，且数值随录入顺序变来变去</li>
+        <li><span class=tag>修复</span>刚需日用账导出再导入会丢掉刚需的日预算设置，GitHub 同步一次就可能把预算抹掉</li>
+        <li><span class=tag>修复</span>时光自撰集图谱点「重新布局」不会清空筛选条件：搜索框有词或分类已筛选时，图谱本来就只剩几条记录，重排它们毫无意义（按钮名不副实）</li>
+        <li><span class=tag>新增</span>时光自撰集图谱新增「清除筛选」按钮，并在统计栏显示当前筛选了什么，图谱只剩几个点时不再一头雾水</li>
+        <li><span class=tag>修复</span>时光自撰集的提示条从顶部弹出改为底部弹出，原来会挡住品牌条和四个视图页签</li>
+        <li><span class=tag>优化</span>时光自撰集版本角标从右下角移到右上角（原来会被底部提示条压住）</li>
+        <li><span class=tag>新增</span>时光自撰集新增「图谱」视图：年份与分类标签连成关联网，一眼看清哪几年在忙哪些事</li>
+        <li><span class=tag>新增</span>时光自撰集图谱支持拖拽联动：拖动一个节点，与它关联的节点会被一并拉动（近处强联动、远处微动），松手回弹</li>
+        <li><span class=tag>新增</span>时光自撰集图谱可切换三档联动强度，点年份直接看该年记录，点分类按分类筛选</li>
+        <li><span class=tag>修复</span>时光自撰集搜索不认年份：搜「2011」这类年份永远搜不到记录</li>
+        <li><span class=tag>修复</span>时光自撰集清空全部后切到图谱页签页面一片空白（连工具条都不显示）</li>
+        <li><span class=tag>修复</span>时光自撰集手机端「重新布局」按钮被挤成竖排四行</li>
+        <li><span class=tag>新增</span>时光自撰集「重要」判定交回用户手里：新增 ⚙ 规则面板，关键词表与排除词都能自己改，改完立刻生效</li>
+        <li><span class=tag>修复</span>时光自撰集「重要」判定规则是我拍的一张硬编码词表（含「上线/发布会/第一名」等通用动词，易误伤），且推断结果被固化写进本地存储——改了规则也救不回旧数据，分不清哪条 ★ 是自己标的</li>
+        <li><span class=tag>优化</span>时光自撰集「重要」不再按时间跨度自动判定（只认关键词），「只看重要」不再等于「只看住得久」</li>
+        <li><span class=tag>新增</span>时光自撰集支持手动标记「重要 / 不重要」，手动永远优先于规则，且规则改不动它</li>
+        <li><span class=tag>新增</span>时光自撰集规则词表随云端表格一起同步，换设备后判定结果保持一致</li>
+        <li><span class=tag>修复</span>时光自撰集导出表格再导入，标题里会多出「★」和分类名（原来把每一行拼成一句话解析）</li>
+        <li><span class=tag>修复</span>时光自撰集本地存储写满时提示不显示，用户看着「✓ 已保存」以为存好了其实没落盘</li>
+        <li><span class=tag>修复</span>时光自撰集手机端搜索框被挤得只剩两个字</li>
+        <li><span class=tag>修复</span>时光自撰集开「只看重要」后页面自相矛盾：上面写着「找到 N 条重要的记录」，下面却显示「没有可作为章节的记录」</li>
+        <li><span class=tag>修复</span>时光自撰集深色模式下「时间段事件」卡片是白底白字几乎看不见（浅色规则的渐变终点是纯白，深色下没被覆盖）</li>
+        <li><span class=tag>修复</span>时光自撰集深色模式下密码输入框白底白字，输入内容完全不可见（ID 选择器特异性高于主题规则）</li>
+        <li><span class=tag>修复</span>时光自撰集搜索期间「章节」页签点不动、清空搜索后回不到主视图（用户手动选的视图不再被自动切换覆盖）</li>
+        <li><span class=tag>修复</span>时光自撰集重渲染后第一次点击卡片没反应（旧的展开状态没随 DOM 重建一起清掉）</li>
+        <li><span class=tag>修复</span>时光自撰集清空全部数据后时期总览的横条、年份条、「收起全部」按钮残留在页面上</li>
+        <li><span class=tag>修复</span>时光自撰集深色模式下年份标题的吸顶底色被渐变裁掉，滚动时下方卡片会从标题行透出来</li>
+        <li><span class=tag>修复</span>时光自撰集重要程度：跨 1 年不再自动判为重要（改为跨 2 年及以上），且跨年段事件的「重要」现在可以手动取消</li>
+        <li><span class=tag>修复</span>时光自撰集 Excel 导入导出的「重要」列与云端同步不一致，导出再导入会清空所有重要标记</li>
+        <li><span class=tag>修复</span>时光自撰集编辑弹窗能保存「开始日期晚于结束日期」的倒挂时间段</li>
+        <li><span class=tag>修复</span>时光自撰集多关键词搜索永远 0 结果（改为任一词命中即可）</li>
+        <li><span class=tag>优化</span>时光自撰集时期总览带跟随搜索与分类筛选，不再显示已被筛掉的条目</li>
+        <li><span class=tag>优化</span>时光自撰集章节骨架选错后仍能切换回来（空态下也显示骨架选择器）</li>
+        <li><span class=tag>优化</span>时光自撰集章节卡内重叠的时间段分到不同泳道显示（原来全叠在同一条上）</li>
+        <li><span class=tag>优化</span>时光自撰集年份条的左右翻页按钮状态按渲染后的实际宽度计算，并保留横向滚动位置</li>
+        <li><span class=tag>修复</span>时光自撰集深色模式下左上角品牌名和章节卡标题变成白灰色方块：深色覆盖规则用了 background 简写，把 background-clip 重置成 border-box，渐变不再裁剪成文字</li>
+        <li><span class=tag>修复</span>时光自撰集章节骨架不再误选「旅行」这类短期行程分类：改为「总时长 × 根号条数」综合评分，长度按精确月数算（原来只看年份差，3 个月的行程被算成 1 年）</li>
+        <li><span class=tag>优化</span>章节卡内的时间轴改为自适应窗口：短章节不再只占全局轴的 1.5%，章内嵌套状态清晰可见，并标注当前轴的年份范围</li>
+        <li><span class=tag>优化</span>章节骨架选择器改按总时长排序并显示累计年数与平均月数，能直接看出哪个分类撑得起章节</li>
+        <li><span class=tag>优化</span>章节卡副标题不再重复地点名，时长按月数显示（短期行程不再一律显示「1 年」）</li>
+        <li><span class=tag>改版</span>时光自撰集整体换成深色星云主题：底色深紫黑 + 紫粉描边卡片 + 渐变标题 + 彩虹标语，视觉规范参考 mydoip 产品中心</li>
+        <li><span class=tag>新增</span>深浅色切换开关（右上角 ☾/☀），选择会记住；手机状态栏颜色同步切换</li>
+        <li><span class=tag>新增</span>时光自撰集新增「章节」主视图：一张卡 = 一个住处（章节），卡内含迷你时间轴、分类图例与统计</li>
+        <li><span class=tag>新增</span>章节骨架自动识别：按跨年段数量与总跨度自动选出最合适的分类，也可手动切换</li>
+        <li><span class=tag>新增</span>第二维度「重要程度」：重要记录左边框加粗 + 标题加 ★，可手动勾选；老数据按规则自动推断</li>
+        <li><span class=tag>新增</span>「只看重要」筛选按钮：与搜索、分类筛选叠加，一眼筛出人生节点</li>
+        <li><span class=tag>优化</span>顶部改为品牌条 + 章节/时间轴/列表三页签，当前页签有渐变下划线指示</li>
+        <li><span class=tag>优化</span>Excel 导出新增「重要」列（★），导入导出往返后重要标记不丢</li>
+        <li><span class=tag>优化</span>搜索时自动从章节视图切到时间轴（章节视图看不到搜索结果）</li>
+        <li><span class=tag>新增</span>时光自撰集加搜索框：搜标题/备注/分类，命中处高亮，搜到哪年自动展开哪年</li>
+        <li><span class=tag>新增</span>时光自撰集加年份快捷检索条：一眼看全部年份（带条数），点一下直达那一年并闪烁提示</li>
+        <li><span class=tag>新增</span>时光自撰集加「列表」视图：两行式紧凑排布，180 条从 24 屏压到 13 屏，适合快速扫描与对比</li>
+        <li><span class=tag>新增</span>时光自撰集加「时期总览带」：跨年时间段按真实年份比例画成横条，一眼看清每段时期占多长、在哪几年、有无重叠</li>
+        <li><span class=tag>优化</span>时光自撰集操作按钮改为悬浮/点按才出现，卡片高度从 104px 降到 60px，页面从 24 屏压到 4 屏</li>
+        <li><span class=tag>优化</span>时光自撰集默认只展开最近一年，更早年份收起（手动改过会记住）</li>
+        <li><span class=tag>优化</span>时光自撰集元信息压缩：时间段直接显示持续天数（如「8天」），去掉占位的「时间段」标签，已保护标记缩成图标</li>
+        <li><span class=tag>优化</span>时光自撰集分类栏收纳成「更多 N」，手机上不再横向溢出</li>
+        <li><span class=tag>修复</span>时光自撰集在有跨年时间段记录时页面崩溃：年份是字符串，「20161 &lt;= 2024」恒为真导致死循环内存溢出，现已转成数字比较</li>
+        <li><span class=tag>修复</span>时光自撰集时期总览带不再截断：原先最多只画 6 条，其余折叠成「还有 N 条未显示」—— 那 10 条既看不到也点不到，现在全部画出（条数多时总览带自身可滚动）</li>
+        <li><span class=tag>修复</span>时光自撰集的备注支持换行：原先在备注里按回车，保存后会被压成一行（HTML 默认把 
+ 折叠成空格），现在按原样分行显示</li>
+        <li><span class=tag>安全</span>标记文件路径白名单：原先填「data/ledger.json」就能直接覆盖账本原件（不可逆丢数据），现只允许写三个标记文件，越界自动改回并提示</li>
+        <li><span class=tag>安全</span>收支记录器、体重记录器补上 HTML 转义函数：备注列里放一行标签就能在渲染历史时执行脚本（同源页面的 GitHub Token 就在浏览器里）</li>
+        <li><span class=tag>安全</span>物品柜的图片地址加协议白名单（只放行 data:/blob:/https:），挡住能直接执行脚本的伪协议</li>
+        <li><span class=tag>安全</span>物品柜、时光记录器的外部数据入库前逐条校验（字段白名单 + 长度上限），云端同步与 JSON 导入不再整包塞进数据库</li>
+        <li><span class=tag>安全</span>体重记录的时段字段加白名单（早/中/晚），旧数据里的异常值自动降级</li>
+        <li><span class=tag>安全</span>六个工具的云端同步路径加白名单：只能写 data/ 目录，且不能覆盖别的工具的数据文件或账本原件</li>
+        <li><span class=tag>安全</span>Service Worker 清理缓存时只删本应用自己的缓存，不再连带清掉同域下其它站点的缓存</li>
+        <li><span class=tag>安全</span>第三方库（SheetJS）改为独立带版本号的缓存，发新版不会继续命中旧库</li>
+        <li><span class=tag>安全</span>体重记录器的配置键改为独立命名空间，不再与其它工具共用同一个键</li>
+        <li><span class=tag>修复</span>导入文件加大小上限（表格 20MB / 图片 8MB），超大文件不再卡死页面</li>
+        <li><span class=tag>修复</span>浏览器存储写满时给出明确提示，不再静默丢数据</li>
+        <li><span class=tag>修复</span>本机数据格式损坏时不再直接显示为空，原始内容会备份到带 _corrupt 后缀的键里，可手工找回</li>
+        <li><span class=tag>优化</span>下载页「本次更新」不再把二十多个版本的改动全铺开：只显示本次发版的条目，历史折叠进「更早的更新」（默认收起）</li>
+        <li><span class=tag>新增</span>高消费补上翻页器：原先「每页 30/60/120」只是硬截断，超出的记录直接看不到；现在有首页/上一页/页码/下一页/末页 + 跳页</li>
+        <li><span class=tag>新增</span>高消费顶部四类统计可点击：点「其他 57 笔」直接只列那 57 笔，标错了好找；勾「仅显示已标记」后另有类型筛选条</li>
+        <li><span class=tag>修复</span>标记保护的「修改密码」按钮点了没反应（改密码功能原先在界面上不可达）</li>
+        <li><span class=tag>修复</span>高消费列表为空时，顶部四类统计点不动（按钮看着能点其实没绑事件）</li>
+        <li><span class=tag>修复</span>金额门槛滑块拖回原值会永久脱离「大额消费清单」阈值的联动</li>
+        <li><span class=tag>修复</span>账本读空后周度层仍显示上一次的旧图表</li>
+        <li><span class=tag>修复</span>年粒度下矩阵图例把「占比」列误说成涨跌（表头已改名为「占比」）</li>
+        <li><span class=tag>修复</span>单年视图下矩阵表格与下方结论用了两套时间跨度</li>
+        <li><span class=tag>修复</span>单年视图下数据总览的口径说明整段消失</li>
+        <li><span class=tag>优化</span>高消费区渲染提速：一次遍历算完所有口径 + 排序缓存 + 指纹预计算 + 滑块 rAF 节流（6912 条账单下单次渲染 1.4ms）</li>
+        <li><span class=tag>修复</span>修复「标记存了但页面不显示」：备注里的换行符（）经浏览器解析属性时被改写成 
+，导致标记键写入与读取对不上；现已统一归一，并让指纹不再经过 HTML 属性传递（历史标记会自动恢复显示）</li>
+        <li><span class=tag>新增</span>高消费新增第四类「其他」（排在最后，房租/还款/学费等刚性支出，不计入「可省的」）</li>
+        <li><span class=tag>新增</span>高消费新增「仅显示已标记」勾选框，与「隐藏已标记」互斥，方便回头查询已分类的账</li>
+        <li><span class=tag>优化</span>标记同步面板可折叠：标题栏加「✕ 收起」，入口按钮文案随状态切换</li>
+        <li><span class=tag>优化</span>标记同步面板改为「② 不该花的」标签页内就地展开，不再像新增了一个 tab</li>
+        <li><span class=tag>新增</span>标记保护：取消标记、更改标记需输入密码（首次标记免密码），密码不明文存并随标记同步到云端</li>
+        <li><span class=tag>新增</span>「不该花的」标记支持跨设备同步：在该标签页内填 GitHub Token，标记写入仓库独立文件，标记后自动上传</li>
+        <li><span class=tag>优化</span>标记键改为内容指纹（跨设备对得上）并带时间戳，多设备合并以新为准</li>
+        <li><span class=tag>优化</span>周度账观改为按年查看：只列明细年（该年支出&gt;100笔），不再一次铺开所有年份</li>
+        <li><span class=tag>修复</span>明细年门槛统一为每年支出&gt;100笔，并排除每年仅1笔的年度汇总年</li>
+        <li><span class=tag>优化</span>周度图轴标签稀疏化且与柱图共用滚动容器，修正标签与柱子错位</li>
+        <li><span class=tag>优化</span>周度结余图改为基线居中的发散柱（绿上红下），超支周一眼可见</li>
+        <li><span class=tag>修复</span>周度账观改为与分类分析同源（读账本明细按周聚合），金额保留小数不再被抹零</li>
+        <li><span class=tag>清理</span>全项目零引用文件清理：移出 3 个无引用文件，新增自动巡检闸门</li>
+        <li><span class=tag>新增</span>快捷方式 / 书签栏 / 标签栏专用 icon（浏览器 .ico 多档尺寸）</li>
+        <li><span class=tag>优化</span>本月每日记录表头吸顶，滚动时锁定日期 / 星期 / 实际 / 预算 / 备注</li>
+        <li><span class=tag>修复</span>删除按钮满屏误显示：收紧为「仅录入当天可删」，并一次性迁移旧脏数据</li>
+        <li><span class=tag>优化</span>记录范围说明改排版：第一行加粗上色，第二行改中性灰并倾斜</li>
+        <li><span class=tag>重命名</span>门户「收支规划局」→「刚需日用账」，副标题「追踪每日底线刚需开销」</li>
+        <li><span class=tag>修复</span>删除判定支持「当天补录历史日期」：录入当天可删，过天即禁</li>
+        <li><span class=tag>新增</span>Excel 导出新增第 5 列「录入日」，删除权限随录入日期持久化</li>
+        <li><span class=tag>优化</span>账单透视镜「② 不该花的」改为「② 高消费」，三类：家庭采购 / 个人置物 / 冲动消费</li>
+        <li><span class=tag>优化</span>高消费按钮由 2 个改 3 个，统计、口径、页面文案全部按三类重写</li>
+        <li><span class=tag>优化</span>「③ 可省的」只计个人置物 + 冲动消费，家庭采购属刚需不计入</li>
+        <li><span class=tag>新增</span>账单透视镜「② 高消费」新增金额门槛筛选，默认跟随「大额消费清单」阈值，可独立设定</li>
+        <li><span class=tag>优化</span>账单透视镜背景图换成 assets/bg-ledger.png 平铺</li>
+        <li><span class=tag>重命名</span>账本透视 → 历年收支簿（门户卡片、页面标题、导出文件名同步；数据层 ledger-p612 / data/ledger.json 不变）</li>
+        <li><span class=tag>优化</span>门户按钮「历史账单导入与分析」改为「历年收支导入与分析」</li>
+        <li><span class=tag>新增</span>账单透视镜「② 高消费」新增第四类「其他」，排在最后，用于房租/还款/学费等刚性支出</li>
+        <li><span class=tag>优化</span>「其他」不计入「③ 可省的」年省额（刚性支出砍不掉，计入会让年可省虚高）</li>
+        <li><span class=tag>优化</span>高消费四类统计、徽章、按钮配色与文案同步（其他用灰色系区分）</li>
+        <li><span class=tag>新增</span>账单透视镜「② 高消费」新增「仅显示已标记」勾选框，只显示标记过的交易，方便回头查询</li>
+        <li><span class=tag>优化</span>「仅显示已标记」与「隐藏已标记」互斥（勾一个自动取消另一个），都不勾默认显示全部</li>
+      </ul>
+    </details>
   </div>
 
   <div class="note">
@@ -123,7 +220,7 @@
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v94），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v108），否则页面看起来"没变化"</div>
 </div>
 </body>
 </html>
