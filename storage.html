@@ -303,9 +303,19 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .data-toolbar .spacer { flex: 1; }
   .data-toolbar .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
   .data-toolbar button { padding: 6px 12px; font-size: 13px; }
+  /* 存储降级提示条：IndexedDB 打不开时出现，取代原来那个在 iframe 里常被拦掉的 alert */
+  .store-notice {
+    position: fixed; left: 50%; top: 10px; transform: translateX(-50%);
+    z-index: 9999; max-width: min(680px, calc(100vw - 24px));
+    background: #fff8e6; border: 1px solid #f0c36d; color: #7a5200;
+    border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.65;
+    box-shadow: 0 8px 24px rgba(0,0,0,.14); display: none; white-space: pre-wrap;
+  }
+  .store-notice.show { display: block; }
 </style>
 </head>
 <body>
+  <div class="store-notice" id="storeNotice"></div>
   <header>
     <h1>清居置物箱<span class="tag">室内物品整理归纳</span></h1>
     <p class="subtitle">按「衣柜 / 储物柜 → 第几层 → 放了什么」逐层记录，例如哪层放夏季衣物、哪层放冬季被褥。</p>
@@ -453,12 +463,28 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 <script>
 const $ = (id) => document.getElementById(id);
 
-/* ---------- IndexedDB（三个层级 store） ---------- */
+/* ---------- 存储层：IndexedDB 优先，不可用时自动降级 ----------
+   踩过的坑（2026-11-10）：原来只有 openDB().then(...).catch(alert(...))。
+   IndexedDB 打不开时（无痕模式 / iframe 里第三方存储被禁 / 存储配额满），
+   catch 里只有一句 alert —— 在 iframe 里弹窗常被拦掉，用户看不到任何提示，
+   而 catch 之后也没继续初始化，于是列表永远不渲染，
+   表现就是「置物箱打不开」，控制台还不报错，很难查。
+   现在做成三层降级：IndexedDB → localStorage → 内存，
+   任何环境下页面都能打开，并明确告诉用户当前处于哪种模式。 */
 const DB_NAME = "home-storage", VER = 1;
+const LS_PREFIX = "home-storage-ls:";
 let db = null;
+let storeMode = "idb";            // idb | ls | mem
+const memStore = { locations: [], levels: [], items: [] };
+
 function openDB() {
   return new Promise((res, rej) => {
-    const req = indexedDB.open(DB_NAME, VER);
+    let req;
+    try {
+      req = indexedDB.open(DB_NAME, VER);
+    } catch (e) {
+      rej(e || new Error("IndexedDB 在当前环境不可用")); return;
+    }
     req.onupgradeneeded = () => {
       const d = req.result;
       if (!d.objectStoreNames.contains("locations")) d.createObjectStore("locations", { keyPath: "id" });
@@ -466,15 +492,110 @@ function openDB() {
       if (!d.objectStoreNames.contains("items")) d.createObjectStore("items", { keyPath: "id" });
     };
     req.onsuccess = () => { db = req.result; res(db); };
-    req.onerror = () => rej(req.error);
+    req.onerror = () => rej(req.error || new Error("IndexedDB 打开失败"));
+    req.onblocked = () => rej(new Error("IndexedDB 被其它页面占用"));
   });
 }
 const st = (name, mode) => db.transaction(name, mode).objectStore(name);
-const getAll = (name) => new Promise((res, rej) => { const r = st(name, "readonly").getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-const put = (name, v) => new Promise((res, rej) => { const r = st(name, "readwrite").put(v); r.onsuccess = res; r.onerror = () => rej(r.error); });
-const del = (name, id) => new Promise((res, rej) => { const r = st(name, "readwrite").delete(id); r.onsuccess = res; r.onerror = () => rej(r.error); });
+
+/* localStorage 兜底读写 */
+const lsAll = (name) => { try { return JSON.parse(localStorage.getItem(LS_PREFIX + name) || "[]"); } catch (e) { return []; } };
+const lsWrite = (name, arr) => { localStorage.setItem(LS_PREFIX + name, JSON.stringify(arr)); };
+
+/* 把 IndexedDB 里已有的数据搬到 localStorage（写入失败触发降级时用，避免数据看起来"消失"） */
+async function migrateIdbToLs() {
+  if (!db) return;
+  try {
+    for (const n of ["locations", "levels", "items"]) {
+      const rows = await new Promise((res, rej) => {
+        const r = st(n, "readonly").getAll();
+        r.onsuccess = () => res(r.result || []);
+        r.onerror = () => rej(r.error || new Error("读取失败"));
+      });
+      if (rows.length) lsWrite(n, rows);
+    }
+  } catch (e) { console.warn("数据迁移到兼容模式失败：", e); }
+}
+
+const getAll = (name) => {
+  if (storeMode === "ls") return Promise.resolve(lsAll(name));
+  if (storeMode === "mem") return Promise.resolve((memStore[name] || []).slice());
+  return new Promise((res, rej) => {
+    try {
+      const r = st(name, "readonly").getAll();
+      r.onsuccess = () => res(r.result || []);
+      r.onerror = () => rej(r.error || new Error("读取失败"));
+    } catch (e) { rej(e); }
+  });
+};
+
+/* 写入：IDB 模式下失败（多半是配额满）就自动降级到 localStorage 并重试一次，
+   调用方全部不用改。 */
+async function put(name, v) {
+  if (storeMode === "ls") {
+    const arr = lsAll(name).filter(x => x && x.id !== v.id);
+    arr.push(v);
+    lsWrite(name, arr);
+    return;
+  }
+  if (storeMode === "mem") {
+    const arr = (memStore[name] || []).filter(x => x && x.id !== v.id);
+    arr.push(v); memStore[name] = arr;
+    return;
+  }
+  try {
+    await new Promise((res, rej) => {
+      const r = st(name, "readwrite").put(v);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error || new Error("写入失败"));
+    });
+  } catch (e) {
+    console.warn("IndexedDB 写入失败，降级到兼容模式：", e);
+    await migrateIdbToLs();
+    storeMode = "ls";
+    showStoreNotice("ls", e);
+    const arr = lsAll(name).filter(x => x && x.id !== v.id);
+    arr.push(v);
+    lsWrite(name, arr);
+  }
+}
+
+async function del(name, id) {
+  if (storeMode === "ls") { lsWrite(name, lsAll(name).filter(x => x && x.id !== id)); return; }
+  if (storeMode === "mem") { memStore[name] = (memStore[name] || []).filter(x => x && x.id !== id); return; }
+  await new Promise((res, rej) => {
+    try {
+      const r = st(name, "readwrite").delete(id);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error || new Error("删除失败"));
+    } catch (e) { rej(e); }
+  });
+}
 const uid = () => Date.now() + "-" + Math.random().toString(36).slice(2, 7);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[m]));
+
+/* 存储降级提示：用页面内提示条，不用 alert ——
+   alert 在 iframe 里经常被拦截，用户看不到，而故障恰恰最容易发生在 iframe 里。 */
+function showStoreNotice(mode, err) {
+  const box = document.getElementById("storeNotice");
+  if (!box) return;
+  const why = err ? (err.message || err.name || String(err)) : "未知原因";
+  if (mode === "ls") {
+    box.textContent = "⚠ 当前环境禁用了 IndexedDB（" + why + "），已自动切换到兼容模式：功能照常可用，" +
+      "但浏览器本地存储上限约 5MB，图片较多时可能存不下。";
+  } else if (mode === "mem") {
+    box.textContent = "⚠ 当前浏览器完全禁用了本地存储（" + why + "），已进入临时模式：可以浏览和编辑，" +
+      "但关闭页面后改动会丢失，请及时用「导出 JSON」备份。";
+  } else {
+    box.textContent = "⚠ 存储异常：" + why;
+  }
+  box.classList.add("show");
+  const modeEl = document.getElementById("store-mode");
+  if (modeEl) {
+    modeEl.textContent = mode === "ls" ? "本机浏览器（兼容模式 · localStorage）"
+      : mode === "mem" ? "临时模式（仅本次会话有效）" : "本机浏览器（IndexedDB）";
+  }
+}
 
 /* ---------- 外部数据入库校验（云端同步 / JSON 导入共用）----------
    背景：这三条路径原本把整个对象原样 put 进 IndexedDB，
@@ -1430,7 +1551,8 @@ applyAutoSidebar();
 window.addEventListener("resize", () => {
   document.body.classList.toggle("sidebar-auto", window.innerWidth <= 480);
 });
-openDB().then(async () => {
+/* 应用启动：读本机数据 + 已配置 Token 时静默从仓库拉一次 */
+async function bootApp() {
   await load();
   // 已配置 Token：启动时静默从仓库拉取一次
   if (ghReady()) {
@@ -1471,8 +1593,35 @@ openDB().then(async () => {
       refreshSyncUI();
     }
   }
-}).catch(e => alert("数据库初始化失败：" + e.message));
+}
+
+/* 启动入口：IndexedDB → localStorage → 内存，逐级降级。
+   任何一层失败都不会让页面瘫掉，最差也有一个能用的临时模式 + 明确提示。 */
+async function bootStorage() {
+  try {
+    await openDB();
+    await bootApp();
+    return;
+  } catch (e) {
+    console.warn("IndexedDB 初始化失败，准备降级：", e);
+  }
+  // 降级一：localStorage（上限约 5MB，图片多时可能存不下）
+  storeMode = "ls";
+  try {
+    localStorage.setItem(LS_PREFIX + "__probe", "1");
+    localStorage.removeItem(LS_PREFIX + "__probe");
+  } catch (e2) {
+    // 降级二：纯内存（本次会话有效，关闭页面即丢）
+    storeMode = "mem";
+    showStoreNotice("mem", e2);
+    try { await bootApp(); } catch (e3) { console.warn(e3); showStoreNotice("mem", e3); }
+    return;
+  }
+  showStoreNotice("ls", null);
+  try { await bootApp(); } catch (e3) { console.warn(e3); showStoreNotice("ls", e3); }
+}
+bootStorage();
 </script>
-<div class="ver">v27</div>
+<div class="ver">v28</div>
 </body>
 </html>

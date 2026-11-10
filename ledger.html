@@ -162,9 +162,19 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     .stats { grid-template-columns: repeat(2, 1fr); }
     .data-toolbar, .sync-card { margin-left: 12px; margin-right: 12px; }
   }
+  /* 存储降级提示条：IndexedDB 打不开时出现，取代原来那个在 iframe 里常被拦掉的 alert */
+  .store-notice {
+    position: fixed; left: 50%; top: 10px; transform: translateX(-50%);
+    z-index: 9999; max-width: min(680px, calc(100vw - 24px));
+    background: #fff8e6; border: 1px solid #f0c36d; color: #7a5200;
+    border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.65;
+    box-shadow: 0 8px 24px rgba(0,0,0,.14); display: none; white-space: pre-wrap;
+  }
+  .store-notice.show { display: block; }
 </style>
 </head>
 <body>
+  <div class="store-notice" id="storeNotice"></div>
   <header>
     <h1>历年收支簿<span class="tag">历年收支导入与分析</span></h1>
     <p class="subtitle">把记账 App 导出的 Excel 拖进来，自动整理成图表——收入支出趋势、分类占比、每月盈亏、累计结余一目了然。</p>
@@ -325,20 +335,84 @@ const money0 = (n) => (isFinite(n) ? n : 0).toLocaleString('zh-CN', { maximumFra
 // SVG 用具体色值（CSS 变量作为 SVG 表现属性不会生效，会渲染成黑色）
 const C = { income: '#4f7cff', expense: '#f0a04b', up: '#ff5d6c', down: '#1f9e5c', brand: '#7c6cc4' };
 
-/* ====================== IndexedDB（单 store） ====================== */
+/* ====================== 存储层：IndexedDB 优先，不可用时自动降级 ======================
+   踩过的坑（2026-11-10）：原来只有 openDB().then(...).catch(alert(...))。
+   IndexedDB 打不开时（无痕模式 / iframe 里第三方存储被禁 / 配额满），
+   catch 里只有一句 alert —— 在 iframe 里常被拦掉，用户看不到提示；
+   而且 catch 之后没继续初始化，列表永远不渲染，表现就是「打不开」。
+   与置物箱同款问题，一并改成三层降级：IndexedDB → localStorage → 内存。 */
 const DB_NAME = "ledger-p612", VER = 1, KID = "main";
+const LS_KEY = "ledger-p612-ls";
 let db = null;
+let storeMode = "idb";           // idb | ls | mem
+let memKV = null;
 function openDB() {
   return new Promise((res, rej) => {
-    const req = indexedDB.open(DB_NAME, VER);
+    let req;
+    try { req = indexedDB.open(DB_NAME, VER); }
+    catch (e) { rej(e || new Error("IndexedDB 在当前环境不可用")); return; }
     req.onupgradeneeded = () => { const d = req.result; if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv", { keyPath: "id" }); };
     req.onsuccess = () => { db = req.result; res(db); };
-    req.onerror = () => rej(req.error);
+    req.onerror = () => rej(req.error || new Error("IndexedDB 打开失败"));
+    req.onblocked = () => rej(new Error("IndexedDB 被其它页面占用"));
   });
 }
-const kvGet = () => new Promise((res, rej) => { const r = db.transaction("kv", "readonly").objectStore("kv").get(KID); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-const kvPut = (v) => new Promise((res, rej) => { const r = db.transaction("kv", "readwrite").objectStore("kv").put(v); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
-const kvDel = () => new Promise((res, rej) => { const r = db.transaction("kv", "readwrite").objectStore("kv").delete(KID); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
+async function kvGet() {
+  if (storeMode === "ls") { try { return JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { return null; } }
+  if (storeMode === "mem") return memKV;
+  return new Promise((res, rej) => {
+    try {
+      const r = db.transaction("kv", "readonly").objectStore("kv").get(KID);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error || new Error("读取失败"));
+    } catch (e) { rej(e); }
+  });
+}
+async function kvPut(v) {
+  if (storeMode === "ls") { localStorage.setItem(LS_KEY, JSON.stringify(v)); return; }
+  if (storeMode === "mem") { memKV = v; return; }
+  try {
+    await new Promise((res, rej) => {
+      const r = db.transaction("kv", "readwrite").objectStore("kv").put(v);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error || new Error("写入失败"));
+    });
+  } catch (e) {
+    console.warn("IndexedDB 写入失败，降级到兼容模式：", e);
+    storeMode = "ls";
+    showStoreNotice("ls", e);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(v)); }
+    catch (e2) { storeMode = "mem"; memKV = v; showStoreNotice("mem", e2); }
+  }
+}
+async function kvDel() {
+  if (storeMode === "ls") { try { localStorage.removeItem(LS_KEY); } catch (e) {} return; }
+  if (storeMode === "mem") { memKV = null; return; }
+  await new Promise((res, rej) => {
+    try {
+      const r = db.transaction("kv", "readwrite").objectStore("kv").delete(KID);
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error || new Error("删除失败"));
+    } catch (e) { rej(e); }
+  });
+}
+
+/* 存储降级提示：用页面内提示条，不用 alert（iframe 里 alert 常被拦截） */
+function showStoreNotice(mode, err) {
+  const box = document.getElementById("storeNotice");
+  if (!box) return;
+  const why = err ? (err.message || err.name || String(err)) : "未知原因";
+  if (mode === "ls") {
+    box.textContent = "⚠ 当前环境禁用了 IndexedDB（" + why + "），已自动切换到兼容模式：功能照常可用，" +
+      "但浏览器本地存储上限约 5MB，账单数据较多时可能存不下。";
+  } else if (mode === "mem") {
+    box.textContent = "⚠ 当前浏览器完全禁用了本地存储（" + why + "），已进入临时模式：可以浏览和编辑，" +
+      "但关闭页面后改动会丢失，请及时导出备份。";
+  } else {
+    box.textContent = "⚠ 存储异常：" + why;
+  }
+  box.classList.add("show");
+}
 const uid = () => Date.now() + "-" + Math.random().toString(36).slice(2, 7);
 
 /* ====================== 状态 ====================== */
@@ -1282,7 +1356,8 @@ $('f-year').onchange = () => { refreshMonthOptions(); renderStats(); renderChart
 $('f-opening').oninput = () => { OPENING = parseFloat($('f-opening').value) || 0; persist(); renderStats(); renderCharts(); };
 
 /* ====================== 启动 ====================== */
-openDB().then(async () => {
+/* 应用启动：读本机账本 + 已配置 Token 时静默拉一次云端 */
+async function bootApp() {
   const k = await kvGet();
   if (k && Array.isArray(k.records)) { RECORDS = k.records.map(r => ({ ...r, id: r.id || uid() })); OPENING = Number(k.openingBalance) || 0; $('f-opening').value = OPENING; }
   renderAll();
@@ -1315,8 +1390,32 @@ openDB().then(async () => {
     }
   }
   refreshSyncUI();
-}).catch(e => alert("数据库初始化失败：" + e.message));
+}
+
+/* 启动入口：IndexedDB → localStorage → 内存，逐级降级，任何一层失败都不会让页面瘫掉 */
+async function bootStorage() {
+  try {
+    await openDB();
+    await bootApp();
+    return;
+  } catch (e) {
+    console.warn("IndexedDB 初始化失败，准备降级：", e);
+  }
+  storeMode = "ls";
+  try {
+    localStorage.setItem(LS_KEY + "__probe", "1");
+    localStorage.removeItem(LS_KEY + "__probe");
+  } catch (e2) {
+    storeMode = "mem";
+    showStoreNotice("mem", e2);
+    try { await bootApp(); } catch (e3) { console.warn(e3); showStoreNotice("mem", e3); }
+    return;
+  }
+  showStoreNotice("ls", null);
+  try { await bootApp(); } catch (e3) { console.warn(e3); showStoreNotice("ls", e3); }
+}
+bootStorage();
 </script>
-<div class="ver">v19</div>
+<div class="ver">v20</div>
 </body>
 </html>
