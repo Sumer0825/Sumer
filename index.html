@@ -102,6 +102,28 @@
     animation: spin .8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 工具页打不开时的提示层：说清发生了什么，并给一键修复入口 */
+  .frame-err {
+    position: absolute; inset: 0; z-index: 6; display: none;
+    background: rgba(244,246,251,.97);
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .frame-err.show { display: flex; }
+  .frame-err .fe-box {
+    max-width: 460px; background: #fff; border: 1px solid #e6eaf2; border-radius: 14px;
+    padding: 24px 26px; text-align: center; box-shadow: 0 12px 34px rgba(31,39,51,.12);
+  }
+  .frame-err .fe-ico { font-size: 30px; line-height: 1; margin-bottom: 8px; }
+  .frame-err h3 { margin: 0 0 8px; font-size: 16px; color: #1f2733; }
+  .frame-err p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.75; color: #7c8798; }
+  .frame-err .fe-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .frame-err button {
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    padding: 9px 18px; border-radius: 999px; border: 1px solid #4f7cff;
+    background: #4f7cff; color: #fff;
+  }
+  .frame-err button.ghost { background: #eef3ff; color: #4f7cff; border-color: #d8e3ff; }
 </style>
 </head>
 <body>
@@ -119,11 +141,25 @@
       <div style="text-align:center;margin-top:22px">
         <a href="install.html" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:999px;background:#eef3ff;border:1px solid #d8e3ff;color:#4f7cff;text-decoration:none;font-size:13.5px;font-weight:600">📱 装到手机（独立图标 · 全屏 · 离线可用）</a>
       </div>
+      <div style="text-align:center;margin-top:14px">
+        <button type="button" onclick="p612HardReset(this)" style="border:0;background:none;color:#8a94a6;font-size:12.5px;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;padding:4px 8px">⚙ 工具打不开？清除缓存并重载</button>
+      </div>
     </div>
   </div>
 
   <div class="frame-box" id="frameBox">
     <div class="loading" id="loading"><div class="spin"></div>正在打开工具…</div>
+    <div class="frame-err" id="frameErr">
+      <div class="fe-box">
+        <div class="fe-ico">📡</div>
+        <h3>这个工具暂时打不开</h3>
+        <p id="feMsg">正在重试…</p>
+        <div class="fe-btns">
+          <button type="button" id="feRetry">再试一次</button>
+          <button type="button" class="ghost" onclick="p612HardReset(this)">清除缓存并重载</button>
+        </div>
+      </div>
+    </div>
     <iframe class="frame" id="frame" title=""></iframe>
   </div>
 
@@ -157,7 +193,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 29, 'weight.html': 35, 'budget.html': 37, 'storage.html': 27, 'ledger.html': 19, 'analysis.html': 23, 'daily.html': 4 };
+const TOOLS_VER = { 'time.html': 32, 'weight.html': 36, 'budget.html': 41, 'storage.html': 27, 'ledger.html': 19, 'analysis.html': 23, 'daily.html': 4 };
 
 TOOLS.forEach((t, i) => {
   if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里
@@ -181,14 +217,21 @@ TOOLS.forEach((t, i) => {
 });
 
 let loadPoll = null;   // 加载探测定时器
+let healTry = 0;       // 自愈重试次数
+let healFile = '';     // 当前正在打开的工具文件
+const PORTAL_H1 = '欢迎使用我的百宝箱';
+
 function openTool(i) {
   const t = TOOLS[i];
+  healTry = 0;
+  healFile = t.file;
+  document.getElementById('frameErr').classList.remove('show');
   home.style.display = 'none';
   frameBox.style.display = 'block';
   const ld = document.getElementById('loading');
   ld.style.display = 'flex';                        // 打开时显示加载提示
   const hide = () => { ld.style.display = 'none'; };
-  frame.onload = hide;                              // 常规：加载完成事件
+  frame.onload = function () { hide(); setTimeout(checkFrame, 120); };
   if (loadPoll) clearInterval(loadPoll);            // 兜底：子页面真正渲染出内容即隐藏（防 iframe 空文档 load 误触发）
   loadPoll = setInterval(() => {
     try {
@@ -196,14 +239,78 @@ function openTool(i) {
       if (d && d.body && d.body.children.length > 0) { clearInterval(loadPoll); loadPoll = null; hide(); }
     } catch (e) {}
   }, 150);
-  setTimeout(() => { if (loadPoll) { clearInterval(loadPoll); loadPoll = null; } }, 30000);
-  const v = TOOLS_VER[t.file];
-  frame.src = t.file + (v ? '?v=' + v : '');   // 带版本号，绕过 CDN/浏览器缓存
+  // 12 秒兜底：无论 iframe 是否加载成功都撤掉遮罩，避免「一直转圈打不开」
+  setTimeout(() => { if (loadPoll) { clearInterval(loadPoll); loadPoll = null; } hide(); }, 12000);
+  // ⚠️ 不要再往地址后面加 ?v=NN：
+  //   服务器对所有 HTML 都发 Cache-Control: no-store，浏览器本来就不会缓存它，
+  //   这个参数对「破缓存」毫无用处；却恰好是旧版 Service Worker 缓存未命中的元凶 ——
+  //   旧 SW 的回落是「任何未命中的 URL 都返回门户首页」，于是工具 iframe 里被塞进
+  //   门户首页，看起来就是「一点工具就被弹回门户页面」。
+  //   不带 query 时，新旧 SW 都能命中缓存里的 ./xxx.html。
+  frame.src = t.file;
   frame.title = t.name;
   crumb.innerHTML = `当前：<b>${t.name}</b>`;
   crumb.style.display = 'block';     // 显示当前工具名（顶部右侧指示器）
   back.style.display = 'block';      // 同时显示返回按钮
 }
+
+/* ---------------------------------------------------------------
+   iframe 自愈：加载完检查工具页的真实内容。
+   · 旧版 SW 会把门户首页塞进工具 iframe；
+   · 断网时新 SW 会给一张离线提示页；
+   两种情况都在这里识别并自动换地址重试 —— 不依赖浏览器里的 SW 是不是最新版，
+   也不依赖用户有没有手动清过缓存。
+   --------------------------------------------------------------- */
+function checkFrame() {
+  let d = null;
+  try { d = frame.contentDocument; } catch (e) { return; }
+  if (!d || !d.body) return;
+  const h1 = (d.querySelector('h1') ? d.querySelector('h1').textContent : '').trim();
+  const txt = (d.body.innerText || '').trim();
+  if (h1.indexOf(PORTAL_H1) >= 0 || txt.indexOf(PORTAL_H1) >= 0) {
+    retryFrame('检测到工具页被门户首页占用了（旧缓存的问题），正在重新加载…');
+  } else if (txt.indexOf('暂时无法加载这个工具') >= 0) {
+    retryFrame('网络没连上，正在重新加载…');
+  } else if (d.body.children.length === 0) {
+    retryFrame('工具页内容为空，正在重新加载…');
+  }
+}
+
+function retryFrame(why) {
+  if (healTry >= 3) {
+    showFrameErr(why.replace(/正在重新加载…$/, '') + '（已重试 ' + healTry + ' 次仍不行）。点「清除缓存并重载」一般能立刻解决。');
+    return;
+  }
+  healTry++;
+  showFrameMsg(why);
+  const v = TOOLS_VER[healFile];
+  // 第 1 次重试用固定的 ?v=NN（新 SW 能正确处理，缓存键稳定）；
+  // 之后换随机参数，绕开可能被污染的缓存副本
+  frame.src = (healTry === 1)
+    ? (v ? healFile + '?v=' + v : healFile)
+    : healFile + '?r=' + Date.now() + '_' + healTry;
+  setTimeout(() => { if (healTry < 3) checkFrame(); }, 2600);
+}
+
+function showFrameMsg(msg) {
+  document.getElementById('feMsg').textContent = msg;
+  document.getElementById('frameErr').classList.remove('show');
+  document.getElementById('loading').style.display = 'flex';
+}
+
+function showFrameErr(msg) {
+  document.getElementById('feMsg').textContent = msg;
+  document.getElementById('frameErr').classList.add('show');
+  document.getElementById('loading').style.display = 'none';
+}
+
+document.getElementById('feRetry').addEventListener('click', function () {
+  healTry = 0;
+  document.getElementById('frameErr').classList.remove('show');
+  document.getElementById('loading').style.display = 'flex';
+  frame.src = healFile + '?r=' + Date.now();
+  setTimeout(checkFrame, 2600);
+});
 
 back.onclick = () => {
   frameBox.style.display = 'none';
@@ -212,12 +319,38 @@ back.onclick = () => {
   crumb.textContent = '首页';
   crumb.style.display = 'block';
   back.style.display = 'none';
+  healTry = 0;
+  document.getElementById('frameErr').classList.remove('show');
 };
 
 // Service Worker：iOS 主屏幕模式下联网时永远加载最新版（file:// 环境自动跳过）
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  let regRef = null;
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    regRef = reg;
+    reg.update();                 // 主动查一次更新，别等浏览器自己想起来（PWA 常驻时尤其重要）
+  }).catch(() => {});
+  // 页面重新可见时再查一次
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && regRef) regRef.update();
+  });
+  // ⚠️ 这里不要再做「新 SW 接管后 location.reload()」：
+  //   自动刷新会把用户从正在看的工具页弹回门户首页（正在填的内容全丢），
+  //   而新 SW 自带 skipWaiting + clients.claim()，不刷新也会自动接管。
 }
+
+/* 「工具打不开」自助修复：注销 SW + 清掉本族缓存后重载。
+   用于旧 SW 一直没换掉、或缓存里存了坏内容的极端情况。 */
+window.p612HardReset = async function (btn) {
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = '正在修复…'; }
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k.indexOf('p612-') === 0).map(k => caches.delete(k)));
+  } catch (e) {}
+  location.reload();
+};
 </script>
 </body>
 </html>

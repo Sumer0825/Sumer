@@ -64,18 +64,71 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     margin-bottom: 18px;
   }
 
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; }
   .stat { text-align: center; padding: 8px; }
   .stat .label { font-size: 12px; color: var(--muted); }
   .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
   .stat .value small { font-size: 12px; font-weight: 500; color: var(--muted); }
-  /* 已记录天数：常驻成就感数据，用主题蓝淡底和体重数字区分开 */
-  .stat-days { background: #f4f7ff; border-radius: 10px; padding: 6px 4px; }
-  .stat-days .label { color: var(--primary); font-weight: 600; }
+  /* 已记录天数：常驻成就感数据。v36 起改成**描边式**（不再实心蓝底）——
+     主视觉「最新体重」已经占了唯一的实心蓝块，两个都实心会互相抢戏。 */
+  .stat-days { background: #f7f9fc; border: 1px solid var(--line); border-radius: 10px; padding: 7px 4px; }
+  .stat-days .label { color: var(--muted); font-weight: 600; }
   .stat-days .value { color: var(--primary); }
   .stat-days .value small { color: var(--primary); opacity: .75; }
   .delta-up { color: var(--danger); }
   .delta-down { color: var(--success); }
+
+  /* ===== v36「最新体重」主视觉 =====
+     原来 6 个数字平铺在同一个 auto-fit 网格里，「最新体重」和「初始体重」
+     视觉权重完全一样 —— 用户第一眼根本分不出哪个才是当前值，
+     而它恰恰是唯一每天都会变的那个数。
+     改法：把「最新体重 + 较前次」提出来单独成块（主视觉），
+     数字放到 46px 渐变字，配淡蓝渐变底 + 描边；
+     其余 4 项（初始/平均/距目标/已记录）降级为下方小网格。 */
+  .hero {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap;
+    padding: 14px 18px 16px; margin-bottom: 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #eaf1ff 0%, #f5f8ff 52%, #e9f7f0 100%);
+    border: 1.5px solid rgba(79,124,255,.24);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .hero-label {
+    font-size: 12px; font-weight: 700; color: var(--primary);
+    letter-spacing: .4px; margin-bottom: 1px;
+  }
+  .hero-num {
+    display: flex; align-items: baseline; gap: 3px;
+    font-size: 46px; font-weight: 800; line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--primary);            /* 不支持渐变字时的回退色 */
+  }
+  .hero-num small { font-size: 16px; font-weight: 700; color: var(--muted); }
+  /* 渐变字：只有浏览器支持 background-clip:text 时才启用，
+     否则保持上面的纯色回退（否则 -webkit-text-fill-color:transparent 会让字消失）。 */
+  @supports (-webkit-background-clip: text) or (background-clip: text) {
+    .hero-num {
+      background: linear-gradient(135deg, #2f5fe0 0%, #4f7cff 48%, #2bbf7a 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-num small { -webkit-text-fill-color: var(--muted); }
+  }
+  .hero-date { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .hero-right { text-align: right; flex: 0 0 auto; }
+  .hero-delta {
+    display: inline-block; font-size: 15px; font-weight: 700;
+    padding: 5px 12px; border-radius: 999px;
+    background: #fff; box-shadow: 0 2px 8px rgba(31,39,51,.09);
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-delta.delta-up   { color: var(--danger);  background: #fff2f3; }
+  .hero-delta.delta-down { color: var(--success); background: #eafaf3; }
+  /* 涨跌箭头用 CSS 伪元素加 —— JS 里的文案保持纯数字，不污染数据口径 */
+  .hero-delta.delta-up::before   { content: '▲ '; font-size: 11px; }
+  .hero-delta.delta-down::before { content: '▼ '; font-size: 11px; }
+  .hero-cap { font-size: 11px; color: var(--muted); margin-top: 5px; }
 
   .chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .chart-head h2 { margin-bottom: 14px; }
@@ -220,6 +273,11 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   }
   @media (max-width: 520px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
+    /* v36：窄屏时主视觉改为上下叠放，数字缩小避免挤爆一行 */
+    .hero { padding: 12px 14px 13px; gap: 8px; }
+    .hero-num { font-size: 38px; }
+    .hero-num small { font-size: 14px; }
+    .hero-right { text-align: left; }
   }
 
 /* ===== 自我鼓励三件套 =====
@@ -304,14 +362,24 @@ html.in-frame header { padding-top: 0; }
       <span class="cheer-ico">🌿</span>
       <span class="cheer-txt" id="cheer-a-txt">今天也在往前挪,没偷懒</span>
     </div>
+    <!-- v36：最新体重提为「主视觉」，其余 4 项降为下方小网格 -->
+    <div class="hero">
+      <div class="hero-left">
+        <div class="hero-label">最新体重</div>
+        <div class="hero-num" id="s-latest">--<small>斤</small></div>
+        <div class="hero-date" id="s-latest-date">还没有记录</div>
+      </div>
+      <div class="hero-right">
+        <div class="hero-delta" id="s-delta">--</div>
+        <div class="hero-cap">较前次</div>
+      </div>
+    </div>
     <div class="stats">
-      <div class="stat"><div class="label">最新体重</div><div class="value" id="s-latest">--<small>斤</small></div></div>
-      <div class="stat"><div class="label">较前次</div><div class="value" id="s-delta">--</div></div>
       <div class="stat"><div class="label">初始体重</div><div class="value" id="s-first">--<small>斤</small></div></div>
       <div class="stat"><div class="label">平均</div><div class="value" id="s-avg">--<small>斤</small></div></div>
-<div class="stat"><div class="label">距目标</div><div class="value" id="s-goal">--<small>斤</small></div></div>
-    <div class="stat stat-days"><div class="label">已记录</div><div class="value" id="s-days">--<small>天</small></div></div>
-  </div>
+      <div class="stat"><div class="label">距目标</div><div class="value" id="s-goal">--<small>斤</small></div></div>
+      <div class="stat stat-days"><div class="label">已记录</div><div class="value" id="s-days">--<small>天</small></div></div>
+    </div>
     <div class="goal-bar" title="距目标进度"><span id="goal-fill" style="width:0%"></span></div>
     <div class="tip" id="goal-text">未设置目标体重</div>
     <div class="cheer-mini" id="cheer-b">秤在看着呢</div>
@@ -722,12 +790,28 @@ function render() {
   $('s-latest').innerHTML = len ? `${fmt(K2J(data[len-1].weight))}<small>斤</small>` : '--';
   $('s-first').innerHTML  = len ? `${fmt(K2J(data[0].weight))}<small>斤</small>` : '--';
   $('s-avg').innerHTML    = len ? `${fmt(K2J(data.reduce((s,x)=>s+x.weight,0)/len))}<small>斤</small>` : '--';
+
+  // ★ v36：主视觉下方补「最近一次是什么时候称的」——
+  //   只有「最新体重 143.3」而没有日期时，用户不知道这个数是今天的还是三周前的。
+  const ldEl = $('s-latest-date');
+  if (len) {
+    const last = data[len-1];
+    const seg = last.seg || '早';
+    const days = Math.max(0, Math.round((new Date(todayStr()) - new Date(last.date)) / 86400000));
+    const rel = days === 0 ? '今天' : days === 1 ? '昨天' : days === 2 ? '前天' : `${days} 天前`;
+    // 日期去掉前导零：「11月3日」而不是「11月03日」
+    const md = last.date.slice(5).split('-').map(v => parseInt(v, 10)).join('月') + '日';
+    ldEl.textContent = `最近一次：${md} ${seg} · ${rel}`;
+  } else {
+    ldEl.textContent = '还没有记录';
+  }
+
   const delta = len >= 2 ? data[len-1].weight - data[len-2].weight : null;
   const dEl = $('s-delta');
-  if (delta == null) { dEl.textContent = '--'; dEl.className = 'value'; }
-  else if (delta > 0) { dEl.innerHTML = `+${fmt(K2J(delta))}`; dEl.className = 'value delta-up'; }
-  else if (delta < 0) { dEl.innerHTML = fmt(K2J(delta)); dEl.className = 'value delta-down'; }
-  else { dEl.textContent = '0.0'; dEl.className = 'value'; }
+  if (delta == null) { dEl.textContent = '--'; dEl.className = 'hero-delta'; }
+  else if (delta > 0) { dEl.innerHTML = `+${fmt(K2J(delta))}`; dEl.className = 'hero-delta delta-up'; }
+  else if (delta < 0) { dEl.innerHTML = fmt(K2J(delta)); dEl.className = 'hero-delta delta-down'; }
+  else { dEl.textContent = '0.0'; dEl.className = 'hero-delta'; }
 
   // 距目标差值（最新体重 - 目标体重；正=还需减，负=已低于目标）
   // 目标取「最近一条填了目标的记录」，本机设置的目标兜底（默认 106 斤）
@@ -1261,6 +1345,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v35</div>
+<div class="ver">v36</div>
 </body>
 </html>

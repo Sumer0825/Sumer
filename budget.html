@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="刚需日用账">
-<meta name="theme-color" content="#f4f6fb">
+<meta name="theme-color" content="#f1ecfa">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="assets/icon-192.png">
@@ -78,11 +78,18 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .col-left { flex: 0 0 372px; width: 372px; min-width: 0; }
   .col-right { flex: 1 1 0; min-width: 0; }
   .col-left > .card:last-child { margin-bottom: 0; }
-  /* 左栏里的页签改竖排：刚需/非刚需各占一行，合计块在其下 */
+  /* ★ v39 布局调整：左栏（372px）里合计块占满一行在上，
+     下面两个页签**并排**（各占一半，等宽）。 */
   .kind-tabs { flex-direction: column; align-items: stretch; gap: 8px; }
   .kind-tabs .side { width: 100%; }
   .kind-tabs .side button { width: 100%; justify-content: flex-start; padding: 0 16px; }
   .total-chip { width: 100%; margin-inline: 0; margin-top: 2px; }
+  /* 并排的两个页签：各占一半、按钮铺满、文字居中 */
+  .kind-tabs .kind-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .kind-tabs .kind-row .side { flex: 1 1 0; width: auto; min-width: 0; }
+  .kind-tabs .kind-row .side button {
+    width: 100%; flex: 1 1 auto; min-width: 0; justify-content: center; padding: 0 8px;
+  }
   /* 记一笔在窄栏里改为竖排 */
   .today-input { flex-direction: column; }
   /* 左栏竖排时的输入框尺寸规则**放在文件后面的 .today-input 定义处** ——
@@ -99,9 +106,13 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     /* ⚠️ 改回横排时必须**同步**把 .side button 的 width 改回 auto ——
        否则两个 728px 宽的按钮并排 = 1456px，把 .wrap 的 scrollWidth
        撑到 1653px → 页面出现横向滚动条（实测 760/900px 都中招）。 */
-    .kind-tabs { flex-direction: row; align-items: center; flex-wrap: wrap; }
-    .kind-tabs .side { flex: 1 1 auto; width: auto; min-width: 0; }
-    .kind-tabs .side button { width: auto; flex: 1 1 auto; justify-content: center; }
+    /* ★ v39：窄屏同样「合计在上、页签并排」——与桌面保持一致 */
+    .kind-tabs { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+    .kind-tabs .side { flex: 1 1 0; width: auto; min-width: 0; }
+    .kind-tabs .side button { width: 100%; flex: 1 1 auto; justify-content: center; }
+    .kind-tabs .kind-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+    .kind-tabs .kind-row .side { flex: 1 1 0; width: auto; min-width: 0; }
+    .kind-tabs .kind-row .side button { width: 100%; flex: 1 1 auto; min-width: 0; justify-content: center; }
     /* 窄屏：合计块保持**横排**（标签在左、四格在右）——
        改回竖排的话宽度会按内容收缩（实测 390px 时只有 210px < 300），
        四个数字挤在一起不好看。横排 + 四个数字均分，占满整行。 */
@@ -318,9 +329,16 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
         三重嵌套把三个块挤成「田字格」拼贴。现在容器去掉底色与内衬，
         三个块各自成为独立的药丸；`space-between` 让左右页签贴两端、
         合计块用 `margin-inline:auto` 水平居中（仍严格夹在两按钮之间）。 */
+  /* ★ v39 布局调整：合计块在上、两个页签并排在下 —— 容器改竖向排列，
+     页签行由 .kind-row 负责横排。 */
   .kind-tabs {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
     background: transparent; border: 0; border-radius: 0; padding: 0; margin-bottom: 16px;
+  }
+  .kind-tabs .kind-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .kind-tabs .kind-row .side { flex: 1 1 0; display: flex; min-width: 0; width: auto; }
+  .kind-tabs .kind-row .side button {
+    flex: 1 1 auto; width: 100%; min-width: 0; justify-content: center; padding: 0 10px;
   }
   /* ⚠️ `.side` 必须 `flex: 0 0 auto` —— 若保留 `flex:1`，左右页签会被拉成
      265px 的宽方块，药丸感消失、中间的合计块还会被挤压。 */
@@ -394,10 +412,11 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .tc-item .v.under { color: var(--success); }
   .tc-item .v.plus { color: var(--danger); }
   .tc-item .v.minus { color: var(--success); }
-  /* 窄屏：合计块换行到页签下方一行，四个数字均分宽度 */
+  /* 窄屏：合计块**保持在页签上方**（v39 布局调整）——
+     原来用 order:3 把它换行到页签下方，现在合计统一在上方、页签并排在下方。 */
   @media (max-width: 560px) {
-    .kind-tabs { flex-wrap: wrap; }
-    .total-chip { order: 3; width: 100%; margin-top: 4px; padding: 8px 12px; }
+    .kind-tabs { flex-wrap: nowrap; }
+    .total-chip { order: 0; width: 100%; margin-top: 0; padding: 8px 12px; }
     /* ★ v34：四个数字**均分整行**（space-around + 子项 flex:1）——
        原来只写 space-around，数字本身仍按内容宽（实测 320px 时
        items 宽 30/30/20/20，右侧空出 104px，容器挤在左边）。 */
@@ -537,7 +556,247 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 html.in-frame body { padding-top: 24px; }
 html.in-frame header { padding-top: 0; }
 html.in-frame .month-picker { top: 4px; }
+  /* ================================================================
+     ★ 预览 v38：每日记录「日历视图」
+     —— 只改呈现方式；刚需蓝 / 非刚需红（按需求），
+        圆圈底色深浅表示当日支出高低（与账本颜色解耦，避免红蓝打架）
+     ================================================================ */
+  .cal-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .cal-switch { display:inline-flex; gap:4px; padding:3px; background:#eef1f7; border-radius:999px; }
+  .cal-switch button {
+    border:0; background:transparent; padding:7px 15px; border-radius:999px; cursor:pointer;
+    font-size:13px; font-weight:600; color:var(--muted); font-family:inherit;
+    transition:color .15s var(--ease-soft), background .15s var(--ease-soft);
+  }
+  .cal-switch button.on { background:#fff; color:var(--text); box-shadow:0 1px 3px rgba(31,39,51,.12); }
+  .cal-legend { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:12px; color:var(--muted); }
+  .cal-legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align: 0; }
+
+  /* ★ minmax(0,1fr) 而不是 1fr ——
+     1fr 的列最小尺寸是 min-content（圆圈 32px + padding），
+     窄屏（320px）下可用列宽不足时网格会被撑出视口 → 整页横向滚动。
+     minmax(0,1fr) 允许列收窄，再配合窄屏缩小圆圈即可。 */
+  .cal-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px 6px; }
+  .cal-wd { text-align:center; font-size:11.5px; color:var(--muted); padding:2px 0 6px; }
+  .cal-cell {
+    border:0; background:transparent; padding:4px 2px 6px; border-radius:16px; cursor:pointer;
+    font-family:inherit; display:flex; flex-direction:column; align-items:center; gap:2px;
+    /* ★ 统一格子高度（预留两行金额）——
+       否则「某天有两笔」的行会把整行撑高，整月参差不齐、留白很大。
+       金额绝对定位贴在圆圈下方，格子高度就固定了。 */
+    position:relative; min-height:74px;
+    transition:background .15s var(--ease-soft);
+  }
+  .cal-cell:hover { background:rgba(79,124,255,.06); }
+  .cal-cell.out { opacity:.3; cursor:default; }
+  .cal-cell.out:hover { background:transparent; }
+  .cal-cell.future { cursor:default; }
+  .cal-cell.future:hover { background:transparent; }
+  .cal-cell.future .cd-num { color:var(--muted); font-weight:500; }
+  .cd-num {
+    width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:600; color:var(--text); background:transparent;
+    font-variant-numeric:tabular-nums; transition:box-shadow .15s var(--ease-soft), background .15s var(--ease-soft);
+  }
+  .cal-cell.has .cd-num { background:rgba(79,124,255,.13); color:var(--text); font-weight:600; }
+  /* 没记账的日子（过去的空白日也算）统一调灰 ——
+     否则「5 号」这种没记账的过去日是粗黑字，比真正记了账的日子还重，容易误读。 */
+  .cal-cell:not(.has) .cd-num { color:var(--muted); font-weight:500; }
+  .cal-cell.today .cd-num { color:var(--primary); }
+  .cal-cell.sel .cd-num { box-shadow:0 0 0 2px var(--primary); background:rgba(79,124,255,.2); color:var(--text); }
+  .cal-amts {
+    position:absolute; left:0; right:0; top:41px;
+    display:flex; flex-direction:column; align-items:center; gap:0; min-height:14px;
+  }
+  .ca { font-style:normal; font-size:11px; line-height:1.35; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ca.need { color:var(--primary); }
+  /* 非刚需 = 粉紫（--extra），与原表格的「非刚需」徽章同一色；
+     红色 --danger 专门留给「超支」，两种语义不再打架 */
+  .ca.extra { color:var(--extra); }
+  .ca.more { color:var(--muted); }
+
+  .cal-detail { margin-top:16px; border-top:1px solid var(--line); padding-top:14px; }
+  .cd-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  .cd-date { font-size:15px; font-weight:700; color:var(--text); }
+  .cd-date small { font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
+  .cd-sum { display:flex; gap:16px; font-size:12.5px; color:var(--muted); }
+  .cd-sum b { font-variant-numeric:tabular-nums; font-size:13.5px; }
+  .cd-sum .need { color:var(--primary); }
+  .cd-sum .extra { color:var(--extra); }
+  .cd-item { display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); }
+  .cd-item:last-child { border-bottom:0; }
+  .cd-tag { font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:6px; white-space:nowrap; flex:none; }
+  .cd-tag.need { background:var(--primary-soft); color:var(--primary); }
+  .cd-tag.extra { background:var(--extra-soft); color:var(--extra); }
+  .cd-mid { flex:1; min-width:0; }
+  .cd-mid .t { font-size:13.5px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cd-mid .n { font-size:11.5px; color:var(--muted); margin-top:3px; }
+  .cd-over { color:var(--danger); font-weight:600; }
+  .cd-amt { font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
+  .cd-amt.need { color:var(--primary); }
+  .cd-amt.extra { color:var(--extra); }
+  .cd-empty { padding:26px 0; text-align:center; color:var(--muted); font-size:13px; }
+  .cd-empty b { color:var(--text); }
+
+  /* ★ 窄屏：格子只有 ~40px 宽，「2,200.00」这种 8 字符金额会溢出压到邻格。
+     窄屏改用紧凑格式（去小数末位 + 缩字号），桌面保持两位小数千分位。 */
+  @media (max-width:520px) {
+    .cd-num { width:30px; height:30px; font-size:13.5px; }
+    .cal-cell { min-height:62px; }
+    .cal-amts { top:35px; }
+    .cal-grid { gap:2px 4px; }
+    .ca { font-size:9.5px; letter-spacing:-.2px; }
+    .cd-item { gap:8px; }
+    .cd-amt { font-size:14px; }
+  }
+  /* 超窄屏（320px）：圆圈再收一档，避免顶到格子边缘 */
+  @media (max-width:360px) {
+    .cd-num { width:27px; height:27px; font-size:12.5px; }
+    .cal-cell { min-height:58px; }
+    .cal-amts { top:32px; }
+    .cal-grid { gap:2px 2px; }
+  }
+
 </style>
+<style id="theme-layer">
+
+/* ============================================================
+   v41 主题层：C 雾紫柔光（浅色） / D 暗夜墨蓝（深色）
+   —— 只重定义颜色变量 + 覆盖原文件里写死的白/浅色，
+      业务样式、数据语义色含义、交互逻辑一律不动。
+   ============================================================ */
+html[data-theme="light"] {
+  --bg:#f1ecfa; --card:#ffffff; --text:#2e2740; --muted:#8b82a3;
+  --line:#eee9f7; --line-ctl:#ded6ef; --line-strong:#cec3e6;
+  --primary:#4f7cff; --primary-2:#7da2ff; --primary-soft:#eee9ff;
+  --extra:#c85f92; --extra-2:#e6a6c2; --extra-soft:#fbeaf3;
+  --danger:#ff5d6c; --success:#2bbf7a; --warn:#f5a623; --warm:#a8886b;
+  --shadow:0 10px 30px rgba(63,44,104,.09);
+  --shadow-xs:0 1px 2px rgba(63,44,104,.05);
+  --shadow-sm:0 6px 18px rgba(63,44,104,.09);
+  --input-bg:#fbf9ff; --switch-bg:#e9e3f6; --focus-bg:#ffffff;
+  --pane-bg:rgba(255,255,255,.88); --tab-bg:rgba(255,255,255,.80); --ctl-bg:#ffffff;
+  --chip-a:rgba(255,255,255,.96); --chip-b:rgba(246,241,255,.92);
+  --row-extra:#fbf6fd; --code-bg:#f1ecf8; --code-fg:#4a3c68;
+  --alert-i-bg:#f3eeff; --alert-i-fg:#3a5bbf;
+  --alert-d-bg:#fff4f5; --alert-d-fg:#c0392b;
+  --alert-w-bg:#fffaf0; --alert-w-fg:#a86b00;
+  --cal-hover:rgba(79,124,255,.06); --mask:rgba(20,26,38,.45);
+  --track:#eee9f7; --ver:rgba(120,110,145,.45);
+}
+html[data-theme="dark"] {
+  --bg:#111726; --card:#1b2333; --text:#e8edf7; --muted:#8e9bb3;
+  --line:#2a3446; --line-ctl:#35415a; --line-strong:#45536e;
+  --primary:#7aa2ff; --primary-2:#9dbcff; --primary-soft:#243255;
+  --extra:#e08ab4; --extra-2:#f0a9c9; --extra-soft:#3a2436;
+  --danger:#ff7a86; --success:#4fd39a; --warn:#f7ba55; --warm:#d0ab86;
+  --shadow:0 10px 30px rgba(0,0,0,.36);
+  --shadow-xs:0 1px 2px rgba(0,0,0,.30);
+  --shadow-sm:0 6px 18px rgba(0,0,0,.34);
+  --input-bg:#222c3f; --switch-bg:#26314a; --focus-bg:#222c3f;
+  --pane-bg:rgba(27,35,51,.90); --tab-bg:#222c3f; --ctl-bg:#2a3446;
+  --chip-a:rgba(34,44,63,.96); --chip-b:rgba(27,35,51,.92);
+  --row-extra:#26203a; --code-bg:#2a3446; --code-fg:#d7e0f2;
+  --alert-i-bg:#1e2a45; --alert-i-fg:#a9c0ff;
+  --alert-d-bg:#3a2028; --alert-d-fg:#ff9aa4;
+  --alert-w-bg:#3a2f1c; --alert-w-fg:#f7c978;
+  --cal-hover:rgba(122,162,255,.12); --mask:rgba(4,8,16,.72);
+  --track:#2a3446; --ver:rgba(170,182,205,.40);
+}
+
+/* 背景双层：靠 opacity 交叉淡入，切换时不闪、不跳 */
+html { background: var(--bg); transition: background-color .3s ease; }
+body { background: transparent !important; }
+body::before, body::after {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  transition: opacity .32s ease;
+}
+body::before {
+  background:
+    radial-gradient(1000px 520px at 9% -9%, rgba(150,120,220,.22), transparent 62%),
+    radial-gradient(850px 500px at 93% 5%, rgba(216,140,180,.20), transparent 62%),
+    linear-gradient(180deg,#faf7ff 0%, #ece5f9 100%);
+}
+body::after {
+  background:
+    radial-gradient(1000px 520px at 10% -10%, rgba(90,130,255,.16), transparent 62%),
+    radial-gradient(850px 500px at 92% 4%, rgba(200,95,146,.12), transparent 62%),
+    linear-gradient(180deg,#151d2e 0%, #0e1420 100%);
+}
+html[data-theme="light"] body::before { opacity: 1; }
+html[data-theme="light"] body::after  { opacity: 0; }
+html[data-theme="dark"]  body::before { opacity: 0; }
+html[data-theme="dark"]  body::after  { opacity: 1; }
+
+/* 变量过渡：卡片 / 控件 / 文字平滑换色 */
+body, .card, .pw-card, th, .total-chip, .month-picker, .cal-switch,
+.field input, .today-input input, #pw-input, .btn-line, .mp-btn,
+.kind-tabs .side button, .btn-ghost, .alert, code, tr.x-row td,
+.cal-cell .cd-num, .ver {
+  transition: background-color .28s ease, color .28s ease,
+              border-color .28s ease, box-shadow .28s ease;
+}
+
+/* ===== 覆盖原文件里写死的颜色（全部改为引用变量） ===== */
+.card, .pw-card, th { background: var(--card) !important; }
+.month-picker { background: var(--pane-bg) !important; box-shadow: 0 8px 24px rgba(31,39,51,.07) !important; }
+.field input, .today-input input, #pw-input { background: var(--input-bg) !important; color: var(--text) !important; }
+.field input:focus, .today-input input:focus, #pw-input:focus { background: var(--focus-bg) !important; }
+.field input:disabled { background: var(--switch-bg) !important; color: var(--muted) !important; }
+.cal-switch { background: var(--switch-bg) !important; }
+.cal-switch button.on, .kind-tabs .side button:hover:not(.on) { background: var(--card) !important; }
+.kind-tabs .side button:not(.on) { background: var(--tab-bg) !important; color: var(--muted) !important; }
+.kind-tabs .side button:hover:not(.on) { color: var(--text) !important; }
+.kind-tabs .kb { background: var(--switch-bg) !important; color: var(--muted) !important; }
+.total-chip { background: linear-gradient(135deg, var(--chip-a), var(--chip-b)) !important; }
+tr.x-row td { background: var(--row-extra) !important; }
+.btn-line, .mp-btn { background: var(--card) !important; color: var(--muted) !important; }
+.btn-line:hover:not(:disabled), .mp-btn:hover:not(:disabled) { background: var(--card) !important; color: var(--primary) !important; }
+.mp-btn:disabled { color: var(--muted) !important; opacity: .55; }
+.btn-ghost { background: var(--primary-soft) !important; color: var(--primary) !important; }
+.btn-ghost:hover:not(:disabled) { background: var(--primary-soft) !important; filter: brightness(.96); }
+.prog-bar { background: var(--track) !important; }
+.prog-bar > span { background: linear-gradient(90deg, var(--primary), var(--primary-2)) !important; }
+.btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important; }
+.alert-info  { background: var(--alert-i-bg) !important; color: var(--alert-i-fg) !important; }
+.alert-danger{ background: var(--alert-d-bg) !important; color: var(--alert-d-fg) !important; }
+.alert-warn  { background: var(--alert-w-bg) !important; color: var(--alert-w-fg) !important; }
+code { background: var(--code-bg) !important; color: var(--code-fg) !important; }
+.pw-mask { background: var(--mask) !important; }
+.cal-cell:hover:not(.out):not(.future) { background: var(--cal-hover) !important; }
+.cal-cell.today .cd-num { color: var(--primary) !important; }
+.cal-cell.sel .cd-num { box-shadow: 0 0 0 2px var(--primary) !important; color: var(--text) !important; }
+.ver { color: var(--ver) !important; }
+html[data-theme="dark"] .month-picker { box-shadow: 0 8px 24px rgba(0,0,0,.35) !important; }
+html[data-theme="dark"] .mp-btn { background: var(--ctl-bg) !important; color: var(--text) !important; }
+html[data-theme="dark"] .kind-tabs .side button.on .kb { background: rgba(255,255,255,.24) !important; color: #fff !important; }
+html[data-theme="dark"] .lg-b { background: rgba(122,162,255,.62) !important; }
+
+/* 模式切换按钮 */
+.theme-toggle { white-space: nowrap; font-weight: 600; cursor: pointer;
+              display: inline-flex; align-items: center; justify-content: center; gap: 1px; }
+.tt-ico { width: 15px; height: 15px; flex: 0 0 15px; margin-right: 5px; }
+/* 图标与文字跟随 data-theme 显隐，不依赖 emoji 字体 */
+.tt-sun, .tt-light { display: none; }
+html[data-theme="dark"] .tt-moon, html[data-theme="dark"] .tt-dark { display: none; }
+html[data-theme="dark"] .tt-sun, html[data-theme="dark"] .tt-light { display: inline; }
+.theme-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+</style>
+
+<script>
+/* 主题尽早落地：读本机选择 → 否则跟随系统，避免刷新时闪一下白底 */
+(function () {
+  var K = 'budget_theme_v1', t = 'light';
+  try {
+    var saved = localStorage.getItem(K);
+    if (saved === 'light' || saved === 'dark') t = saved;
+    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+  } catch (e) {}
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
 </head>
 <body>
 <div class="wrap">
@@ -548,6 +807,11 @@ html.in-frame .month-picker { top: 4px; }
       <span id="sync-status" class="sync-status">未连接 GitHub</span>
       <button type="button" class="btn-line" id="sync-settings-btn">⚙ 同步设置</button>
       <button type="button" class="btn-ghost" id="sync-now-btn" style="display:none">↻ 立即同步</button>
+      <button type="button" class="btn-line theme-toggle" id="theme-toggle" aria-label="切换显示模式">
+        <svg class="tt-ico tt-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 15.1A8.6 8.6 0 0 1 8.9 3.6a8.6 8.6 0 1 0 11.5 11.5z" fill="currentColor"/></svg>
+        <svg class="tt-ico tt-sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.1"/><path d="M12 1.8v2.1M12 20.1v2.1M4.2 4.2l1.5 1.5M18.3 18.3l1.5 1.5M1.8 12h2.1M20.1 12h2.1M4.2 19.8l1.5-1.5M18.3 5.7l1.5-1.5"/></svg>
+        <span class="tt-dark">深色</span><span class="tt-light">浅色</span>
+      </button>
     </div>
   </header>
 
@@ -581,11 +845,8 @@ html.in-frame .month-picker { top: 4px; }
   <!-- ★ 左右分栏：左=操作类（切换/记一笔/预警），右=数据类（概览/柱图/预算/记录） -->
   <div class="layout">
     <div class="col-left">
-      <div class="kind-tabs" id="kind-tabs" role="tablist">
-        <div class="side">
-          <button type="button" data-kind="need" class="on" role="tab">🔒 刚需 <span class="kb" id="kb-need">--</span></button>
-        </div>
-        <!-- 两账合计：总实际 / 总预算 / 已用 / 结余 -->
+      <div class="kind-tabs" id="kind-tabs">
+        <!-- ★ v39 布局调整：两账合计从「夹在两页签中间」移到**页签上方** -->
         <div class="total-chip" id="total-chip">
           <div class="tc-label">两账合计<small id="tc-month"></small></div>
           <div class="tc-vals">
@@ -595,8 +856,14 @@ html.in-frame .month-picker { top: 4px; }
             <div class="tc-item"><div class="l">结余</div><div class="v" id="tc-bal">--</div></div>
           </div>
         </div>
-        <div class="side">
-          <button type="button" data-kind="extra" role="tab">🎈 非刚需 <span class="kb" id="kb-extra">--</span></button>
+        <!-- ★ v39 布局调整：两个页签**并排一行**（原来是竖排三段：刚需/合计/非刚需） -->
+        <div class="kind-row" role="tablist">
+          <div class="side">
+            <button type="button" data-kind="need" class="on" role="tab">🔒 刚需 <span class="kb" id="kb-need">--</span></button>
+          </div>
+          <div class="side">
+            <button type="button" data-kind="extra" role="tab">🎈 非刚需 <span class="kb" id="kb-extra">--</span></button>
+          </div>
         </div>
       </div>
 
@@ -641,7 +908,8 @@ html.in-frame .month-picker { top: 4px; }
         <div class="stat-note" id="sum-note"></div>
       </section>
 
-      <!-- 记录范围说明（始终可见，提醒哪些算、哪些不算；非刚需页签下隐藏 —— v30） -->
+      <!-- ★ v39 布局调整：这段「本记录仅涵盖 / 不计入」提示已整块注释掉
+           （含两段文字与它随刚需/非刚需 tab 切换显隐的逻辑；需要还原时去掉下面这段注释即可）
       <div class="alert alert-info" id="scope-note" style="margin-top:-6px;padding-bottom:14px">
         <span class="ai">📒</span>
         <span class="at">
@@ -649,6 +917,37 @@ html.in-frame .month-picker { top: 4px; }
           <span style="display:inline-block;transform:skewX(-10deg);transform-origin:left center;padding:3px 0 7px"><b style="color:#4a5568;font-size:15px">不计入：</b><span style="color:#4a5568;font-size:15px">房租等由录入人主观认定为非刚需的支出不计入其中（相关录入金额不具备严谨记账的准确参考价值）</span></span></span>
         </span>
       </div>
+      -->
+
+      <!-- 每日记录 -->
+      <section class="card">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+          <h2 style="margin-bottom:0" id="hist-title">每日记录</h2>
+          <span class="tip" id="hist-count" style="margin-top:0"></span>
+        </div>
+        <div class="cal-top">
+          <div class="cal-switch" id="cal-switch">
+            <button type="button" data-m="cal" class="on">📅 日历</button>
+            <button type="button" data-m="table">📋 表格</button>
+          </div>
+          <button type="button" class="btn-line" id="cal-today">回到今天</button>
+          <div class="cal-legend">
+            <span><i style="background:var(--primary)"></i>刚需</span>
+            <span><i style="background:var(--extra)"></i>非刚需</span>
+            <span>圆圈底色深浅 = 当日支出高低</span>
+          </div>
+        </div>
+        <div id="cal-view">
+          <div class="cal-grid" id="cal-grid"></div>
+          <div class="cal-detail" id="cal-detail"></div>
+        </div>
+        <div id="history" style="display:none"></div>
+        <div class="actions">
+          <button type="button" class="btn-line" id="export-btn">导出 Excel</button>
+          <button type="button" class="btn-line" id="import-btn">导入</button>
+          <button type="button" class="btn-ghost" id="clear-btn" title="清空本月记录（需密码）">清空本月</button>
+        </div>
+      </section>
 
       <!-- 周柱图 -->
       <section class="card">
@@ -672,19 +971,6 @@ html.in-frame .month-picker { top: 4px; }
         <div class="set-hint" id="b-hint"></div>
       </section>
 
-      <!-- 每日记录 -->
-      <section class="card">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-          <h2 style="margin-bottom:0" id="hist-title">每日记录</h2>
-          <span class="tip" id="hist-count" style="margin-top:0"></span>
-        </div>
-        <div id="history"></div>
-        <div class="actions">
-          <button type="button" class="btn-line" id="export-btn">导出 Excel</button>
-          <button type="button" class="btn-line" id="import-btn">导入</button>
-          <button type="button" class="btn-ghost" id="clear-btn" title="清空本月记录（需密码）">清空本月</button>
-        </div>
-      </section>
     </div>
 
     <input type="file" id="file-input" accept=".xlsx,.json,application/json" style="display:none">
@@ -823,13 +1109,18 @@ function normData(d) {
   const out = emptyData();
   out.meta = Object.assign({ version: 1, lastModified: '' }, d.meta || {});
   // v20 迁移：旧数据的 entryDate 不可信（v19 的同步/导入路径会误打「今天」戳），一次性清空
-  const legacySchema = parseInt((d.meta && d.meta.schemaVersion) || 1, 10) < 2;
+  // ★ v38：meta.schemaVersion **缺失**时按 2 处理 ——
+  //   原来缺省按 1，会把导入数据的全部 entryDate 清空 → 记录永久不可删除。
+  //   （真正的 v1 老数据本来就没有 entryDate，清不清是 no-op，不受影响。）
+  const legacySchema = parseInt((d.meta && d.meta.schemaVersion) || 2, 10) < 2;
   if (Array.isArray(d.budgets)) {
-    out.budgets = d.budgets.filter(b => b && /^\d{4}-\d{2}$/.test(b.month || '') && /^\d{4}-\d{2}-\d{2}$/.test(b.effective_from || '') && !isNaN(parseFloat(b.daily)))
+    // ★ v38：负数预算直接丢弃 —— 原来只判 !isNaN，负数会让总预算为负、「已用%」变 null
+    out.budgets = d.budgets.filter(b => b && /^\d{4}-\d{2}$/.test(b.month || '') && /^\d{4}-\d{2}-\d{2}$/.test(b.effective_from || '') && !isNaN(parseFloat(b.daily)) && parseFloat(b.daily) >= 0)
       .map((b, i) => ({ id: b.id || 'b' + (i + 1), month: b.month, effective_from: b.effective_from, daily: Math.round(parseFloat(b.daily) * 100) / 100, note: b.note || '' }));
   }
   if (Array.isArray(d.actuals)) {
-    out.actuals = d.actuals.filter(a => a && /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') && !isNaN(parseFloat(a.amount)))
+    // ★ v38：负数金额直接丢弃 —— 负数会抵扣累计实际、把「已用%」算歪
+    out.actuals = d.actuals.filter(a => a && /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') && !isNaN(parseFloat(a.amount)) && parseFloat(a.amount) >= 0)
       .map(a => ({
         date: a.date, amount: Math.round(parseFloat(a.amount) * 100) / 100, note: a.note || '',
         entryDate: /^\d{4}-\d{2}-\d{2}$/.test(a.entryDate || '') ? a.entryDate : '',
@@ -837,11 +1128,18 @@ function normData(d) {
         kind: a.kind === 'extra' ? 'extra' : 'need',
       }));
     if (legacySchema) { out.actuals.forEach(a => { a.entryDate = ''; }); out.meta.schemaVersion = 2; }
+    // ★ v38：同一天同一类型只保留**最后一条** ——
+    //   业务模型是「每天每账一条」（upsertActual 按 date+kind 覆盖），
+    //   但这里原来不去重 → 导入的重复行会让概览（find 只取第一条 = 30）
+    //   与合计栏（全部累加 = 80）显示两个不同的数，同屏自相矛盾。
+    const seenA = new Map();
+    out.actuals.forEach(a => seenA.set(a.date + '|' + a.kind, a));
+    out.actuals = [...seenA.values()];
   }
   // v30：非刚需的月总预算
   if (Array.isArray(d.monthlyBudgets)) {
     out.monthlyBudgets = d.monthlyBudgets
-      .filter(b => b && /^\d{4}-\d{2}$/.test(b.month || '') && !isNaN(parseFloat(b.total)))
+      .filter(b => b && /^\d{4}-\d{2}$/.test(b.month || '') && !isNaN(parseFloat(b.total)) && parseFloat(b.total) >= 0)
       .map((b, i) => ({ id: b.id || 'm' + (i + 1), month: b.month, total: Math.round(parseFloat(b.total) * 100) / 100, note: b.note || '' }));
     // ★ v31：同月多条只保留**最后一条**（与 extraBudgetOf / dataToRows 口径一致）
     const seen = new Map();
@@ -859,13 +1157,32 @@ function sortAll(d) {
   // v30：非刚需月预算按月份排序
   if (d.monthlyBudgets) d.monthlyBudgets.sort((a, b) => a.month < b.month ? -1 : a.month > b.month ? 1 : 0);
 }
-const load = () => { try { return normData(JSON.parse(localStorage.getItem(KEY))); } catch { return emptyData(); } };
+const load = () => {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return emptyData();
+    return normData(JSON.parse(raw));
+  } catch (e) {
+    // ★ v38：解析失败**先备份原始串**再当空账本 ——
+    //   原来直接返回空数据，下一次 save 就把原始（可能只是被截断、仍可修复）的内容覆盖掉。
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) localStorage.setItem(KEY + '_corrupt', raw);
+    } catch (e2) { /* 备份不了就算了 */ }
+    console.error('[budget] 本地数据解析失败，原始内容已备份到 ' + KEY + '_corrupt', e);
+    return emptyData();
+  }
+};
 /* 同样要捕获配额溢出 —— 否则写满时抛 QuotaExceededError，
  * 调用方 await 直接 reject，用户以为存上了、实际全丢，且没有任何提示。 */
 const save = d => {
   d.meta.lastModified = new Date().toISOString();
+  // ★ v38：safeSet 自己 catch 了异常并 return false ——
+  //   原来这里只判断「有没有抛异常」，等于写盘失败的分支永远走不到：
+  //   存储配额满 / Safari 无痕模式下会**假装保存成功**（用户看到「✓ 已记录」，刷新即丢）。
+  //   现在按 safeSet 的返回值判定，失败就明确提示并让调用方知道。
   try {
-    safeSet(KEY, JSON.stringify(d));
+    if (!safeSet(KEY, JSON.stringify(d))) throw new Error('localStorage 写入失败');
     return true;
   } catch (e) {
     const msg = '保存失败：浏览器本地存储空间已满（或处于隐私模式）。\n' +
@@ -896,7 +1213,9 @@ function dailyAt(date, budgets) {
 // 该月总预算（按分段天数累加）
 function monthBudgetTotal(month, budgets) {
   const segs = (budgets || DATA.budgets).filter(b => b.month === month)
-    .slice().sort((a, b) => a.effective_from < b.effective_from ? -1 : 1);
+    // ★ v38：三路比较 —— 原来 a<b?-1:1 在相等时返回 1（违反 sort 契约），
+    //   同一生效日的两段预算顺序不确定，分段天数可能算错
+    .slice().sort((a, b) => a.effective_from < b.effective_from ? -1 : a.effective_from > b.effective_from ? 1 : 0);
   if (!segs.length) return 0;
   const last = lastDayOfMonth(month);
   let total = 0;
@@ -1100,9 +1419,9 @@ function rowsToData(rows) {
     const typeRaw0 = hasTypeCol ? String(r[colType] == null ? '' : r[colType]).trim() : '';
     const isExtraRow = (typeRaw0 === '非刚需' || typeRaw0.toLowerCase() === 'extra');
     const daily = isExtraRow ? NaN : parseFloat(r[1]);
-    if (!isNaN(daily)) dailyByDate[date] = Math.round(daily * 100) / 100;
+    if (!isNaN(daily) && daily >= 0) dailyByDate[date] = Math.round(daily * 100) / 100;
     const amt = parseFloat(r[2]);
-    if (!isNaN(amt)) {
+    if (!isNaN(amt) && amt >= 0) {
       const noteV = colNote >= 0 ? r[colNote] : r[3];
       const edV = colEntry >= 0 ? r[colEntry] : r[4];
       const ed = xlDate(edV);   // 「录入日」：没有就留空（视为历史数据，不可删）
@@ -1275,11 +1594,15 @@ function setSync(text, type) {
   const dc = $('gh-disconnect'); if (dc) dc.style.display = GH.token ? '' : 'none';
 }
 async function persist(d) {
-  DATA = d; save(d); render();
+  DATA = d;
+  const saved = save(d);      // ★ v38：写盘失败要把失败状态传出去，调用方不能继续报「✓ 已记录」
+  render();
+  if (!saved) { setSync('本地保存失败（存储空间已满或隐私模式）', 'err'); return false; }
   if (GH.token) {
     try { await ghPush(d); setSync('已写入 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok'); }
     catch (e) { setSync('同步失败：' + e.message, 'err'); console.warn(e); }
   }
+  return true;
 }
 async function refresh() {
   render();                                                // ① 本地缓存先上屏
@@ -1348,16 +1671,17 @@ function render() {
   renderKindBadges();     // v30：页签上的金额小标
   renderTotalBar();       // v33：两账合计栏
   // ★ v30：范围说明讲的是「刚需」，非刚需页签下隐藏（换成非刚需的说明）
+  /* ★ v39：scope-note 整块已注释（连同随 tab 切换的显隐逻辑）
   const scopeEl = $('scope-note');
   if (scopeEl) {
     scopeEl.style.display = isNeedKind() ? '' : 'none';
-  }
+  } */
   renderAlerts();
   renderToday();
   renderSummary();
   drawChart();
   renderBudgetSetting();
-  renderHistory();
+  renderDailyBlock();   // v38：日历 / 表格 切换
 }
 
 function renderPicker() {
@@ -1406,7 +1730,8 @@ function renderAlerts() {
     // ★ v31：超支只弹**一条** —— 原来当月超支会同时弹
     //   「本月非刚需已超支」和「本月非刚需累计超支」，金额完全一样，纯重复。
     if (total != null && sum > total) {
-      list.push(['danger', '📉', `本月非刚需已超支 <b>¥${money(sum - total)}</b>（月预算 ¥${money(total)}，实际 ¥${money(sum)}）`]);
+      // ★ v38：VIEW 可能是历史月/未来月，文案不能写死「本月」
+      list.push(['danger', '📉', `${monthLabel(VIEW)}非刚需已超支 <b>¥${money(sum - total)}</b>（月预算 ¥${money(total)}，实际 ¥${money(sum)}）`]);
     }
     box.innerHTML = list.map(([cls, icon, text]) =>
       `<div class="alert alert-${cls}"><span class="ai">${icon}</span><span class="at">${text}</span></div>`
@@ -1475,7 +1800,10 @@ function renderToday() {
     const todayExtra = actualOn(today, 'extra');
     $('t-budget-label').textContent = '非刚需月总预算';
     $('t-budget').textContent = total == null ? '--' : money(total);
-    $('t-actual-wrap').innerHTML = `本月非刚需 <b id="t-actual">--</b> 元`;
+    // ★ v38：标签写「本月」但下面填的是**今日**金额（进度条又是整月占比），
+    //   一张卡里三个口径混着看。改成「今日非刚需」，与刚需分支的「今日实际」对称；
+    //   进度条继续表示月总预算的使用率（那是另一个独立元素，不冲突）。
+    $('t-actual-wrap').innerHTML = `今日非刚需 <b id="t-actual">--</b> 元`;
     $('t-remain-wrap').innerHTML = `剩余 <b id="t-remain">--</b> 元`;
     const remainX = total == null ? null : total - sum;
     const rwX = $('t-remain-wrap');
@@ -1697,7 +2025,7 @@ function renderBudgetSetting() {
   $('bset-label').textContent = '每天预算金额（元）';
   inp.placeholder = '如 120';
   // 显示当月「当前生效」的日预算（取最后一段）
-  const segs = DATA.budgets.filter(b => b.month === VIEW).sort((a, b) => a.effective_from < b.effective_from ? -1 : 1);
+  const segs = DATA.budgets.filter(b => b.month === VIEW).sort((a, b) => a.effective_from < b.effective_from ? -1 : a.effective_from > b.effective_from ? 1 : 0);
   const val = segs.length ? segs[segs.length - 1].daily : '';
   if (document.activeElement !== inp) inp.value = val === '' ? '' : val;
 
@@ -1729,6 +2057,192 @@ function renderBudgetSetting() {
     hint.textContent = '还没有设置预算。填一个金额保存即可开始。';
   }
 }
+
+/* ===== 预览 v38：每日记录「日历视图」 =====
+   只改呈现方式，数据结构/口径全部沿用原来的：
+   DATA.actuals[{date, amount, note, entryDate, kind}]，kind = need(刚需) / extra(非刚需)
+   —— 刚需蓝（--primary）、非刚需红（--danger），圆圈底色深浅只表示当日支出高低
+*/
+let calMode = 'cal';     // 'cal' 日历 | 'table' 表格
+let calSel = '';         // 当前选中的日期 YYYY-MM-DD
+/** 日历金额格式：固定两位小数 + 千分位（原 money0 只保 2 位不补零，显示成 152.5） */
+const money2 = n => (n == null || isNaN(n)) ? '--'
+  : Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** 窄屏用紧凑格式：格子只有 ~40px 宽，8 字符金额会溢出压到邻格 */
+// ★ v38：阈值用 <=520，与 CSS 的 @media (max-width:520px) 对齐 ——
+//   原来用 <520，窗口正好 520px 时会用紧凑格式却套宽屏字号，金额撑出格子。
+const calMoney = n => (window.innerWidth <= 520) ? money0(n) : money2(n);
+
+/** 当月日历格子（含上下月补位，周日起）
+    注意：daysInMonth() 返回的是**完整日期字符串**数组（'2026-11-01'），
+    不要再拼一层 —— 拼了会得到 '2026-11-2026-11-01'，
+    导致 has/sel/today 三个类全部失效（实测：35 个格子全无标记）。 */
+function calCells(month) {
+  const [y, m] = month.split('-').map(Number);
+  const days = daysInMonth(month);
+  const firstDow = parseYmd(days[0]).getDay();
+  const prevM = m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
+  const nextM = m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
+  const prevDays = daysInMonth(prevM);
+  const nextDays = daysInMonth(nextM);
+  const cells = [];
+  for (let i = firstDow - 1; i >= 0; i--) cells.push({ iso: prevDays[prevDays.length - 1 - i], out: true });
+  days.forEach(iso => cells.push({ iso, out: false }));
+  let n = 0;
+  while (cells.length % 7 !== 0) cells.push({ iso: nextDays[n++], out: true });
+  return cells;
+}
+
+/** 渲染日历 */
+function renderCalendar() {
+  const box = $('cal-grid');
+  if (!box) return;
+  const today = todayStr();
+  const month = VIEW;
+  // 选中的日期必须落在当前月，否则重选（切月份后自动落到有记录的那天）
+  if (!calSel || calSel.slice(0, 7) !== month) {
+    const inMonth = DATA.actuals.filter(a => a.date.slice(0, 7) === month);
+    calSel = today.slice(0, 7) === month ? today
+      : (inMonth.length ? inMonth[inMonth.length - 1].date : '');
+  }
+  const byDay = {};
+  DATA.actuals.filter(a => a.date.slice(0, 7) === month).forEach(a => {
+    (byDay[a.date] = byDay[a.date] || []).push(a);
+  });
+  const total = {};
+  Object.keys(byDay).forEach(d => {
+    total[d] = byDay[d].reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  });
+  const maxT = Math.max(1, ...Object.keys(total).map(d => total[d]));
+  let html = ['日', '一', '二', '三', '四', '五', '六'].map(w => `<div class="cal-wd">${w}</div>`).join('');
+  calCells(month).forEach(c => {
+    const recs = (byDay[c.iso] || []).slice()
+      .sort((a, b) => (kindOf(a) === 'need' ? (kindOf(b) === 'need' ? 0 : -1) : 1));   // 刚需在前（同类保持原序）
+    const cls = ['cal-cell'];
+    if (c.out) cls.push('out');
+    else if (c.iso > today) cls.push('future');
+    if (recs.length) cls.push('has');
+    if (c.iso === today) cls.push('today');
+    if (c.iso === calSel) cls.push('sel');
+    // 圆圈底色深浅 = 当日支出占本月最高日的比例（与账本红蓝解耦）
+    const alpha = recs.length ? (0.09 + 0.21 * (total[c.iso] / maxT)).toFixed(3) : '';
+    let amts = '';
+    if (recs.length) {
+      amts = recs.slice(0, 2).map(a =>
+        `<i class="ca ${kindOf(a) === 'extra' ? 'extra' : 'need'}" title="¥${money2(a.amount)}">${calMoney(a.amount)}</i>`).join('');
+      if (recs.length > 2) amts += `<i class="ca more">+${recs.length - 2}</i>`;
+    }
+    html += `<button type="button" class="${cls.join(' ')}" data-date="${c.iso}"${(c.out || c.iso > today) ? ' disabled' : ''}>
+      <span class="cd-num"${alpha ? ` style="background:rgba(79,124,255,${alpha})"` : ''}>${+c.iso.slice(8, 10)}</span>
+      <span class="cal-amts">${amts}</span></button>`;
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('.cal-cell:not([disabled])').forEach(b => {
+    b.onclick = () => { calSel = b.dataset.date; renderCalendar(); renderDayDetail(); };
+  });
+}
+
+/** 渲染选中日的记账明细 */
+function renderDayDetail() {
+  const box = $('cal-detail');
+  if (!box) return;
+  if (!calSel) {
+    box.innerHTML = `<div class="cd-empty">点日历上的<b>日期数字</b>，这里展开当天的记账明细</div>`;
+    return;
+  }
+  const recs = DATA.actuals.filter(a => a.date === calSel)
+    .sort((a, b) => (kindOf(a) === 'need' ? (kindOf(b) === 'need' ? 0 : -1) : 1));
+  const d = parseYmd(calSel);
+  const sum = k => recs.filter(a => kindOf(a) === k).reduce((s, a) => s + (+a.amount || 0), 0);
+  const nNeed = sum('need'), nExtra = sum('extra');
+  // 只显示实际记过的类别（不摆 ¥0.00 的空项）
+  const sums = [];
+  if (recs.some(a => kindOf(a) === 'need')) sums.push(`<span class="need">刚需 <b>¥${money(nNeed)}</b></span>`);
+  if (recs.some(a => kindOf(a) === 'extra')) sums.push(`<span class="extra">非刚需 <b>¥${money(nExtra)}</b></span>`);
+  sums.push(`<span>合计 <b>¥${money(nNeed + nExtra)}</b></span>`);
+  let html = `<div class="cd-head">
+      <div class="cd-date">${+calSel.slice(5, 7)}月${+calSel.slice(8, 10)}日<small>${WEEKDAY[d.getDay()]}</small></div>
+      <div class="cd-sum">${sums.join('')}</div>
+    </div>`;
+  if (!recs.length) {
+    html += `<div class="cd-empty">这天<b>没有记账</b></div>`;
+  } else {
+    const today = todayStr();
+    recs.forEach(a => {
+      const isX = kindOf(a) === 'extra';
+      const dl = isX ? null : dailyAt(a.date, DATA.budgets);   // 非刚需没有日预算
+      const over = dl != null && a.amount > dl;
+      const meta = [];
+      if (a.entryDate) meta.push('记于 ' + a.entryDate);
+      if (dl != null) meta.push('日预算 ¥' + money(dl));
+      let sub = esc(meta.join(' · '));
+      if (over) sub += (meta.length ? ' · ' : '') + `<span class="cd-over">超支 ¥${money(a.amount - dl)}</span>`;
+      // ★ 删除按钮：与表格视图同一套规则（同类型才删 / 录入当天才可删 / 已结清月份锁定）——
+      //   日历成了默认视图后，删除能力必须在这里也有一份，否则用户没法删单条记录。
+      const chk = canEditMonth(VIEW) ? canDeleteActual(a, today)
+        : { ok: false, why: '该月已结清，不可修改' };
+      html += `<div class="cd-item">
+        <span class="cd-tag ${isX ? 'extra' : 'need'}">${isX ? '非刚需' : '刚需'}</span>
+        <div class="cd-mid">
+          <div class="t">${esc(a.note || (isX ? '非刚需支出' : '刚需支出'))}</div>
+          <div class="n">${sub}</div>
+        </div>
+        <div class="cd-amt ${isX ? 'extra' : 'need'}">¥${money(a.amount)}</div>
+        <button class="del" data-date="${esc(a.date)}" data-kind="${isX ? 'extra' : 'need'}"${chk.ok ? '' : ` disabled title="${esc(chk.why)}"`}>删除</button>
+      </div>`;
+    });
+  }
+  box.innerHTML = html;
+  // 删除绑定（语义与表格视图一致：只删同日期同类型的那一条）
+  box.querySelectorAll('.del:not([disabled])').forEach(b => {
+    b.onclick = () => {
+      const date = b.dataset.date;
+      const bk = b.dataset.kind || 'need';
+      const rec = DATA.actuals.find(a => a.date === date && kindOf(a) === bk);
+      const chk2 = rec ? canDeleteActual(rec, todayStr()) : { ok: false, why: '记录不存在' };
+      if (!chk2.ok) { toast('✗ ' + chk2.why); return; }
+      const lbl = bk === 'extra' ? '非刚需' : '刚需';
+      if (!confirm(`删除 ${date} 的${lbl}记录？`)) return;
+      DATA.actuals = DATA.actuals.filter(a => !(a.date === date && kindOf(a) === bk));
+      persist(DATA).then(ok => { if (ok !== false) toast(`✓ 已删除 ${date} 的${lbl}记录`); });
+    };
+  });
+}
+
+/** 日历 / 表格 两种呈现的入口 */
+function renderDailyBlock() {
+  const cv = $('cal-view'), tb = $('history');
+  if (calMode === 'cal') {
+    if (cv) cv.style.display = '';
+    if (tb) tb.style.display = 'none';
+    const monthActuals = DATA.actuals.filter(a => a.date.slice(0, 7) === VIEW);
+    const nNeed = monthActuals.filter(a => kindOf(a) === 'need').length;
+    const nExtra = monthActuals.filter(a => kindOf(a) === 'extra').length;
+    $('hist-title').textContent = (VIEW === curMonth() ? '本月' : monthLabel(VIEW)) + '每日记录 · 日历';
+    $('hist-count').textContent = monthActuals.length
+      ? `刚需 ${nNeed} 笔 · 非刚需 ${nExtra} 笔 · 共 ${daysInMonth(VIEW).length} 天` : '';
+    renderCalendar();
+    renderDayDetail();
+  } else {
+    if (cv) cv.style.display = 'none';
+    if (tb) tb.style.display = '';
+    renderHistory();
+  }
+}
+
+/* 预览 v38：日历交互绑定 */
+(function bindCal() {
+  const sw = $('cal-switch');
+  if (sw) sw.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      calMode = b.dataset.m;
+      sw.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      renderDailyBlock();
+    };
+  });
+  const tb = $('cal-today');
+  if (tb) tb.onclick = () => { VIEW = curMonth(); calSel = todayStr(); render(); };
+})();
 
 function renderHistory() {
   const box = $('history');
@@ -1941,7 +2455,10 @@ $('t-save').onclick = async () => {
   // ★ v30：按当前页签决定记到哪本账 —— 「记到哪个页签就算哪个页签的」
   const rec = DATA.actuals.find(a => a.date === dp && kindOf(a) === curKind);
   upsertActual(dp, Math.round(v * 100) / 100, rec ? rec.note : '', curKind);
-  await persist(DATA);
+  // ★ v38：写盘失败（配额满 / 隐私模式）时不再报「✓ 已记录」——
+  //   save() 已经弹过失败原因，这里直接停住，别让用户以为存上了。
+  const saved = await persist(DATA);
+  if (saved === false) return;
   const isToday = dp === today;
   const dayLbl = isToday ? '今日' : dp.slice(5).replace('-', '月') + '日';
   if (curKind === 'extra') {
@@ -2013,7 +2530,8 @@ $('b-save').onclick = async () => {
   } else {
     setBudget(VIEW, Math.round(v * 100) / 100);
   }
-  await persist(DATA);
+  const savedB = await persist(DATA);
+  if (savedB === false) return;      // ★ v38：写盘失败不报成功
   if (budgetLockedThisMonth()) {
     // 冻结月：输密码解锁后保存即重新锁定，下次修改需再次输密码
     budgetUnlocked = false;
@@ -2044,7 +2562,8 @@ $('clear-btn').onclick = async () => {
   DATA.actuals = DATA.actuals.filter(a => !(a.date.slice(0, 7) === VIEW && kindOf(a) === curKind));
   if (isX) DATA.monthlyBudgets = (DATA.monthlyBudgets || []).filter(b => b.month !== VIEW);
   else DATA.budgets = DATA.budgets.filter(b => b.month !== VIEW);
-  await persist(DATA);
+  const savedC = await persist(DATA);
+  if (savedC === false) return;      // ★ v38：写盘失败不报成功
   toast(`✓ 已清空 ${monthLabel(VIEW)} 的${lbl}记录`);
 };
 
@@ -2092,11 +2611,15 @@ async function importXlsx(file) {
   if (!d.budgets.length && !d.actuals.length && !(d.monthlyBudgets && d.monthlyBudgets.length)) { alert('导入失败：Excel 里没有读到有效记录（需要表头「日期/日预算/实际花费/备注」+ 数据行）'); return; }
   const n = d.actuals.length + d.budgets.length;
   if ((DATA.actuals.length || DATA.budgets.length) && !confirm(`将从 Excel 导入 ${n} 项数据，并覆盖现有全部数据，确定继续？`)) return;
-  await persist(d);
-  VIEW = curMonth();
+  VIEW = curMonth();          // ★ v38：先切月份再 persist —— persist 内部会 render，
+  await persist(d);            //   顺序反了的话导入后月份标题/日历还停在旧月份
   toast(`✓ 已从 Excel 导入 ${n} 项数据`);
 }
 function importJson(file) {
+  // ★ v38：JSON 导入也要有体积上限 ——
+  //   MAX_IMPORT_BYTES 的注释写着「表格/JSON 导入 20MB」，但原来只对 Excel 生效，
+  //   几百 MB 的 JSON 会让 JSON.parse 长时间阻塞主线程、页面假死。
+  if (!checkFileSize(file, MAX_IMPORT_BYTES, 'JSON')) return;
   const reader = new FileReader();
   reader.onerror = () => alert('文件读取失败，请重试');
   reader.onload = async () => {
@@ -2108,8 +2631,8 @@ function importJson(file) {
     if (!d.budgets.length && !d.actuals.length && !(d.monthlyBudgets && d.monthlyBudgets.length)) { alert('导入失败：文件里没有有效数据（需包含 budgets / actuals 数组）'); return; }
     const n = d.actuals.length + d.budgets.length;
     if ((DATA.actuals.length || DATA.budgets.length) && !confirm(`将导入 ${n} 项数据，并覆盖现有全部数据，确定继续？`)) return;
+    VIEW = curMonth();        // ★ v38：同上，先切月份再 persist
     await persist(d);
-    VIEW = curMonth();
     toast(`✓ 已导入 ${n} 项数据`);
   };
   reader.readAsText(file, 'utf-8');
@@ -2129,7 +2652,12 @@ function ghCfgSave() {
   GH.branch = $('gh-branch').value.trim() || 'main';
   GH.path = sanitizeGhPath($('gh-path').value.trim(), 'data/budget.xlsx');
   GH.sha = null;
-  safeSet(GH_CFG_KEY, JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path, token: GH.token }));
+  // ★ v38：检查写入结果 —— 原来忽略 safeSet 的返回值，
+  //   存储写不进去时界面照样显示「已连接 GitHub」，刷新后配置静默消失。
+  if (!safeSet(GH_CFG_KEY, JSON.stringify({ owner: GH.owner, repo: GH.repo, branch: GH.branch, path: GH.path, token: GH.token }))) {
+    toast('✗ GitHub 配置保存失败（本地存储空间已满或处于隐私模式）');
+    return;
+  }
   $('store-mode').textContent = GH.token ? `GitHub Excel（${GH.owner}/${GH.repo}）` : '本机浏览器（localStorage）';
 }
 function ghPrefill() {
@@ -2196,7 +2724,14 @@ tick(); setInterval(tick, 1000);
 
 // 窗口尺寸变化后重绘图表
 let rsT = null;
-window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(drawChart, 200); });
+window.addEventListener('resize', () => {
+  clearTimeout(rsT);
+  rsT = setTimeout(() => {
+    drawChart();
+    // v38：窄屏与桌面的日历金额格式不同（窄屏用紧凑格式防溢出），切宽度要重渲染
+    if (typeof calMode !== 'undefined' && calMode === 'cal') { renderCalendar(); renderDayDetail(); }
+  }, 200);
+});
 
 // iOS 键盘收起后视口残留修正（同时修正外层门户窗口）
 document.addEventListener('focusout', () => {
@@ -2215,6 +2750,40 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v36</div>
+
+<script>
+/* 浅色（雾紫柔光）/ 深色（暗夜墨蓝）模式切换 */
+(function () {
+  var K = 'budget_theme_v1';
+  var btn = document.getElementById('theme-toggle');
+  var meta = document.querySelector('meta[name="theme-color"]');
+  function apply(t, persist) {
+    document.documentElement.setAttribute('data-theme', t);
+    if (btn) {
+      var toDark = t === 'light';
+      btn.setAttribute('aria-label', toDark ? '切换到深色模式（暗夜墨蓝）' : '切换到浅色模式（雾紫柔光）');
+      btn.title = toDark ? '切换到深色模式（暗夜墨蓝）' : '切换到浅色模式（雾紫柔光）';
+    }
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#111726' : '#f1ecfa');
+    if (persist) { try { localStorage.setItem(K, t); } catch (e) {} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  if (btn) btn.addEventListener('click', function () {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(next, true);
+  });
+  /* 从未手动选过时，跟随系统深浅变化 */
+  try {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onChange = function (e) {
+      var saved = localStorage.getItem(K);
+      if (saved !== 'light' && saved !== 'dark') apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  } catch (e) {}
+})();
+</script>
+<div class="ver">v41</div>
 </body>
 </html>

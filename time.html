@@ -227,20 +227,6 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
     font-size: 13px; opacity: .5; pointer-events: none;
   }
-  .searchbar .sclr {
-    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-    border: none; background: none; color: var(--muted); font-size: 15px;
-    cursor: pointer; padding: 4px 6px; line-height: 1; font-family: inherit;
-  }
-  .viewtog {
-    display: flex; gap: 0; border: 1px solid var(--line); border-radius: 9px;
-    overflow: hidden; flex: none; background: #fff;
-  }
-  .viewtog button {
-    border: none; background: none; padding: 9px 12px; font-size: 12.5px;
-    font-family: inherit; color: var(--muted); cursor: pointer;
-  }
-  .viewtog button.on { background: var(--primary); color: #fff; }
   .srch-hint { font-size: 11.5px; color: var(--muted); margin: -4px 0 10px; }
   /* 第二维度筛选按钮 */
   .keyfilter {
@@ -323,14 +309,6 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
   .graph-pop b { display: block; font-size: 13px; margin-bottom: 3px; }
   .graph-pop span { color: var(--muted); }
 
-  /* 分类栏收纳：放不下的分类折进「更多」 */
-  .cats { flex-wrap: wrap; }
-  .cats .more {
-    border: 1px solid var(--line); background: #fff; color: var(--muted);
-    font-size: 12.5px; padding: 5px 11px; border-radius: 99px;
-    cursor: pointer; font-family: inherit;
-  }
-  .cats .more.on { border-color: var(--primary); color: var(--primary); }
 
   /* 悬浮操作按钮：桌面 hover 才出，手机点标题展开 */
   .ev-ops {
@@ -562,7 +540,6 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     .searchbar { flex-wrap: wrap; }
     .searchbar .sbox { flex: 1 0 100%; order: -1; }
     .searchbar .keyfilter { font-size: 11.5px; padding: 8px 9px; }
-    .searchbar .viewtog { margin-left: auto; }
   }
   /* 版本角标：右下角极小字，不响应点击，用于快速分辨新旧版 */
   /* 版本角标挪到**右上角** —— 原来在右下角，toast 改到底部弹出后会被压住。
@@ -669,15 +646,6 @@ html[data-theme="dark"] .searchbar input:focus {
   border-color: rgba(187,124,228,.75); box-shadow: 0 0 0 2px rgba(187,124,228,.18);
 }
 html[data-theme="dark"] .sicon { opacity: .6; }
-html[data-theme="dark"] .sclr { color: var(--muted); }
-/* 视图切换 */
-html[data-theme="dark"] .viewtog {
-  background: rgba(27,10,49,.8); border-color: rgba(187,124,228,.28); border-radius: 4px;
-}
-html[data-theme="dark"] .viewtog button { color: var(--muted); }
-html[data-theme="dark"] .viewtog button.on {
-  background: linear-gradient(90deg, #7b2ff7, #bb7ce4); color: #fff;
-}
 /* 分类页签 */
 html[data-theme="dark"] .chip {
   background: transparent;
@@ -690,10 +658,6 @@ html[data-theme="dark"] .chip.on {
   background: linear-gradient(90deg, #7b2ff7, #bb7ce4);
   border-color: transparent; color: #fff;
   box-shadow: 0 0 14px rgba(123,47,247,.3);
-}
-html[data-theme="dark"] .cats .more {
-  background: transparent; border: 1px solid rgba(187,124,228,.28);
-  color: var(--muted); border-radius: 4px;
 }
 /* 年份条 */
 html[data-theme="dark"] .yrbar {
@@ -1068,83 +1032,436 @@ html[data-theme="dark"] .lv-t .key-star { color: #ffd24a; }
 .key-pick.on { border-color: #ffd24a; background: rgba(255,210,74,.07); }
 html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); background: rgba(255,210,74,.08); }
 
+  /* ============================================================
+     ★ v30 左右分栏（方案 A）
+     —— 把原来堆在顶部的「品牌 + 标题 + 工具栏 + 搜索 + 分类」
+        整体搬进左侧常驻控制台，右栏只留内容。
+        动机（实测原版 760px 单列）：
+          1) 顶部四层控件吃掉约 200px 垂直高度，内容被推到下面；
+          2) 搜索结果数提示藏在页面顶部，搜完必须滚回顶才知道命中几条；
+          3) 7 个分类横排放不下，第 4 个之后要折进「更多」，
+             最常用的分类反被藏起来；
+          4) 顶部页签（章节/时间轴/列表/图谱）与搜索栏里的
+             viewtog（时间轴/列表）是同一件事的两个入口。
+        对应改动：
+          · 四层控件 → 左栏 300px 常驻，顶部省出约 180px
+          · 新增右栏「筛选状态条」，把「当前在看什么」显式写出来
+          · 分类改竖排，7 项全露出，计数右对齐
+          · 删掉重复的 viewtog
+        ≤980px 自动降级为单列（行为与原版一致）。
+     ============================================================ */
+  .pv-wrap {
+    max-width: 1180px; margin: 0 auto; padding: 0 16px 40px;
+    display: flex; align-items: flex-start; gap: 20px;
+  }
+  /* ---- 左栏：常驻控制台 ---- */
+  .pv-left {
+    flex: 0 0 300px; width: 300px;
+    position: sticky; top: 0; max-height: 100vh;
+    display: flex; flex-direction: column;
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  .pv-left-in {
+    overflow-y: auto; overscroll-behavior: contain;
+    padding: 12px 13px 16px;
+    border: 1px solid var(--line); border-radius: 14px;
+    background: rgba(255,255,255,.55);
+    box-shadow: 0 1px 10px rgba(120,95,70,.06);
+    scrollbar-width: thin;
+  }
+  html[data-theme="dark"] .pv-left-in {
+    background: rgba(27,10,49,.5);
+    border-color: rgba(187,124,228,.22);
+    box-shadow: 0 1px 12px rgba(0,0,0,.3);
+  }
+  .pv-left-in::-webkit-scrollbar { width: 5px; }
+  .pv-left-in::-webkit-scrollbar-thumb { background: rgba(191,154,125,.35); border-radius: 3px; }
+  html[data-theme="dark"] .pv-left-in::-webkit-scrollbar-thumb { background: rgba(187,124,228,.32); }
+
+  /* 品牌条：只留品牌名，页签移到下面 */
+  .pv-left .brandbar { padding: 0 0 9px; margin-bottom: 9px; }
+  /* 视图页签：2×2 药丸网格 */
+  .pv-views {
+    /* ★ v32：页签从 4 个减到 3 个（章节下线），改成自适应列数 ——
+       固定 2 列会让第 3 个页签孤零零占一行、右边空一格；
+       auto-fit 按页签数量自动均分，以后加减页签都不用再改这里。 */
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 5px;
+    margin: 0 0 12px; padding: 0; border: none;
+  }
+  .pv-views .tab {
+    width: 100%; text-align: center; padding: 8px 4px;
+    border: 1px solid var(--line); border-radius: 9px;
+    background: rgba(255,255,255,.5); font-size: 12.5px;
+    position: relative; overflow: hidden;
+  }
+  html[data-theme="dark"] .pv-views .tab { background: rgba(27,10,49,.5); }
+  .pv-views .tab.on { border-color: transparent; }
+  .pv-views .tab.on::after { display: none; }   /* 药丸模式不要下划线 */
+  .pv-views .tab.on {
+    background: linear-gradient(90deg,#7b2ff7,#bb7ce4); color: #fff;
+  }
+
+  .pv-left .head-top {
+    margin-bottom: 2px;
+    align-items: center;           /* 标题与主题按钮同一基线 */
+    justify-content: space-between;
+  }
+  .pv-left .hero-title { font-size: 20px !important; margin: 0 !important; }
+  .pv-left .verse { font-size: 11px; letter-spacing: 2px; margin: 3px 0 11px; }
+
+  /* 数据概览：三块小指标 */
+  .pv-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    margin-bottom: 12px;
+  }
+  .pv-stats .ps {
+    border: 1px solid var(--line); border-radius: 9px;
+    padding: 6px 4px; text-align: center; background: rgba(255,255,255,.4);
+  }
+  html[data-theme="dark"] .pv-stats .ps { background: rgba(27,10,49,.45); }
+  .pv-stats .ps .l { font-size: 10px; color: var(--muted); display: block; line-height: 1.4; }
+  .pv-stats .ps .v {
+    font-size: 16px; font-weight: 700; color: var(--text);
+    font-variant-numeric: tabular-nums; line-height: 1.3;
+  }
+  .pv-stats .ps.k .v { color: #d19b00; }
+  html[data-theme="dark"] .pv-stats .ps.k .v { color: #ffd24a; }
+
+  /* 搜索：竖排时输入框独占一行，筛选按钮并排 */
+  .pv-search { flex-wrap: wrap; margin-bottom: 8px; }
+  .pv-search .sbox { flex: 1 1 100%; }
+  .pv-search .sicon { left: 9px; }
+  /* 框内 ✕ 移除后右侧留白收窄（type=search 的原生清除按钮仍可用） */
+  .pv-search .sbox input { padding: 8px 10px 8px 30px; font-size: 13px; }
+  .pv-filters { display: flex; gap: 6px; width: 100%; }
+  .pv-filters .keyfilter { flex: 1; }
+  .pv-filters .keyfilter.icon { flex: 0 0 34px; }
+
+  .pv-left .srch-hint { font-size: 11px; margin: 0 0 9px; }
+
+  /* 分类：竖排，**固定显示 6 项 + 超出滚动** */
+  .pv-cats {
+    display: flex; flex-direction: column; gap: 4px;
+    margin: 0 0 12px;
+    /* **高度按「6 项」精确算出来** —— 每项 33px（6px 上下 padding + 20px 行高
+       + 1px 上下边框），项间 gap 4px，6 项 = 33×6 + 4×5 = 218px。
+       写死这个高度是有意的：分类多到几十个时，左栏不会因为分类变长而
+       把下面的操作按钮挤出视口 —— 分类区自己滚动就够了。 */
+    max-height: 218px;
+    overflow-y: auto; overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 2px;
+  }
+  .pv-cats::-webkit-scrollbar { width: 5px; }
+  .pv-cats::-webkit-scrollbar-track { background: transparent; }
+  .pv-cats::-webkit-scrollbar-thumb {
+    background: rgba(191,154,125,.4); border-radius: 3px;
+  }
+  .pv-cats::-webkit-scrollbar-thumb:hover { background: rgba(191,154,125,.65); }
+  html[data-theme="dark"] .pv-cats::-webkit-scrollbar-thumb { background: rgba(187,124,228,.35); }
+  html[data-theme="dark"] .pv-cats::-webkit-scrollbar-thumb:hover { background: rgba(187,124,228,.6); }
+  /* 滚动到底时渐隐提示还有更多 ——
+     **只在真的能滚时才加遮罩**（.has-more 由 JS 动态加/减）。
+     原来是无条件加遮罩，结果「刚好 6 项填满」时第 6 项下半截被吃掉，
+     看着像渲染坏了。 */
+  .pv-cats.has-more {
+    mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 14px), transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 14px), transparent 100%);
+  }
+  .pv-cats .chip {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; text-align: left; padding: 6px 11px; font-size: 12.5px;
+    flex: none;   /* column 方向下 flex-basis 是高度，别让浏览器压缩项高 */
+  }
+  .pv-cats .chip .cc { font-size: 10.5px; opacity: .7; font-variant-numeric: tabular-nums; }
+  .pv-cats .chip.on .cc { opacity: .85; }
+  /* **0 条的分类**：置灰 —— 一眼看出「还没用过」，但仍可点 */
+  .pv-cats .chip.empty-cat { opacity: .5; }
+  .pv-cats .chip.empty-cat:hover { opacity: .85; }
+  .pv-cats .chip.empty-cat.on { opacity: 1; }
+  /* 选中项在滚动区里要更醒目一点 */
+  .pv-cats .chip.on {
+    box-shadow: 0 0 0 1px rgba(191,154,125,.35);
+  }
+
+  /* 分类标题行 + 增改入口 */
+  .pv-cats-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 0 0 6px;
+  }
+  .pv-cats-t {
+    font-size: 11px; color: var(--muted); letter-spacing: .5px; font-weight: 700;
+  }
+  .pv-cats-btn {
+    font-family: inherit; font-size: 11px; cursor: pointer;
+    padding: 3px 9px; border-radius: 99px;
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    transition: color .15s, border-color .15s, background .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pv-cats-btn:hover { color: var(--primary); border-color: var(--primary); }
+  html[data-theme="dark"] .pv-cats-btn:hover {
+    color: #e8dff4; border-color: rgba(187,124,228,.7); background: rgba(187,124,228,.12);
+  }
+
+  /* 分类管理弹窗里的分类列表 */
+  .cat-man-list {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: 264px; overflow-y: auto; overscroll-behavior: contain;
+    border: 1px solid var(--line); border-radius: 9px; padding: 6px;
+  }
+  .cat-man-list::-webkit-scrollbar { width: 5px; }
+  .cat-man-list::-webkit-scrollbar-thumb { background: rgba(191,154,125,.4); border-radius: 3px; }
+  html[data-theme="dark"] .cat-man-list::-webkit-scrollbar-thumb { background: rgba(187,124,228,.32); }
+  /* **三段式网格**：名称 | 计数 | 按钮 ——
+     之前用 flex + gap，结果「名称」被 flex:1 撑开后，
+     计数和两个按钮全挤在一起贴住文字（实测按钮糊成一片）。 */
+  .cm-row {
+    display: grid; grid-template-columns: 1fr auto auto;
+    align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 7px; background: rgba(255,255,255,.45);
+  }
+  html[data-theme="dark"] .cm-row { background: rgba(27,10,49,.5); }
+  .cm-row:hover { background: rgba(191,154,125,.10); }
+  html[data-theme="dark"] .cm-row:hover { background: rgba(187,124,228,.10); }
+  .cm-row .cm-name {
+    min-width: 0; font-size: 13px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 计数：固定宽度 + 右对齐，形成一条竖线便于比较 */
+  .cm-row .cm-n {
+    font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+    min-width: 26px; text-align: right; flex: none;
+  }
+  .cm-row .cm-act { display: flex; gap: 5px; }
+  .cm-row button {
+    font-family: inherit; font-size: 11px; cursor: pointer;
+    padding: 4px 10px; border-radius: 6px; line-height: 1.4;
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    white-space: nowrap;
+  }
+  html[data-theme="dark"] .cm-row button { background: rgba(27,10,49,.8); }
+  .cm-row button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .cm-row button.del:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+  /* 「其他」是兜底分类 → 按钮置灰不可点 + 行本身加个标记 */
+  .cm-row.locked { opacity: .62; }
+  .cm-row.locked .cm-name::after {
+    content: '兜底'; font-size: 9.5px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 99px;
+    padding: 0 5px; margin-left: 6px; vertical-align: 1px;
+  }
+  .cm-row button:disabled { opacity: .4; cursor: not-allowed; }
+  .cm-row button:disabled:hover { border-color: var(--line); color: var(--muted); }
+  /* 改名进行中：原名变输入框 */
+  .cm-row .cm-edit {
+    min-width: 0; width: 100%; font-size: 13px; font-family: inherit;
+    padding: 4px 8px; border-radius: 6px;
+    border: 1px solid var(--primary); background: #fff; color: var(--text);
+  }
+  html[data-theme="dark"] .cm-row .cm-edit { background: rgba(27,10,49,.85); }
+
+  /* 操作区：2 列网格 */
+  .pv-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0; }
+  .pv-toolbar .tb { flex: none; padding: 8px 4px; font-size: 12.5px; border-radius: 9px; }
+  .pv-toolbar .tb.pri { grid-column: 1 / -1; flex: none; }
+
+  /* ---- 右栏：纯内容 ---- */
+  .pv-main { flex: 1 1 0; min-width: 0; padding-top: calc(12px + env(safe-area-inset-top)); }
+
+  /* 筛选状态条：右栏顶部吸顶 */
+  .pv-status {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    min-height: 40px; padding: 7px 12px; margin-bottom: 10px;
+    border: 1px solid var(--line); border-radius: 11px;
+    background: rgba(255,255,255,.45);
+    position: sticky; top: 0; z-index: 12;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  html[data-theme="dark"] .pv-status { background: rgba(27,10,49,.82); border-color: rgba(187,124,228,.2); }
+  /* 无筛选时降级成一行轻量文字 */
+  .pv-status.pv-status-bare {
+    border-color: transparent; background: none; backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0 2px; margin-bottom: 4px; min-height: 0;
+  }
+  .pv-status.pv-status-bare .pv-status-f { display: none; }
+  .pv-status-l { display: flex; align-items: baseline; gap: 6px; }
+  .pv-status-f {
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    font-size: 12px; color: var(--muted); margin-left: auto;
+  }
+  .pv-status-f:empty { display: none; }
+  .pv-status-f .pf {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 99px;
+    background: rgba(191,154,125,.16); color: #8a6b4d;
+    border: 1px solid transparent; font-size: 11.5px;
+  }
+  html[data-theme="dark"] .pv-status-f .pf {
+    background: rgba(187,124,228,.16); color: #cfc4dd;
+  }
+  .pv-status-f .pf b { color: var(--text); font-weight: 700; }
+  html[data-theme="dark"] .pv-status-f .pf b { color: #fff; }
+  .pv-status-f .pf.x { cursor: pointer; }
+  .pv-status-f .pf.x:hover { border-color: var(--primary); }
+  .pv-status-f .pf-clear {
+    background: none; border: 1px dashed var(--line); color: var(--muted);
+    cursor: pointer; padding: 3px 9px; border-radius: 99px; font-size: 11.5px;
+    font-family: inherit;
+  }
+  .pv-status-f .pf-clear:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* 章节骨架选择器：留在右栏顶部 */
+  .pv-main .ch-picker {
+    gap: 6px; padding: 8px 10px; margin: 0 0 12px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: rgba(255,255,255,.4);
+  }
+  html[data-theme="dark"] .pv-main .ch-picker { background: rgba(27,10,49,.45); }
+  .pv-main .ch-picker button { padding: 4px 9px; border-radius: 99px; }
+  .pv-main .ch-picker > span { font-weight: 700; color: var(--text); }
+
+  /* 窄屏：退化为单列，左栏不再吸顶 */
+  @media (max-width: 980px) {
+    .pv-wrap { display: block; max-width: 760px; }
+    .pv-left {
+      position: static; width: auto; max-height: none; padding-top: 0;
+      margin-bottom: 14px;
+    }
+    .pv-left-in { overflow: visible; }
+    .pv-views { grid-template-columns: repeat(4, 1fr); }
+    /* 窄屏变横排 → 取消固定高度与滚动条，改成横向滑动。
+       **必须显式复位 max-height / mask-image** ——
+       桌面端的 max-height:218px 和底部渐隐遮罩是给竖排滚动用的，
+       横排时留着会让内容被裁掉一截（底部莫名少一行）。 */
+    /* **选择器要带上 html[data-theme] 才能压过深色主题那两条** ——
+       `html[data-theme="dark"] .pv-cats` 的特异性是 (0,2,0)，
+       媒体查询里的 `.pv-cats` 只有 (0,1,0) —— 压不过，
+       结果窄屏横向排布时底部仍有一层渐隐遮罩，最后一排分类被吃掉一半。
+       这里用 `html[data-theme="dark"] .pv-cats` 与 `html .pv-cats` 双写，
+       保证两种主题下都被复位。 */
+    html[data-theme="dark"] .pv-cats,
+    html .pv-cats {
+      flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+      max-height: none;
+      /* 横排不需要渐隐提示（横向滑动没有「下面还有」的语义） */
+      mask-image: none; -webkit-mask-image: none;
+      padding-bottom: 2px;
+    }
+    .pv-cats .chip { width: auto; flex: none; }
+    .pv-toolbar { grid-template-columns: repeat(4, 1fr); }
+    .pv-toolbar .tb.pri { grid-column: 1 / -1; }
+  }
+  @media (max-width: 560px) {
+    .pv-views { grid-template-columns: repeat(2, 1fr); }
+  }
+
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <!-- 顶部品牌条 + 主视图页签 -->
-    <div class="brandbar">
-      <span class="brand">⏳ 时光自撰集</span>
-      <nav class="tabs" role="tablist">
-        <button class="tab" data-view="chapter" role="tab">章节</button>
+<div class="wrap pv-wrap">
+  <!-- ============ 左栏：常驻控制台 ============ -->
+  <aside class="pv-left" id="pv-left">
+    <div class="pv-left-in">
+      <!-- 顶部品牌条 + 主视图页签 -->
+      <div class="brandbar">
+        <span class="brand">⏳ 时光自撰集</span>
+      </div>
+      <nav class="tabs pv-views" role="tablist">
+        <!-- ★ v32：章节视图**暂时下线**（页面上不再出现）——
+             原因：那一屏全是自造词（章节/骨架/段/高光/轴）且无任何说明，
+             用户反馈「完全看不懂」。代码全部保留在下面（renderChapters 等），
+             以后想恢复，把这一行加回来 + curView 改回 'chapter' 即可。
+             现在默认展示「关联图谱」，图谱排在第一个。 -->
+        <button class="tab" data-view="graph" role="tab">图谱</button>
         <button class="tab" data-view="axis" role="tab">时间轴</button>
         <button class="tab" data-view="list" role="tab">列表</button>
-        <button class="tab" data-view="graph" role="tab">图谱</button>
       </nav>
+      <div class="head-top">
+        <h1 class="hero-title">我的时光轴</h1>
+        <button class="theme-btn" id="theme-btn" title="切换深浅色" aria-label="切换深浅色">☾</button>
+      </div>
+      <div class="verse">愿无岁月可回头</div>
+
+      <!-- 数据概览 -->
+      <div class="pv-stats" id="pv-stats"></div>
+
+      <!-- 搜索 + 筛选 -->
+      <div class="searchbar pv-search">
+        <div class="sbox">
+          <span class="sicon">🔍</span>
+          <input type="search" id="q" placeholder="搜索事件 / 备注 / 分类…" autocomplete="off">
+          <!-- v37 预览：输入框内的 ✕ 去掉 ——
+               清除功能已上移到右栏状态条的「✕ 清除全部筛选」，
+               两个 ✕ 挨在一起（一个在框内一个在框右）看着像重复。 -->
+        </div>
+        <div class="pv-filters">
+          <button class="keyfilter" id="key-filter" title="只看重要事件（人生节点）">★ 只看重要</button>
+          <button class="keyfilter icon" id="rule-btn" title="重要判定规则：编辑关键词 / 判定设置" aria-label="重要判定规则">⚙</button>
+        </div>
+      </div>
+      <div class="srch-hint" id="srch-hint" style="display:none"></div>
+
+      <!-- 分类：竖排，固定显示 6 项 + 超出滚动；标题行带「增改分类」入口 -->
+      <div class="pv-cats-head">
+        <span class="pv-cats-t">分类</span>
+        <button class="pv-cats-btn" id="cat-manage-btn" title="新增 / 修改 / 删除分类" aria-label="新增或修改分类">⚙ 分类</button>
+      </div>
+      <div class="cats pv-cats" id="cats"></div>
+
+      <!-- 操作区 -->
+      <div class="toolbar pv-toolbar">
+        <button class="tb pri" id="add-btn">+ 新增事件</button>
+        <button class="tb" id="import-btn">导入</button>
+        <button class="tb" id="export-btn">导出</button>
+        <button class="tb" id="sync-btn">⚙ 云端</button>
+        <button class="tb" id="clear-btn" style="color:var(--danger);border-color:rgba(192,80,60,.3)">清空</button>
+      </div>
     </div>
-    <div class="head-top">
-      <button class="theme-btn" id="theme-btn" title="切换深浅色" aria-label="切换深浅色">☾</button>
-      <h1 class="hero-title">我的时光轴</h1>
-      <span style="display:flex;align-items:baseline;gap:2px">
+  </aside>
+
+  <!-- ============ 右栏：纯内容 ============ -->
+  <main class="pv-main" id="pv-main">
+    <!-- 筛选状态条：常驻可见，告诉你当前正在看什么 -->
+    <div class="pv-status" id="pv-status">
+      <div class="pv-status-l">
         <span class="head-cnt" id="head-cnt">0 条</span>
         <button class="yr-all" id="yr-all-btn" style="display:none">收起全部</button>
-      </span>
-    </div>
-    <div class="verse">愿无岁月可回头</div>
-    <div class="toolbar">
-      <button class="tb pri" id="add-btn">+ 新增事件</button>
-      <button class="tb" id="import-btn">导入</button>
-      <button class="tb" id="export-btn">导出</button>
-      <button class="tb" id="sync-btn">⚙ 云端</button>
-      <button class="tb" id="clear-btn" style="color:var(--danger);border-color:rgba(192,80,60,.3)">清空</button>
-    </div>
-    <div class="searchbar">
-      <div class="sbox">
-        <span class="sicon">🔍</span>
-        <input type="search" id="q" placeholder="搜索事件 / 备注 / 分类…" autocomplete="off">
-        <button class="sclr" id="q-clr" style="display:none" title="清空">✕</button>
       </div>
-      <button class="keyfilter" id="key-filter" title="只看重要事件（人生节点）">★ 只看重要</button>
-      <button class="keyfilter icon" id="rule-btn" title="重要判定规则：编辑关键词 / 判定设置" aria-label="重要判定规则">⚙</button>
-      <div class="viewtog">
-        <button id="v-axis" class="on">时间轴</button>
-        <button id="v-list">列表</button>
-      </div>
+      <div class="pv-status-f" id="pv-status-f"></div>
     </div>
-    <div class="srch-hint" id="srch-hint" style="display:none"></div>
-    <div class="cats" id="cats"></div>
-  </header>
 
-  <!-- 时间轴总览带：所有时间段事件一览（拍板②） -->
-  <div class="ovbar" id="ovbar" style="display:none"></div>
+    <!-- 时间轴总览带：所有时间段事件一览（拍板②） -->
+    <div class="ovbar" id="ovbar" style="display:none"></div>
 
-  <!-- 年份快捷检索：一根横向年份条，点一下直达该年 -->
-  <div class="yrbar" id="yrbar" style="display:none">
-    <button class="nav" id="yr-prev" title="更早的年份">‹</button>
-    <div class="track" id="yr-track"></div>
-    <button class="nav" id="yr-next" title="更新的年份">›</button>
-  </div>
+    <!-- 年份快捷检索：一根横向年份条，点一下直达该年 -->
+    <div class="yrbar" id="yrbar" style="display:none">
+      <button class="nav" id="yr-prev" title="更早的年份">‹</button>
+      <div class="track" id="yr-track"></div>
+      <button class="nav" id="yr-next" title="更新的年份">›</button>
+    </div>
 
-  <div class="axis" id="axis"></div>
+    <div class="axis" id="axis"></div>
 
-  <!-- 关联图谱 -->
-  <div class="axis" id="graph-wrap" style="display:none">
-    <div class="graph-panel">
-      <div class="graph-bar">
-        <button class="tb" id="graph-reheat" title="清空筛选条件并重新计算布局（回到完整图谱）">↻ 重新布局</button>
-        <button class="tb" id="graph-mode" title="切换拖拽联动强度">联动：近处强</button>
-        <button class="tb" id="graph-clear" title="清除搜索 / 分类 / 只看重要等筛选条件" style="display:none">✕ 清除筛选</button>
-        <span class="gl-stat" id="graph-stat"></span>
-      </div>
-      <svg id="graph-svg"></svg>
-      <div class="graph-legend" id="graph-legend"></div>
-      <div class="graph-tip">
-        <b>玩法：</b>按住任意圆点拖动 —— 它的<b>直接关联</b>被强联动拉近并高亮，<b>二度关联</b>轻微跟随，三度以外几乎不动；松手后整张图缓缓回弹。<br>
-        <b>节点：</b>大圆＝年份（大小按记录数），中圆＝分类标签；边＝该年出现过该分类。<b>点击年份</b>切到列表看该年记录，点击分类按分类筛选。
+    <!-- 关联图谱 -->
+    <div class="axis" id="graph-wrap" style="display:none">
+      <div class="graph-panel">
+        <div class="graph-bar">
+          <button class="tb" id="graph-reheat" title="清空筛选条件并重新计算布局（回到完整图谱）">↻ 重新布局</button>
+          <button class="tb" id="graph-mode" title="切换拖拽联动强度">联动：近处强</button>
+          <button class="tb" id="graph-clear" title="清除搜索 / 分类 / 只看重要等筛选条件" style="display:none">✕ 清除筛选</button>
+          <span class="gl-stat" id="graph-stat"></span>
+        </div>
+        <svg id="graph-svg"></svg>
+        <div class="graph-legend" id="graph-legend"></div>
+        <div class="graph-tip">
+          <b>玩法：</b>按住任意圆点拖动 —— 它的<b>直接关联</b>被强联动拉近并高亮，<b>二度关联</b>轻微跟随，三度以外几乎不动；松手后整张图缓缓回弹。<br>
+          <b>节点：</b>大圆＝年份（大小按记录数），中圆＝分类标签；边＝该年出现过该分类。<b>点击年份</b>切到列表看该年记录，点击分类按分类筛选。
+        </div>
       </div>
     </div>
-  </div>
+  </main>
 </div>
 <div class="graph-pop" id="graph-pop"></div>
 
@@ -1264,6 +1581,33 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   </div>
 </div>
 
+<!-- v31 分类管理 -->
+<div class="mask" id="cat-mask">
+  <div class="card" style="width:min(420px,100%)">
+    <div class="card-title">⚙ 分类管理</div>
+    <div class="card-tip">
+      分类决定左栏筛选、图谱节点和统计口径。
+      <b>改名</b>会把该分类下已有的记录一起改掉；<b>删除</b>会把记录归到「其他」。
+      「其他」是兜底分类，永久保留。
+    </div>
+    <div class="fld">
+      <label>新增分类</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="cat-new" placeholder="如：行业 / 健康 / 学习计划" maxlength="12"
+               style="flex:1" autocomplete="off">
+        <button class="btn pri" id="cat-add" style="flex:none">添加</button>
+      </div>
+    </div>
+    <div class="fld">
+      <label>已有分类（点「改」可改名，点「删」会归到「其他」）</label>
+      <div class="cat-man-list" id="cat-man-list"></div>
+    </div>
+    <div class="btns">
+      <button class="btn pri" id="cat-close">完成</button>
+    </div>
+  </div>
+</div>
+
 <!-- 密码 -->
 <div class="mask" id="pw-mask">
   <div class="card" style="width:min(330px,100%)">
@@ -1291,7 +1635,28 @@ const SHEET_NAME = 'events';
 const RULES_SHEET = '规则';        // 规则词表工作表（跟着数据走，解决跨设备判定不一致）
 const CLEAR_PW = '870825';
 const $ = id => document.getElementById(id);
-const CATS = ['观演', '学业', '工作', '居住', '家庭', '旅行', '其他'];
+/* ===== v31：分类表从硬编码改为「可持久化 + 可编辑」=====
+   原来 CATS 是写死的常量，带来三个限制：
+     1) 用户加不了自己需要的分类（比如「行业」「健康」「学习计划」）；
+     2) 删不掉的分类（哪怕一条记录都没有也一直占位）；
+     3) **sanitizeEvent 会把不在 CATS 里的分类强制改成「其他」** ——
+        这意味着即使硬塞一个新分类进去，下次读数据也会被打回「其他」。
+   现在：
+     · CATS_DEFAULT —— 7 个内置分类（你现有数据里的，永久保留）
+     · catList     —— 当前生效的分类表，可增可改可删，存 localStorage
+     · 分类表跟着 Excel/云端表格走（第三个工作表「分类」），
+       换设备拉数据时一起同步，新分类不会丢。
+   「其他」是兜底分类，任何时候都存在、不可删除。 */
+const CATS_DEFAULT = ['观演', '学业', '工作', '居住', '家庭', '旅行', '其他'];
+const FALLBACK_CAT = '其他';        // 兜底分类：不可删
+const CATS_KEY = 'time_cats_v1';    // 分类表本地存储
+const CATS_SHEET = '分类';           // 分类表工作表（跟着数据走）
+/** 当前生效的分类表（可变）—— 初始化时由 loadCats() 填充 */
+let catList = CATS_DEFAULT.slice();
+/* 云端拉取时记录「云端那份分类表」与「是否读到」，
+   供 doPull 做并集合并（云端可能缺本机新建的分类）。 */
+let remoteCatsList = null;
+let remoteCatsApplied = false;
 /* ============================================================
    重要程度规则（v27 重做）
    —— key    : 1=手动重要 / 0=手动不重要 / 缺失=未表态（交给规则）
@@ -1322,7 +1687,8 @@ let DATA = [];
 let curCat = 'ALL';
 /* ===== 查看体验改版：新增状态 ===== */
 let curQ = '';        // 搜索关键词
-let curView = 'chapter'; // 'chapter'(主) | 'axis' | 'list' | 'graph'
+/* ★ v32：默认视图改为「图谱」（章节视图暂时下线，见页签处说明） */
+let curView = 'graph';   // 'graph'(默认) | 'axis' | 'list' | 'chapter'(暂时下线，代码保留)
 /* 第二维度筛选：只看重要事件 */
 let onlyKey = false;
 let openEvId = null;  // 手机端点开的卡片
@@ -1335,7 +1701,8 @@ let openEvId = null;  // 手机端点开的卡片
 let viewPinned = false;  // 用户手动点过视图页签
 let filterOpen = false;  // 用户手动开过筛选
 let curListCache = null; // 当前筛选后的记录（总览带用它，保证与列表一致）
-let catsMoreOpen = false; // 分类栏「更多」是否展开
+// v30：原「catsMoreOpen」（分类栏「更多」展开态）已随横排→竖排改造移除，
+// 竖排放得下全部 7 个分类，不再需要折叠。
 
 /* ---------- 解析器 ---------- */
 const CAT_RULES = [
@@ -1715,6 +2082,111 @@ function saveRules() {
   try { localStorage.setItem(RULES_KEY, JSON.stringify(keyRules)); }
   catch (e) { console.warn('重要规则保存失败', e); }
 }
+
+/* ===== v31：分类表读写 =====
+   规则：
+     · 「其他」是兜底分类，**永远存在、不可删、不可改名**
+     · 内置的 7 个分类（观演/学业/工作/居住/家庭/旅行/其他）默认存在，
+       但用户可以改名（改名时已有记录跟着改）
+     · 分类名去重（同名自动忽略）、限长、限数量（防误操作塞爆）
+     · 读取时若本地表为空 → 用默认表；
+       若本地表缺了某些「数据里实际在用」的分类 → 自动补进来
+       （否则从别处导入的记录会因为分类不在表里而全被打回「其他」）
+*/
+/** 分类名规范化：去空白、限长、过滤空值 */
+function normCatName(s) {
+  return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').slice(0, 12);
+}
+/** 读取分类表（localStorage）；失败/为空 → 默认表 */
+function loadCats() {
+  let arr = null;
+  try {
+    const raw = localStorage.getItem(CATS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) arr = parsed.map(normCatName).filter(Boolean);
+    }
+  } catch (e) { console.warn('分类表读取失败，用默认分类', e); }
+  // 兜底分类必须在
+  const list = arr && arr.length ? arr : CATS_DEFAULT.slice();
+  if (!list.includes(FALLBACK_CAT)) list.push(FALLBACK_CAT);
+  return list;
+}
+/** 保存分类表 */
+function saveCats() {
+  try { localStorage.setItem(CATS_KEY, JSON.stringify(catList)); }
+  catch (e) { console.warn('分类表保存失败', e); }
+}
+/** 保证「数据里实际在用」的分类都在表里 ——
+ *  从 Excel / 云端导入的记录可能带了我们表里没有的分类，
+ *  不补进来的话这些记录会在 sanitizeEvent 里被打回「其他」，
+ *  表现为「导入后分类全变成其他」。 */
+function ensureCatsForData(arr) {
+  const used = new Set((arr || []).map(e => e && e.cat).filter(Boolean));
+  let changed = false;
+  used.forEach(c => {
+    const n = normCatName(c);
+    if (n && !catList.includes(n) && catList.length < 40) {
+      catList.push(n); changed = true;
+    }
+  });
+  if (changed) saveCats();
+  return changed;
+}
+
+/* ===== v31：分类的增 / 改 / 删 ===== */
+/** 新增分类 → 返回 { ok, msg } */
+function addCat(name) {
+  const n = normCatName(name);
+  if (!n) return { ok: false, msg: '分类名不能为空' };
+  if (catList.includes(n)) return { ok: false, msg: `「${n}」已存在` };
+  if (catList.length >= 40) return { ok: false, msg: '分类太多了（上限 40 个）' };
+  catList.push(n);
+  saveCats();
+  return { ok: true, msg: `已新增「${n}」`, cat: n };
+}
+/** 改名分类 → 已有记录跟着改（数据迁移）
+ *  返回 { ok, msg, moved } */
+function renameCat(oldName, newName) {
+  const o = normCatName(oldName), n = normCatName(newName);
+  if (!n) return { ok: false, msg: '新名字不能为空' };
+  if (o === n) return { ok: false, msg: '名字没变' };
+  if (o === FALLBACK_CAT) return { ok: false, msg: '「其他」是兜底分类，不能改名' };
+  if (!catList.includes(o)) return { ok: false, msg: `「${o}」不存在` };
+  if (catList.includes(n)) return { ok: false, msg: `「${n}」已存在` };
+  const idx = catList.indexOf(o);
+  catList[idx] = n;
+  // **已有记录跟着迁移** —— 否则改名后旧分类下的记录会
+  // 因为「分类不在表里」在下次读数据时被 sanitizeEvent 打回「其他」。
+  let moved = 0;
+  DATA.forEach(e => { if (e.cat === o) { e.cat = n; moved++; } });
+  if (curCat === o) curCat = n;
+  saveCats();
+  // **必须传 DATA** —— persist(arr) 会用 arr 覆盖全局 DATA，
+  // 无参调用等于 persist(undefined) → DATA = [] → 记录被清空！
+  persist(DATA);
+  // **必须 render()** —— 不重渲染的话左栏分类列表还是旧的 DOM，
+  // 用户会看到「改名改了但界面没变」（实测：左栏整个空了，
+  // 因为 counts 里已没有旧分类名，而 DOM 也没重建）。
+  render();
+  return { ok: true, msg: `已改名为「${n}」`, moved };
+}
+/** 删除分类 → 该分类下的记录归到「其他」
+ *  返回 { ok, msg, moved } */
+function delCat(name) {
+  const n = normCatName(name);
+  if (n === FALLBACK_CAT) return { ok: false, msg: '「其他」是兜底分类，不能删除' };
+  if (!catList.includes(n)) return { ok: false, msg: `「${n}」不存在` };
+  const idx = catList.indexOf(n);
+  catList.splice(idx, 1);
+  let moved = 0;
+  DATA.forEach(e => { if (e.cat === n) { e.cat = FALLBACK_CAT; moved++; } });
+  if (curCat === n) curCat = 'ALL';
+  saveCats();
+  persist(DATA);   // 同上：必须传 DATA，否则 DATA 被清空
+  render();   // 同上：不重渲染左栏不会更新
+  return { ok: true, msg: `已删除「${n}」`, moved };
+}
 /** 推断是否重要 —— **只看关键词，不看时间跨度**（v27）
  *  1) 命中排除词 → 整条否决（0）
  *  2) 命中关键词表 → 重要（1）
@@ -1780,7 +2252,10 @@ function sanitizeEvent(raw) {
     // 渲染时就会显示成「2024-09-09 → 2024-09-09 1天」这种自相矛盾的东西。
     span: !!(from && to && from !== to),
     title: String(raw.title == null ? '' : raw.title).slice(0, EV_MAX_TITLE),
-    cat: CATS.includes(raw.cat) ? raw.cat : '其他',
+    // **分类必须在 catList 里** —— 不在就落到兜底分类「其他」。
+    // 注意：catList 必须在读数据**之前**就绪（见 init 顺序），
+    // 否则用户新建的分类会被当成非法值打回「其他」。
+    cat: catList.includes(raw.cat) ? raw.cat : FALLBACK_CAT,
     note: String(raw.note == null ? '' : raw.note).slice(0, EV_MAX_NOTE),
     // **第二维度：重要程度（v27 语义）**
     //   key = 1 手动重要 / 0 手动不重要 / 缺失 = 未表态（交给规则实时判定）
@@ -2282,7 +2757,7 @@ function graphClick(ev) {
     // 点年份 → 切到列表视图并只看那年
     curView = 'list'; viewPinned = true;
     curCat = 'ALL'; curQ = n.label;
-    $('q').value = n.label; $('q-clr').style.display = '';
+    $('q').value = n.label; safeClr();
     syncViewTabs(); render();
     toast(`已切到列表 · ${n.label} 年`);
   } else {
@@ -2318,26 +2793,100 @@ function renderCats() {
   const mk = (key, label, n) => {
     const b = document.createElement('button');
     b.className = 'chip' + (curCat === key ? ' on' : '');
-    b.textContent = n != null ? `${label} ${n}` : label;
+    // **v30：竖排布局，标签与计数分列** ——
+    // 横排时是「观演 3」一串文字；竖排时左边标签、右边数字，
+    // 计数能右对齐成一条竖线，扫读时更容易比较大小。
+    if (n != null) {
+      const t = document.createElement('span');
+      t.textContent = label;
+      const c = document.createElement('span');
+      c.className = 'cc';
+      c.textContent = n;
+      b.appendChild(t);
+      b.appendChild(c);
+    } else {
+      b.textContent = label;
+    }
     b.onclick = () => { curCat = key; render(); };
     return b;
   };
-  // **按数量降序取前 4** —— 原来按 CATS 固定顺序，
-  // 最常用的分类可能被折进「更多」里（用户得先点开才看得到）。
-  const active = CATS.filter(c => counts[c]).sort((a, b) => counts[b] - counts[a]);
-  const MAX_VISIBLE = 4;                     // 最多直显 4 个，其余折进「更多」
-  const visible = active.slice(0, MAX_VISIBLE);
-  const hidden = active.slice(MAX_VISIBLE);
+  // **v31：显示全部分类（含 0 条的），按条数降序** ——
+  // 原来只显示「有记录」的分类（counts[c] > 0）。但用户新建一个分类后，
+  // 它一条记录都没有 → 不会出现在左栏 → 用户以为没加成功。
+  // 现在 0 条的分类也显示，用置灰 + 计数 0 区分，点了照样能筛（显示 0 条）。
+  const active = catList.slice().sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
   box.appendChild(mk('ALL', '全部', DATA.length));
-  visible.forEach(c => box.appendChild(mk(c, c, counts[c])));
-  if (!hidden.length) return;
-  // 「更多」按钮：点开显示剩余分类
-  const mb = document.createElement('button');
-  mb.className = 'more' + (hidden.includes(curCat) ? ' on' : '');
-  mb.textContent = (catsMoreOpen ? '收起' : `更多 ${hidden.length}`);
-  mb.onclick = () => { catsMoreOpen = !catsMoreOpen; renderCats(); };
-  box.appendChild(mb);
-  if (catsMoreOpen) hidden.forEach(c => box.appendChild(mk(c, c, counts[c])));
+  active.forEach(c => {
+    const n = counts[c] || 0;
+    const btn = mk(c, c, n);
+    // **0 条的分类置灰** —— 一眼看出「这个分类还没用过」，
+    // 但仍然可点（筛出来就是空列表，符合预期）。
+    if (!n && curCat !== c) btn.classList.add('empty-cat');
+    if (curCat === c) btn.classList.add('on');
+    box.appendChild(btn);
+  });
+  // **底部渐隐遮罩只在「真的还有更多」时才加** ——
+  // 无条件加的话，刚好 6 项填满时第 6 项下半截会被吃掉，
+  // 看着像渲染坏了（实测截图确认过）。
+  // 布局要等一帧才能量准 scrollHeight，所以用 rAF 延后判断。
+  requestAnimationFrame(() => {
+    updateCatsMoreHint(box);
+  });
+}
+
+/** 分类栏底部渐隐提示：只有「下面还有内容」时才显示。
+ *  滚到底时也要去掉 —— 已经到底了，再提示「下面还有」是骗人。 */
+function updateCatsMoreHint(box) {
+  if (!box) return;
+  const more = box.scrollHeight - box.clientHeight - box.scrollTop > 2;
+  box.classList.toggle('has-more', more);
+}
+
+/* ===== v30：左栏概览 + 右栏状态条 ===== */
+function renderPvStats() {
+  const box = $('pv-stats');
+  if (!box) return;
+  const years = new Set(DATA.map(e => yearOf(e.sortKey || e.from)));
+  const keyN = DATA.filter(e => evKey(e) === 1).length;
+  box.innerHTML =
+    `<div class="ps"><span class="l">记录</span><span class="v">${DATA.length}</span></div>` +
+    `<div class="ps"><span class="l">跨年</span><span class="v">${years.size}</span></div>` +
+    `<div class="ps k"><span class="l">重要</span><span class="v">${keyN}</span></div>`;
+}
+
+/* 筛选状态条：把「当前在看什么」显式写出来，并提供一键清除 */
+function renderPvStatus(list) {
+  const box = $('pv-status-f');
+  if (!box) return;
+  const parts = [];
+  const q = curQ.trim();
+  if (q) {
+    parts.push(`<span class="pf">搜索 <b>${esc(q)}</b> · ${list.length} 条</span>`);
+  }
+  if (curCat !== 'ALL') {
+    parts.push(`<span class="pf">分类 <b>${esc(curCat)}</b> · ${list.length} 条</span>`);
+  }
+  if (onlyKey) {
+    parts.push(`<span class="pf">只看<b>重要</b></span>`);
+  }
+  if (parts.length) {
+    parts.push(`<button class="pf-clear" id="pv-clear">✕ 清除全部筛选</button>`);
+  }
+  box.innerHTML = parts.join('');
+  // **无筛选时状态条降级为一行轻量文字** ——
+  // 空框占 40px 却没有任何信息，反而把内容往下推。
+  // 去掉边框和内边距后，它退化成一行计数，几乎不占空间。
+  const st = $('pv-status');
+  if (st) st.classList.toggle('pv-status-bare', !parts.length);
+  const cb = $('pv-clear');
+  if (cb) {
+    cb.onclick = () => {
+      curQ = ''; $('q').value = ''; curCat = 'ALL'; onlyKey = false;
+      $('key-filter').classList.remove('on');
+      safeClr();
+      render();
+    };
+  }
 }
 
 /* ===== 改版辅助函数 ===== */
@@ -2443,10 +2992,13 @@ function render() {
     return;
   }
   const q = curQ.trim();
-  let catList = curCat === 'ALL' ? DATA : DATA.filter(e => e.cat === curCat);
+  // **变量名避开全局 catList** —— 同名 let 会遮蔽全局，
+  // 导致这里拿到的是「筛选结果」而不是「分类表」，
+  // 后面读 catList.length 之类会拿到完全错误的值。
+  let catFiltered = curCat === 'ALL' ? DATA : DATA.filter(e => e.cat === curCat);
   // **第二维度筛选：只看重要** —— 与搜索、分类筛选叠加
-  if (onlyKey) catList = catList.filter(e => evKey(e) === 1);
-  const list = q ? catList.filter(e => matchQ(e, q)) : catList;
+  if (onlyKey) catFiltered = catFiltered.filter(e => evKey(e) === 1);
+  const list = q ? catFiltered.filter(e => matchQ(e, q)) : catFiltered;
   curListCache = list;   // 供 renderOvBar 使用（总览带跟随筛选）
 
   applyDefaultCollapse();          // 首次进入默认折叠旧年份
@@ -2470,7 +3022,9 @@ function render() {
   // 页面显示「没有可作为章节的记录」而上方提示写着「找到 N 条」，自相矛盾。
   // **注意**：判据是 viewPinned（手动选视图），**不是** filterOpen（手动开筛选）——
   // 开了筛选不等于用户想留在章节视图。
-  if ((q || onlyKey) && curView === 'chapter' && !viewPinned) {
+  // ★ v32：默认视图改成图谱后，搜索/筛选时从**图谱**切到时间轴
+  //   （图谱在筛选后只剩几个节点，看不出名堂；时间轴才是「按时间读全部」）。
+  if ((q || onlyKey) && curView === 'graph' && !viewPinned) {
     curView = 'axis';
     syncViewTabs();
   }
@@ -2490,6 +3044,8 @@ function render() {
   }
 
   renderCats();
+  renderPvStats();       // v30：左栏概览（记录数 / 跨年数 / 重要数）
+  renderPvStatus(list);  // v30：右栏筛选状态条
 
   const axis = $('axis');
   axis.innerHTML = '';
@@ -2500,7 +3056,9 @@ function render() {
     if (GN.raf) { cancelAnimationFrame(GN.raf); GN.raf = 0; }
   }
 
-  // 章节视图（主视图）
+  // 章节视图 —— ★ v32 暂时下线（页签已移除，默认改图谱）。
+  //   整段保留在文件里，想恢复只需：页签加回一行 + curView 默认值改回 'chapter'。
+  //   注意：章节依赖「跨年段」数据（起止日期），纯单日事件的数据下这屏本来就是空的。
   if (curView === 'chapter') {
     $('yrbar').style.display = 'none';
     $('ovbar').style.display = 'none';
@@ -2812,10 +3370,13 @@ $('ovbar').addEventListener('click', e => {
    写死 148px 会让年份条和年份标题错位（实测 header 实际 243px）。
    这里每次渲染后重新测量，写进 --yr-top。 */
 function syncStickyTop() {
-  const h = document.querySelector('header');
-  if (!h) return;
+  // **v30：吸顶基准从「全宽 header」改成「右栏状态条」** ——
+  // 原来 header 承担了「筛选 + 标题」双重职责，吸顶时占掉近 200px 视口。
+  // 分栏后 header 拆进左栏，右栏顶部只剩一条状态条，
+  // 让它吸顶既保留了「随时知道正在看什么」，又只占 40px。
+  const h = document.querySelector('.pv-status');
   const root = document.documentElement;
-  root.style.setProperty('--yr-top', Math.round(h.getBoundingClientRect().height) + 'px');
+  root.style.setProperty('--yr-top', h ? Math.round(h.getBoundingClientRect().height) + 'px' : '0px');
   // 年份条自身高度（它也吸顶，年份标题要让开它）
   const bar = document.getElementById('yrbar');
   const bh = bar && getComputedStyle(bar).display !== 'none'
@@ -2897,23 +3458,31 @@ $('yr-track').addEventListener('scroll', updateYrNav);   // 滚动时同步按�
 /* ===== 搜索框 ===== */
 const qEl = $('q');
 let qTimer = null;
+/* v30：清掉输入框内的 ✕ 按钮后，原先控制它显隐的调用要变安全。
+   保留这个函数是为了以后想恢复框内 ✕ 时不用改调用点。 */
+function safeClr() {
+  const qc = $('q-clr');
+  if (qc) qc.style.display = 'none';
+}
 qEl.addEventListener('input', () => {
   clearTimeout(qTimer);
   qTimer = setTimeout(() => {
     curQ = qEl.value;
-    $('q-clr').style.display = curQ ? 'block' : 'none';
+    safeClr();
     render();
   }, 140);   // 输入防抖，避免每敲一个字就全量重排
 });
-$('q-clr').onclick = () => {
+/* v30：清除搜索词。原 q-clr 按钮已移除（清除功能上移到右栏状态条的
+   「✕ 清除全部筛选」），但逻辑保留 —— 状态条按钮和 import 预览都会调它。 */
+function clearSearch() {
   qEl.value = ''; curQ = '';
-  $('q-clr').style.display = 'none';
+  safeClr();
   // 清空搜索后，若视图是被搜索自动切走的（用户没手动选过），回主视图
   // （只看重要也一并解除 —— 否则筛选清空后还停在时间轴上）
-  if (!viewPinned && curView === 'axis') { curView = 'chapter'; syncViewTabs(); }
+  if (!viewPinned && curView === 'axis') { curView = 'graph'; syncViewTabs(); }   // ★ v32：回默认视图（图谱）
   if (!onlyKey) filterOpen = false;
   render(); qEl.focus();
-};
+}
 /* ===== 视图切换 ===== */
 /* 第二维度：只看重要 */
 $('key-filter').onclick = () => {
@@ -2924,15 +3493,14 @@ $('key-filter').onclick = () => {
     // 于是筛选后章节视图显示「没有可作为章节的记录」而上方写着「找到 N 条」，自相矛盾。
   render();
 };
-$('v-axis').onclick = () => { curView = 'axis'; $('v-axis').classList.add('on'); $('v-list').classList.remove('on'); syncViewTabs(); render(); };
-$('v-list').onclick = () => { curView = 'list'; $('v-list').classList.add('on'); $('v-axis').classList.remove('on'); syncViewTabs(); render(); };
-/* 顶部品牌条页签（主视图切换） */
+/* 视图页签（主视图切换） */
 function syncViewTabs() {
-  document.querySelectorAll('.brandbar .tab').forEach(x => x.classList.toggle('on', x.dataset.view === curView));
-  $('v-axis').classList.toggle('on', curView === 'axis');
-  $('v-list').classList.toggle('on', curView === 'list');
+  // **v30：页签搬到了左栏 .pv-views，选择器跟着改** ——
+  // 原来用 '.brandbar .tab'，分栏后页签已不在 brandbar 里，
+  // 选择器不跟着改就一个都匹配不到（页签高亮会完全失效）。
+  document.querySelectorAll('.pv-views .tab').forEach(x => x.classList.toggle('on', x.dataset.view === curView));
 }
-document.querySelectorAll('.brandbar .tab').forEach(b => {
+document.querySelectorAll('.pv-views .tab').forEach(b => {
   b.onclick = () => {
     curView = b.dataset.view;
     viewPinned = true;          // 用户主动选的视图，不再被搜索自动切走
@@ -2979,7 +3547,7 @@ function openEdit(ev) {
   $('e-name').value = ev ? ev.title : '';
   $('e-note').value = ev ? ev.note : '';
   const sel = $('e-cat');
-  sel.innerHTML = CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.innerHTML = catList.map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = ev ? ev.cat : '其他';
   // **第二维度：重要程度** —— 已有记录回填其 key；新增时留空（不预设，
   // 由 inferKey 规则在读数据时推断，避免用户被「默认勾上」误导）
@@ -3129,7 +3697,7 @@ function showImportPreview(items, bad, tip) {
       <div class="pv-item">
         <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
         <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
-        <select class="pv-cat" data-i="${i}">${CATS.map(c => `<option value="${c}"${c === e.cat ? ' selected' : ''}>${c}</option>`).join('')}</select>
+        <select class="pv-cat" data-i="${i}">${catList.map(c => `<option value="${c}"${c === e.cat ? ' selected' : ''}>${c}</option>`).join('')}</select>
       </div>`).join('')}</div>
     ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
   $('import-confirm').disabled = false;
@@ -3162,6 +3730,15 @@ $('import-file').onchange = e => {
         keyRules = fileRules;
         saveRules();
         toast('✓ 已同时导入规则词表');
+      }
+      // **v31：表格里带了「分类」工作表 → 一并读回分类表**
+      // 必须在读事件**之前**做：sanitizeEvent 会校验分类是否在表里，
+      // 分类表晚一步到位的话，表格里的新分类会被打成「其他」。
+      const fileCats = readCatsFromBook(wb);
+      if (fileCats) {
+        catList = fileCats;
+        saveCats();
+        toast('✓ 已同时导入分类表');
       }
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
       // **结构化识别** —— 表头里有「事件/标题」列且列数 ≥4 时，按列解析：
@@ -3352,7 +3929,7 @@ function rowsToEvents(rows) {
       sortKey: normDatePart(f).length === 7 ? normDatePart(f) + '-00' : normDatePart(f),
       span: normDatePart(f) !== normDatePart(t),
       title: String(title || '(未命名)'),
-      cat: CATS.includes(cat) ? cat : '其他',
+      cat: catList.includes(cat) ? cat : FALLBACK_CAT,
       note: String(note || ''),
       // 「重要(手动)」列 → key（手动表态，最高优先级）
       //   ★ = 手动重要 / ☆ = 手动不重要 / 空 = 未表态（交给规则实时判定）
@@ -3427,6 +4004,13 @@ function buildXlsx(arr) {
   ]);
   rs['!cols'] = [{ wch: 10 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, rs, RULES_SHEET);
+  // **v31：分类表也跟着数据一起走** ——
+  // 只存本机的话，用户在 A 设备新建的分类到 B 设备就没了
+  // （B 设备读表时会把该分类的记录全打成「其他」—— 数据看似丢了）。
+  // 写进第三个工作表，任何设备拉下来都能对齐。
+  const cs = XLSX.utils.aoa_to_sheet([['分类'], ...catList.map(c => [c])]);
+  cs['!cols'] = [{ wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, cs, CATS_SHEET);
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 }
 /** 从工作簿里读回规则词表（没有该表就返回 null，调用方保留本地词表） */
@@ -3450,6 +4034,24 @@ function readRulesFromBook(wb) {
     return { words, exclude };
   } catch (e) { return null; }
 }
+/** 从工作簿里读回分类表（没有该表就返回 null，调用方保留本地表） */
+function readCatsFromBook(wb) {
+  try {
+    const ws = wb.Sheets[CATS_SHEET];
+    if (!ws) return null;
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const list = [];
+    for (const r of rows) {
+      const v = normCatName(r[0]);
+      if (!v) continue;
+      if (r[0] === '分类') continue;   // 表头行
+      if (!list.includes(v)) list.push(v);
+    }
+    if (!list.length) return null;
+    if (!list.includes(FALLBACK_CAT)) list.push(FALLBACK_CAT);
+    return list;
+  } catch (e) { return null; }
+}
 async function ghPull() {
   const r = await fetch(ghApi() + `?t=${Date.now()}`, { headers: ghHeaders() });
   if (r.status === 404) return null;           // 云端还没有 → 保留本地
@@ -3463,6 +4065,15 @@ async function ghPull() {
   if (remoteRules) {
     keyRules = remoteRules;
     saveRules();
+  }
+  // **v31：云端表格里的「分类」表是权威版本** ——
+  // 同样必须先于读事件生效，否则新分类的记录会被打成「其他」。
+  const remoteCats = readCatsFromBook(wb);
+  remoteCatsList = remoteCats;
+  remoteCatsApplied = !!remoteCats;
+  if (remoteCats) {
+    catList = remoteCats;
+    saveCats();
   }
   return rowsToEvents(XLSX.utils.sheet_to_json(
     wb.Sheets[SHEET_NAME], { header: 1, defval: '' }));
@@ -3506,6 +4117,17 @@ async function doPull(silent) {
       return;
     }
     if (remote.length) {
+      // **v31：合并分类表** —— 云端表可能缺本机新建的分类
+      // （本机加了「行业」但还没同步上去）。直接把云端表整个覆盖过来，
+      // 会让本机那条「行业」记录在下次读数据时被打成「其他」——
+      // 表现为「我明明分类选的是行业，怎么变其他了」。
+      // 规则：**并集**，且本地已有的分类保持原顺序。
+      if (remoteCatsApplied) {
+        const merged = catList.slice();
+        remoteCatsList.forEach(c => { if (!merged.includes(c)) merged.push(c); });
+        catList = merged;
+        saveCats();
+      }
       const localKeys = new Set(DATA.map(e => e.from + '|' + e.title + '|' + e.to));
       const fresh = remote.filter(e => !localKeys.has(e.from + '|' + e.title + '|' + e.to));
       if (fresh.length) {
@@ -3617,6 +4239,99 @@ function openRules() {
 function closeRules() { $('rule-mask').classList.remove('show'); }
 $('rule-btn').onclick = openRules;
 $('rule-cancel').onclick = closeRules;
+
+/* ===== v31：分类管理弹窗 ===== */
+let catEditing = null;    // 正在改名的分类（原名），null = 不在改名态
+
+
+/** 渲染分类管理列表 */
+function renderCatMan() {
+  const box = $('cat-man-list');
+  if (!box) return;
+  const counts = catCounts(DATA);
+  box.innerHTML = catList.map(c => {
+    const locked = c === FALLBACK_CAT;
+    const editing = catEditing === c;
+    const nameCell = editing
+      ? `<input type="text" class="cm-edit" value="${esc(c)}" maxlength="12" autocomplete="off">`
+      : `<span class="cm-name">${esc(c)}</span>`;
+    return `<div class="cm-row${locked ? ' locked' : ''}" data-cat="${esc(c)}">
+      ${nameCell}
+      <span class="cm-n">${counts[c] || 0}</span>
+      <span class="cm-act">
+        ${editing
+          ? `<button class="ok">✓</button><button class="cancel">✕</button>`
+          : `<button class="ed"${locked ? ' disabled' : ''}>改</button><button class="del"${locked ? ' disabled' : ''}>删</button>`}
+      </span>
+    </div>`;
+  }).join('');
+  // 绑定每行的事件（用事件委托，避免反复重建时重复绑定）
+  box.querySelectorAll('.cm-row').forEach(row => {
+    const cat = row.getAttribute('data-cat');
+    const ok = row.querySelector('button.ok'), cancel = row.querySelector('button.cancel');
+    const ed = row.querySelector('button.ed'), del = row.querySelector('button.del');
+    if (ok) ok.onclick = () => {
+      const inp = row.querySelector('.cm-edit');
+      const r = renameCat(cat, inp ? inp.value : '');
+      if (!r.ok) { toast(r.msg); renderCatMan(); return; }
+      catEditing = null;
+      toast(r.msg + (r.moved ? `（${r.moved} 条记录已跟着改）` : ''));
+      renderCatMan(); render();
+    };
+    if (cancel) cancel.onclick = () => { catEditing = null; renderCatMan(); };
+    if (ed) ed.onclick = () => {
+      if (ed.disabled) return;
+      catEditing = cat; renderCatMan();
+      const inp = $('cat-man-list').querySelector('.cm-edit');
+      if (inp) { inp.focus(); inp.select(); }
+    };
+    if (del) del.onclick = () => {
+      if (del.disabled) return;
+      const n = counts[cat] || 0;
+      const msg = n
+        ? `删除「${cat}」？该分类下 ${n} 条记录会归到「其他」。`
+        : `删除「${cat}」？`;
+      if (!confirm(msg)) return;
+      const r = delCat(cat);
+      toast(r.msg + (r.moved ? `（${r.moved} 条记录已归到「其他」）` : ''));
+      renderCatMan(); render();
+    };
+  });
+}
+/** 打开分类管理 */
+function openCats() {
+  catEditing = null;
+  renderCatMan();
+  const m = $('cat-mask');
+  if (m) m.classList.add('show');
+  const inp = $('cat-new');
+  if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 60); }
+}
+/** 关闭分类管理 */
+function closeCats() {
+  catEditing = null;
+  const m = $('cat-mask');
+  if (m) m.classList.remove('show');
+}
+/* 分类区滚动时实时更新底部渐隐提示 */
+$('cats').addEventListener('scroll', () => updateCatsMoreHint($('cats')));
+$('cat-manage-btn').onclick = openCats;
+$('cat-close').onclick = closeCats;
+$('cat-add').onclick = () => {
+  const inp = $('cat-new');
+  const r = addCat(inp ? inp.value : '');
+  if (!r.ok) { toast(r.msg); return; }
+  toast(r.msg);
+  if (inp) inp.value = '';
+  renderCatMan(); render();
+};
+$('cat-new').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); $('cat-add').click(); }
+});
+/** 点弹窗遮罩空白处关闭 */
+$('cat-mask').addEventListener('click', e => {
+  if (e.target === $('cat-mask')) closeCats();
+});
 $('rule-mask').onclick = e => { if (e.target === $('rule-mask')) closeRules(); };
 $('rule-words').oninput = updateRuleStat;
 $('rule-exclude').oninput = updateRuleStat;
@@ -3795,11 +4510,18 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 initTheme();          // 主题开关（深色默认，须在首次 render 前）
 keyRules = loadRules();   // 关键词表必须先加载：旧数据迁移要用它重算
+// **分类表必须先加载** —— loadLocal() 里的 sanitizeEvent 会校验
+// 「分类是否在 catList 里」，不在就打成「其他」。
+// 顺序反了的话，用户自定义的分类会在读数据时被吃掉。
+catList = loadCats();
 DATA = loadLocal();
+// **再把「数据里实际在用、但表里没有」的分类补进表** ——
+// 换设备/从 Excel 导入时可能带来新分类，不补的话那些记录会全变「其他」。
+if (ensureCatsForData(DATA)) render();
 loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v29</div>
+<div class="ver">v32</div>
 </body>
 </html>

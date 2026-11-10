@@ -55,21 +55,82 @@
   <div class="sub">GitHub Pages 整包覆盖上传用</div>
 
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v108.zip</div>
-    <div class="meta" id="meta">🆕 最新 v108：33 个文件 · 1787 KB</div>
+    <div class="nm" id="nm">sumer-pages-v118.zip</div>
+    <div class="meta" id="meta">🆕 最新 v118：33 个文件 · 1817 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="/dl" download="sumer-pages-v108.zip">⬇ 下载 sumer-pages-v108.zip</a>
+  <a class="btn" id="dl" href="sumer-pages-v118.zip" download="sumer-pages-v118.zip">⬇ 下载 sumer-pages-v118.zip</a>
+  <script>
+  /* 下载地址自适应：
+     沙箱网关有自己的文件白名单 —— 只放行页面与 assets/lib，.zip 会被它拦成 403，
+     但它放行无扩展名的 /dl 接口；而 GitHub Pages 这类纯静态托管没有 /dl，
+     只能取同目录下的发布包。所以探测一下：/dl 可用就用它，否则保持相对路径。 */
+  (function () {
+    var a = document.getElementById('dl');
+    if (!a) return;
+    fetch('/dl', { method: 'HEAD' }).then(function (r) {
+      if (r.ok) a.setAttribute('href', '/dl');
+    }).catch(function () {});
+  })();
+  </script>
 
   <div class="chg">
-    <h2 id="chg-title">本次更新 · v108</h2>
+    <h2 id="chg-title">本次更新 · v118</h2>
     <ul id="chg">
-      <li><span class=tag>优化</span>刚需日用账的提醒条从页面最底部移到「记一笔」卡片正上方 —— 原来在窄屏单列时提醒落在最下面，用户正要填账时根本看不到，等于白提醒</li>
-      <li><span class=tag>优化</span>提醒文案同步改为指向前方（&quot;往下记一笔&quot;），并去掉「在下方」这类会因位置变动而失效的表述</li>
+      <li><span class=tag>修复</span>门户点开工具后被弹回门户页面 —— 工具 iframe 请求带 ?v=NN，但服务器对所有 HTML 发的是 Cache-Control: no-store（浏览器压根不缓存它），这个参数对破缓存毫无用处，却恰好是旧版 Service Worker 缓存未命中的元凶：旧 SW 的回落是「任何未命中的 URL 都返回门户首页」，于是门户首页被塞进了工具 iframe。现在 iframe 主路径改为不带参数，新旧 SW 都能命中缓存</li>
+      <li><span class=tag>修复</span>去掉「新 Service Worker 接管后自动刷新页面」—— 自动刷新会把人从正在看的工具页弹回门户首页（正在填的内容全丢）；新 SW 自带 skipWaiting + clients.claim()，不刷新也会自动接管</li>
+      <li><span class=tag>新增</span>工具页加载后自动体检：发现内容被门户首页占用 / 页面空白 / 离线提示页，自动换地址重试（最多 3 次）；仍失败则显示明确提示，并提供「再试一次」与「清除缓存并重载」两个按钮</li>
+      <li><span class=tag>修复</span>断网时体重簿的日期选择器整个失效（报 flatpickr is not defined）—— Service Worker 只预缓存了 xlsx，漏掉 flatpickr.min.js / zh.js / flatpickr.min.css，现已一并预缓存</li>
+      <li><span class=tag>修复</span>Service Worker 的断网回落再加固：只要请求的不是门户首页，就绝不回落到门户首页（原来还依赖浏览器对 iframe 请求 destination 的判定，各家取值不一致）——已用单元测试逐条验证「缓存命中 / 带参请求 / 工具页回落 / 首页回落 / 第三方库」五条分支</li>
+      <li><span class=tag>修复</span>发版时可能把线上整站打挂：重启服务改用「精确按 PID 停止 → 等端口真正释放 → setsid 单层启动」，原来用 `nohup npm run start &amp;` 是 npm → sh → node 三层进程，nohup 只挡住最外层，发版脚本一退出整个进程组被连带带走，服务刚打印完启动日志就被杀掉，线上直接 504</li>
+      <li><span class=tag>新增</span>门户服务保活守护：3000 端口一旦没人监听，5 秒内自动把服务重新拉起，避免任何意外导致网址打不开</li>
+      <li><span class=tag>优化</span>Service Worker 缓存号升至 p612-v148，第三方库缓存号升至 p612-lib-v4</li>
     </ul>
     <details id="chg-hist-box">
-      <summary>更早的更新（<b id="chg-hist-n">134</b> 条）</summary>
+      <summary>更早的更新（<b id="chg-hist-n">176</b> 条）</summary>
       <ul id="chg-hist">
+        <li><span class=tag>修复</span>门户下所有工具打不开（点任意工具都显示「欢迎使用我的百宝箱」）—— Service Worker 联网失败回落时把门户首页塞进了工具 iframe，形成套娃；现在工具页会命中自己的缓存，实在没有缓存时显示明确的离线提示，不再返回首页</li>
+        <li><span class=tag>修复</span>门户 iframe 请求带版本号 ?v=NN，而 SW 安装时缓存的是不带参数的地址，缓存一直匹配不上；回落改为忽略参数再查一次</li>
+        <li><span class=tag>优化</span>门户打开工具时遮罩 12 秒后自动撤掉，避免网络异常时一直转圈</li>
+        <li><span class=tag>优化</span>门户每次打开主动检查 SW 更新，检测到新版本接管后自动刷新一次，旧缓存不会再长期卡住页面</li>
+        <li><span class=tag>新增</span>门户首页新增「⚙ 工具打不开？清除缓存并重载」自助修复入口：一键注销 SW、清空缓存并重载</li>
+        <li><span class=tag>优化</span>Service Worker 缓存号升至 p612-v147</li>
+        <li><span class=tag>新增</span>刚需日用账支持浅色 / 深色双主题：浅色是「雾紫柔光」、深色是「暗夜墨蓝」，顶部工具条新增模式切换按钮（月亮 / 太阳矢量图标）</li>
+        <li><span class=tag>优化</span>首次打开自动跟随系统深浅；手动切换后记住选择、刷新不丢；没手动选过时跟随系统实时变化</li>
+        <li><span class=tag>优化</span>主题切换时背景用双层渐变交叉淡入，不闪白；卡片、输入框、文字平滑过渡，移动端状态栏颜色同步</li>
+        <li><span class=tag>优化</span>深色主题重新适配月份切换条、输入框、表格、预警条、密码弹窗等原先写死的白底，无白色残留</li>
+        <li><span class=tag>修复</span>切换按钮改用矢量图标，避免部分设备把 emoji 显示成方块</li>
+        <li><span class=tag>优化</span>只调整颜色层：刚需蓝 / 非刚需粉紫 / 超支红的数据语义，以及日历圆圈深浅表示当日支出高低的含义均保持不变</li>
+        <li><span class=tag>优化</span>时光自撰集去掉「章节」视图，页签只剩 图谱 / 时间轴 / 列表 三种；关联图谱排到第一个并成为默认视图，打开页面直接看到年份与分类的关联图</li>
+        <li><span class=tag>优化</span>时光自撰集搜索或筛选时从图谱自动切到时间轴（图谱在筛选后只剩几个节点，看不出名堂）；清空搜索后也回到图谱</li>
+        <li><span class=tag>优化</span>时光自撰集左栏页签改成按数量自动均分（原来固定两列，三个页签会空出一格）</li>
+        <li><span class=tag>优化</span>刚需日用账右栏顺序调整：「本月每日记录」从最下面提到「本月概览」正下方 —— 原来要滚到页面底部才看得到当天记了什么</li>
+        <li><span class=tag>优化</span>刚需日用账左栏两个账页签改为并排等宽，「两账合计」移到页签上方单独占一行 —— 原来合计块把两个页签隔开（竖排时是刚需/合计/非刚需三段），现在两个页签肩并肩、合计在上</li>
+        <li><span class=tag>优化</span>刚需日用账移除右栏「本记录仅涵盖 / 不计入」那段说明 —— 两段文字连同它随刚需/非刚需页签切换显隐的逻辑一并注释掉，代码保留、需要时可一键还原</li>
+        <li><span class=tag>修复</span>刚需日用账窄屏（≤560px）下合计块原本会换行到页签下方，与新的「合计在上」布局冲突 —— 现已统一为合计在上、页签并排在下</li>
+        <li><span class=tag>修复</span>刚需日用账在浏览器存储写满（或隐私模式）下仍提示「✓ 已记录」，实际数据没落盘、刷新即丢 —— 现在会明确提示保存失败，记账/改预算/删除/清空都不会再谎报成功</li>
+        <li><span class=tag>修复</span>刚需日用账同一天同一账记了两笔时，概览「累计实际」只算第一条、合计栏却把两条都加起来，同屏两个数字对不上 —— 现在按「每天每账一条」去重（保留最后一条）</li>
+        <li><span class=tag>修复</span>刚需日用账导入的金额/预算为负数时直接放行，负数会抵扣累计实际、把已用百分比算歪 —— 现在负数一律丢弃</li>
+        <li><span class=tag>修复</span>刚需日用账导入 Excel/JSON 后月份标题与日历仍停在旧月份（先渲染再切月份，顺序反了）—— 现在导入后自动回到当前月</li>
+        <li><span class=tag>优化</span>刚需日用账 JSON 导入补上 20MB 体积上限（原来只有 Excel 有，几百 MB 的 JSON 会卡死页面）；本地数据解析失败时先备份原始内容再当空账本，避免下次保存把原始数据覆盖掉</li>
+        <li><span class=tag>优化</span>刚需日用账 GitHub 同步配置写不进本地存储时不再假装「已连接」；非刚需卡片标签由「本月」改为「今日」（原标签写本月、填的是今日金额，一张卡里混了两个口径）</li>
+        <li><span class=tag>修复</span>刚需日用账四处理财分段排序的比较器在生效日相同时返回 1（违反 sort 契约），两段同日的预算顺序不确定、天数可能算错</li>
+        <li><span class=tag>新增</span>刚需日用账「本月每日记录」改成日历视图：整月网格一眼看全每天的金额，点日期展开当天记账明细（备注 / 记账时间 / 日预算 / 超支提示）</li>
+        <li><span class=tag>新增</span>日历明细里可直接删除单条记录（规则与原表格一致：当天录入的才可删、已结清月份锁定），同时保留「表格」一键切回整月列表</li>
+        <li><span class=tag>优化</span>日历里刚需用蓝色、非刚需用粉紫色（与表格里的非刚需徽章同色），红色只留给「超支」提示 —— 三种颜色各司其职，不再互相混淆</li>
+        <li><span class=tag>优化</span>日期圆圈底色深浅表示当天支出高低，花得多的日子一眼看出；没记账的日子只留日期不画圈，空白处不再显眼</li>
+        <li><span class=tag>新增</span>时光自撰集支持自定义分类：左栏「⚙ 分类」按钮可新增/改名/删除，改名时该分类下已有记录一起迁移，删除时归到「其他」</li>
+        <li><span class=tag>优化</span>时光自撰集左栏分类栏固定显示 6 项 + 超出滚动，底部渐隐提示还有更多；0 条记录的分类置灰显示</li>
+        <li><span class=tag>优化</span>时光自撰集分类表跟着 Excel/云端表格一起同步，换设备后自定义分类不会丢</li>
+        <li><span class=tag>优化</span>时光自撰集改成左右分栏布局：左边常驻控制台（视图页签/搜索/分类/操作），右边纯内容，顶部省出约 180px</li>
+        <li><span class=tag>优化</span>时光自撰集新增右栏「筛选状态条」：搜索或筛选后立刻显示命中条数与条件，并可一键清除 —— 原来搜完必须滚回顶才知道找到几条</li>
+        <li><span class=tag>优化</span>时光自撰集分类改为竖排全展示，7 个分类不再折进「更多」，每项的条数一直可见</li>
+        <li><span class=tag>优化</span>时光自撰集删除重复的「时间轴/列表」切换器（与顶部视图页签是同一件事的两个入口）</li>
+        <li><span class=tag>优化</span>时光自撰集左栏新增记录数/跨年数/重要数概览；关联图谱画布加宽至 822px，节点分布更饱满</li>
+        <li><span class=tag>优化</span>轻身时光簿的「最新体重」提为页面主视觉：数字放大到 46px 渐变大字，涨跌幅做成右上角徽章，并新增「最近一次什么时候称的」日期提示</li>
+        <li><span class=tag>优化</span>轻身时光簿其余 4 个指标（初始体重/平均/距目标/已记录）降为下方小网格，主次分明不再平铺抢视线</li>
+        <li><span class=tag>优化</span>刚需日用账的提醒条从页面最底部移到「记一笔」卡片正上方 —— 原来在窄屏单列时提醒落在最下面，用户正要填账时根本看不到，等于白提醒</li>
+        <li><span class=tag>优化</span>提醒文案同步改为指向前方（&quot;往下记一笔&quot;），并去掉「在下方」这类会因位置变动而失效的表述</li>
         <li><span class=tag>优化</span>刚需日用账改成左右分栏布局（与体重记录工具一致）：左边放切换页签/记一笔/预警，右边放概览/柱图/预算/每日记录，表格和图表不再被挤窄</li>
         <li><span class=tag>优化</span>刚需日用账页面加宽到 1080px，顶部的切换页签不再横贯整页，手机端仍自动单列显示</li>
         <li><span class=tag>修复</span>刚需日用账左右分栏后，左栏的日期框和金额框被撑成两个大块（高度 110-140px）—— 现在恢复为正常的一行高度，并排得更紧凑</li>
@@ -220,7 +281,7 @@
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v108），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v148），否则页面看起来"没变化"</div>
 </div>
 </body>
 </html>
