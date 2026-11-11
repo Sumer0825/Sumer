@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -160,7 +161,7 @@
         </div>
       </div>
     </div>
-    <iframe class="frame" id="frame" title=""></iframe>
+    <iframe class="frame" id="frame" title="" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"></iframe>
   </div>
 
 <script>
@@ -193,7 +194,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 32, 'weight.html': 36, 'budget.html': 41, 'storage.html': 27, 'ledger.html': 19, 'analysis.html': 23, 'daily.html': 4 };
+const TOOLS_VER = { 'time.html': 33, 'weight.html': 38, 'budget.html': 43, 'storage.html': 29, 'ledger.html': 21, 'analysis.html': 24, 'daily.html': 5 };
 
 TOOLS.forEach((t, i) => {
   if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里

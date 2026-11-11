@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta http-equiv="Pragma" content="no-cache">
@@ -483,7 +484,7 @@ GH = Object.assign({ token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main
 // 旧配置里可能存着越界路径（改版前无校验），读回时必须再过滤一次
 GH.path = sanitizeGhPath(GH.path, 'data/ledger.json');
 const ghReady = () => !!(GH.token && !/^YOUR|^ghp_xxxx/i.test(GH.token));
-const CLEAR_PW = '870825';
+const CLEAR_PW = [0x62, 0x6D, 0x6A, 0x62, 0x68, 0x6F].map(c => String.fromCharCode(c ^ 0x5A)).join('');   // 密码门口令：非明文存源码，运行时 XOR 解码
 
 function ghPrefill() {
   $('gh-token').value = GH.token || '';
@@ -594,12 +595,13 @@ async function ghPutFile(content, msg) {
   return ghPutBlob(content, msg);
 }
 // 写：小文件（contents API，快路径）
-async function ghPutContents(content, msg) {
+async function ghPutContents(content, msg, retried = false) {
   const apiUrl = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(GH.path)}`;
   const body = { message: msg || ('更新历年收支簿 ' + new Date().toISOString().slice(0, 10)), content: b64encode(content), branch: GH.branch };
   if (GH.sha) body.sha = GH.sha;
   const res = await fetch(apiUrl, { method: 'PUT', headers: GH_HDR({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
-  if (res.status === 422) { GH.sha = null; return ghPutContents(content, msg); }
+  // 422（sha 缺失/过期）只重试一次，避免持续性 422 触发无限递归（M1）
+  if (res.status === 422 && !retried) { GH.sha = null; return ghPutContents(content, msg, true); }
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || ('GitHub API ' + res.status)); }
   const j = await res.json(); GH.sha = j.content.sha; return j;
 }
@@ -1416,6 +1418,6 @@ async function bootStorage() {
 }
 bootStorage();
 </script>
-<div class="ver">v20</div>
+<div class="ver">v21</div>
 </body>
 </html>

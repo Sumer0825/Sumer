@@ -1,10 +1,10 @@
 /* Planet 612 Service Worker
  * 目标：iOS 主屏幕（standalone）模式下，联网时永远加载最新版，断网时可用缓存兜底。
  * 发版时把 CACHE 版本号 +1（与 index.html 的 TOOLS_VER 同步升），activate 自动清旧缓存。 */
-const CACHE = 'p612-v148';
+const CACHE = 'p612-v152';
 const CORE = ['./', './index.html', './time.html', './weight.html', './budget.html', './storage.html', './ledger.html', './analysis.html', './daily.html', './manifest.json',
   './assets/icon-192.png', './assets/icon-512.png', './assets/icon-192-maskable.png', './assets/icon-512-maskable.png', './assets/apple-touch-icon.png',
-  './assets/bg-storage.png', './assets/bg-budget.png', './assets/bg-weight.png', './assets/bg-time.png', './assets/bg-ledger.png', './assets/bg-daily.png'];
+  './assets/bg-storage.png', './assets/bg-budget.png', './assets/bg-weight.png', './assets/bg-time.png', './assets/bg-ledger.png', './assets/bg-daily.png', './assets/bg.jpg'];
 
 /* 缓存命名前缀 —— 只清自己这一族的缓存。
  * 原来的写法是 caches.keys().filter(k => k !== CACHE).map(k => caches.delete(k))，
@@ -39,7 +39,8 @@ const OFFLINE_PAGE = `<!doctype html><html lang="zh-CN"><head><meta charset="utf
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(CORE))
+      // 逐个预缓存且单文件失败不影响整体安装（L4）：旧版 addAll 任一资源 404 就令整个 SW 安装失败
+      .then(c => Promise.all(CORE.map(u => c.add(u).catch(() => {}))))
       // 第三方库一起预缓存：断网首访也能拿到（单个文件失败不影响整体安装）
       .then(() => caches.open(LIB_CACHE))
       .then(c => Promise.all(LIB.map(u => c.add(u).catch(() => {}))))
@@ -73,8 +74,9 @@ self.addEventListener('fetch', e => {
     // 页面：network-first —— 联网时永远拿最新，断网回落缓存
     e.respondWith(
       fetch(e.request).then(r => {
-        const copy = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+        // 只缓存成功响应（避免 404/500 被永久缓存）；缓存键剥掉 query，
+        // 防止自愈重试的 ?r=时间戳 造成缓存条目无限膨胀（L4）
+        if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(url.origin + url.pathname, copy)); }
         return r;
       }).catch(() => caches.match(e.request)
         // 门户 iframe 请求带 ?v=NN，install 时 addAll 缓存的却是不带参数的 key。
@@ -108,8 +110,7 @@ self.addEventListener('fetch', e => {
       caches.open(LIB_CACHE).then(c => c.match(e.request)).then(m => {
         if (m) return m;
         return fetch(e.request).then(r => {
-          const copy = r.clone();
-          caches.open(LIB_CACHE).then(c2 => c2.put(e.request, copy));
+          if (r.ok) { const copy = r.clone(); caches.open(LIB_CACHE).then(c2 => c2.put(e.request, copy)); }
           return r;
         });
       })
@@ -119,9 +120,9 @@ self.addEventListener('fetch', e => {
 
   // 其余静态资源（字体/图片）：cache-first —— 发版清缓存，不担心旧资源
   e.respondWith(
-    caches.match(e.request).then(m => m || fetch(e.request).then(r => {
-      const copy = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
+    // ignoreSearch 让带 ?v=NN 的资源（如门户背景 bg.jpg?v=2）命中预缓存的无 query 副本（L4）
+    caches.match(e.request).then(m => m || caches.match(e.request, { ignoreSearch: true })).then(m => m || fetch(e.request).then(r => {
+      if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
       return r;
     }))
   );

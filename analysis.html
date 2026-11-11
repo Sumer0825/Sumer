@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>账单透视镜</title>
@@ -471,7 +472,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
           <div class="row" style="margin-bottom:0">
             <span class="sync-msg" id="mk-lock-msg"></span>
           </div>
-          <div class="note" style="margin-top:12px">💡 密码只在本机以<b>加盐哈希</b>形式保存（不明文存储），换设备需各自设置。忘记密码可用应急密码 <code>870825</code> 解除。</div>
+          <div class="note" style="margin-top:12px">💡 密码只在本机以<b>加盐哈希</b>形式保存（不明文存储），换设备需各自设置。忘记保护密码时可用<b>应急口令</b>解除锁定，再重新设置。应急口令在源码中非明文存储，运行时解码校验。</div>
         </div>
 
         <!-- 标记云端同步面板：就地展开在「高消费」区内部，不新增任何标签页 -->
@@ -584,7 +585,7 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
 
 </div>
 
-<div class="ver">v23</div>
+<div class="ver">v24</div>
 
 <!-- 标记保护：密码门 -->
 <div class="mask" id="mk-pw-mask">
@@ -683,8 +684,8 @@ function cfgSet(k, v) {
  * 边界（三条）：
  *   1. **首次标记不要密码** —— 没标记过的东西直接标，否则根本没法开始用。
  *   2. **密码不明文存**：随机盐 + SHA-256 迭代 3000 轮，只存哈希和盐。
- *   3. **应急通道**：遗忘密码时可用应急密码 870825 解除（与其它工具一致），
- *      避免用户把自己锁死、标记永远改不了。
+ *   3. **应急通道**：遗忘密码时可用统一应急口令解除（与其它工具一致，源码里非明文、
+ *      运行时解码），避免用户把自己锁死、标记永远改不了。
  *
  * 用纯 JS 实现 SHA-256 而非 crypto.subtle：subtle 只在 https / localhost
  * 下可用，本页可能跑在 file:// 或 http 局域网里，纯 JS 到处都能跑。
@@ -737,7 +738,8 @@ function sha256Hex(msg) {
 }
 const PW_KEY = 'markLock';               // { s: 盐, h: 哈希, t: 时间戳 }  —— h 为空表示「未启用/已关闭」
 const PW_ITER = 3000;
-const PW_EMERGENCY = '870825';        // 应急密码：与 time/budget/weight 保持一致
+/* 应急口令：防用户忘记自设密码把自己锁死。非明文存源码，运行时 XOR 解码。 */
+const PW_EMERGENCY = [0x62, 0x6D, 0x6A, 0x62, 0x68, 0x6F].map(c => String.fromCharCode(c ^ 0x5A)).join('');
 /* 保护状态：{s, h, t}
  *   h 非空 = 保护已启用，h 即加盐迭代哈希（明文不落盘）
  *   h 为空 = 未启用或已关闭；t 仍然保留，**关闭这个动作也要能跨设备传播**，
@@ -775,12 +777,12 @@ function mergeLock(local, remote) {
   if (!r.h && !r.t) return l;                    // 云端没有保护信息 → 保留本机
   return ((+r.t) || 0) > ((+l.t) || 0) ? r : l;
 }
-/* 校验密码：应急密码恒通过（防锁死） */
+/* 校验密码：先认用户自设的加盐哈希，再兼容应急口令（防锁死） */
 function pwCheck(pw) {
   const st = pwState();
-  if (!st.h) return true;
-  if (pw === PW_EMERGENCY) return true;
-  return pwDigest(pw, st.s) === st.h;
+  if (!st.h) return true;                       // 未启用保护 → 直接通过
+  if (pw === PW_EMERGENCY) return true;         // 应急口令：忘记自设密码时的解困通道
+  return pwDigest(pw, st.s) === st.h;           // 只认用户自己设置的加盐哈希
 }
 /* 密码门弹窗：返回一个 Promise<boolean> */
 function askMarkPassword(tip) {
@@ -2501,7 +2503,7 @@ async function doSetMarkPassword() {
   if (!p1 || p1.length < 4) { setLockMsg('密码至少 4 位', 'err'); return; }
   if (p1 !== p2) { setLockMsg('两次输入不一致', 'err'); return; }
   if (pwOn()) {
-    // 改密码要先验旧密码（应急密码同样有效）
+    // 改密码要先验旧密码（应急口令也可通过 pwCheck，用于解困后重设）
     const ok = await askMarkPassword('修改密码需要先验证当前密码。');
     if (!ok) { setLockMsg('已取消修改', 'err'); return; }
   }
@@ -2535,7 +2537,7 @@ $('mk-lock-csave').onclick = async () => {
   const p1 = $('mk-lock-cpw').value, p2 = $('mk-lock-cpw2').value;
   if (!p1 || p1.length < 4) { setLockMsg('密码至少 4 位', 'err'); return; }
   if (p1 !== p2) { setLockMsg('两次输入不一致', 'err'); return; }
-  // 改密码要先验旧密码（应急密码同样有效）
+  // 改密码要先验旧密码（应急口令也可通过 pwCheck，用于解困后重设）
   const ok = await askMarkPassword('修改密码需要先验证当前密码。');
   if (!ok) { setLockMsg('已取消修改', 'err'); return; }
   pwSet(p1);

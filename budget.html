@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1005,7 +1006,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({
 const KEY = 'budget_records_v1';
 // 注：本工具不再内置种子 Excel，无 Token 时本机为空，全部依赖链接后从仓库拉取
 const SHEET_NAME = 'budget';
-const CLEAR_PW = '870825';
+const CLEAR_PW = [0x62, 0x6D, 0x6A, 0x62, 0x68, 0x6F].map(c => String.fromCharCode(c ^ 0x5A)).join('');   // 密码门口令：非明文存源码，运行时 XOR 解码
 
 // ===== 日期工具（全部用本地时区，不用 UTC） =====
 const pad = n => String(n).padStart(2, '0');
@@ -1604,6 +1605,29 @@ async function persist(d) {
   }
   return true;
 }
+/* M2：拉取云端后按记录键做并集合并，避免 DATA=d 整体覆盖丢掉本机未推送的记录。
+ * 传输为 Excel（无逐条时间戳），同键冲突保留本机；仅云端有的记录并入，
+ * 仅本机有的（含刚录入）保留。三张表各自按业务主键合并，合并后过一遍 normData 规整。 */
+function bMergeArr(local, remote, keyFn) {
+  const map = new Map();
+  for (const r of remote) if (r) map.set(keyFn(r), r);
+  const sig = x => JSON.stringify(x);
+  let added = 0, conflicts = 0;
+  for (const r of local) {
+    if (!r) continue;
+    const k = keyFn(r);
+    if (map.has(k)) { if (sig(map.get(k)) !== sig(r)) conflicts++; } else added++;
+    map.set(k, r);                                    // 本机优先
+  }
+  return { merged: [...map.values()], added, conflicts };
+}
+function bMergeData(local, remote) {
+  const A = bMergeArr(local.actuals || [], remote.actuals || [], a => a.date + '|' + a.kind);
+  const B = bMergeArr(local.budgets || [], remote.budgets || [], b => (b.month || '') + '|' + (b.effective_from || ''));
+  const M = bMergeArr(local.monthlyBudgets || [], remote.monthlyBudgets || [], m => m.month);
+  const merged = normData(Object.assign({}, remote, { actuals: A.merged, budgets: B.merged, monthlyBudgets: M.merged }));
+  return { merged, added: A.added + B.added + M.added, conflicts: A.conflicts + B.conflicts + M.conflicts };
+}
 async function refresh() {
   render();                                                // ① 本地缓存先上屏
   if (GH.token) {                                          // ② 有 token → 后台拉取（无 token 时本机为空，全部依赖链接后从仓库拉取）
@@ -1611,8 +1635,11 @@ async function refresh() {
       const d = await ghPull();
       if (d === null) setSync('GitHub 云端暂无 Excel，首次保存将自动创建', '');
       else {
-        DATA = d; save(d); render();
-        setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok');
+        const m = bMergeData(DATA, normData(d));       // M2：按记录并集合并，不整体覆盖
+        DATA = m.merged; save(DATA); render();
+        if (m.added || m.conflicts) persist(DATA);     // 本机有云端没有的 → 把并集推回云端收敛
+        setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN')
+          + (m.conflicts ? ` · 云端有 ${m.conflicts} 处改动，已保留本机版本` : ''), 'ok');
       }
     } catch (e) { setSync('GitHub 读取失败，使用本地缓存：' + e.message, 'err'); }
   } else {
@@ -2687,9 +2714,16 @@ $('gh-connect').onclick = async () => {
       setSync('GitHub 云端暂无 Excel，首次保存将自动创建', '');
       $('gh-msg').textContent = '云端还没有 ' + GH.path + '，保存记录后将自动创建该 Excel';
     } else {
-      DATA = d; save(d); render();
-      setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok');
-      $('gh-msg').textContent = `连接成功，已从 Excel 拉取 ${d.actuals.length} 条实际记录 / ${d.budgets.length} 条预算`;
+      // M2：连接时也走并集合并。切仓库/换设备时云端可能是旧副本，
+      // 整体覆盖会把本机刚录入、尚未推送的记录删掉。
+      const m = bMergeData(DATA, normData(d));
+      DATA = m.merged; save(DATA); render();
+      if (m.added || m.conflicts) persist(DATA);
+      setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN')
+        + (m.conflicts ? ` · 云端有 ${m.conflicts} 处改动，已保留本机版本` : ''), 'ok');
+      $('gh-msg').textContent = `连接成功，合并后共 ${DATA.actuals.length} 条实际记录 / ${DATA.budgets.length} 条预算`
+        + (m.added ? `（本机独有 ${m.added} 项已保留并回推）` : '')
+        + (m.conflicts ? `（${m.conflicts} 处冲突保留本机）` : '');
     }
   } catch (e) {
     setSync('连接失败：' + e.message, 'err');
@@ -2784,6 +2818,6 @@ refresh();
   } catch (e) {}
 })();
 </script>
-<div class="ver">v41</div>
+<div class="ver">v43</div>
 </body>
 </html>

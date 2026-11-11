@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -848,13 +849,13 @@ function renderList() {
         <span class="ds">${di > 0 ? `收 ¥${money(di)}　` : ''}${de > 0 ? `支 ¥${money(de)}` : ''}</span></div>`;
     }
     const isE = r.type === 'expense';
-    h += `<div class="item" data-id="${r.id}">
+    h += `<div class="item" data-id="${esc(r.id)}">
       <div class="info">
         <div class="l1">${esc(r.sub || r.cat)}</div>
         <div class="l2">${isE ? '支出' : '收入'} · ${esc(r.cat)}${r.note ? ' · ' + esc(r.note) : ''}</div>
       </div>
       <div class="amt ${isE ? 'exp' : 'inc'}">${isE ? '−' : '+'}${money(r.amount)}</div>
-      <button class="del" data-del="${r.id}" type="button" title="删除">×</button>
+      <button class="del" data-del="${esc(r.id)}" type="button" title="删除">×</button>
     </div>`;
   });
   if (RECS.length > 120) h += `<div class="hint">只显示最近 120 笔，全部 ${RECS.length} 笔都在本机并存进 Excel。</div>`;
@@ -1228,6 +1229,6 @@ doPull(true);   // 启动时静默拉一次云端
   });
 })();
 </script>
-<div class="ver">v4</div>
+<div class="ver">v5</div>
 </body>
 </html>

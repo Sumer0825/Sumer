@@ -4,7 +4,7 @@
   "description": "时光自撰集 · 轻身时光簿 · 刚需日用账 · 清居置物箱 · 历年收支簿 · 账单透视镜 · 随手记簿 —— 纯前端离线小工具合集",
   "start_url": "./index.html",
   "scope": "./",
-  "id": "/Planet612/",
+  "id": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",

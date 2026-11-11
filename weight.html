@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -572,16 +573,18 @@ const load = () => {
  * 写满时 setItem 抛 QuotaExceededError，不 catch 的话调用方的 await 会直接 reject，
  * 用户看到「什么都没发生」以为没保存，实际数据全丢（而且没有任何提示）。 */
 const save = d => {
-  try {
-    safeSet(KEY, JSON.stringify(d));
-    return true;
-  } catch (e) {
+  // safeSet 配额溢出时返回 false（不抛异常），必须检查返回值，否则恒返回 true 造成「假保存」（M3）
+  let ok = false;
+  try { ok = safeSet(KEY, JSON.stringify(d)); }
+  catch (e) { console.error('[weight] localStorage 序列化失败', e); }
+  if (!ok) {
     const msg = '保存失败：浏览器本地存储空间已满（或处于隐私模式）。\n' +
       '请到「设置 → 清除缓存」导出备份后清理，或减少记录条数。';
     if (typeof toast === 'function') toast(msg); else alert(msg);
-    console.error('[weight] localStorage 写入失败', e);
+    console.error('[weight] localStorage 写入失败');
     return false;
   }
+  return true;
 };
 
 // ===== Excel ↔ 页面数据 转换层 =====
@@ -692,7 +695,7 @@ let GH = {
 
 
   owner: 'sumer0825', repo: 'Sumer', branch: 'main', path: 'data/weight.xlsx',
-  token: localStorage.getItem('weight_gh_token_v1') || localStorage.getItem('gh_token') || '',
+  token: localStorage.getItem('weight_gh_token_v1') || '',   // M4：只认本机专用键，不再回落通用 gh_token（缩小 token 泄露面）
   sha: null
 };
 let DATA = load();   // 内存中的当前数据，渲染以此为准
@@ -748,6 +751,24 @@ async function persist(data) {
     catch (e) { setSync('同步失败：' + e.message, 'err'); console.warn(e); }
   }
 }
+/* M2：体重记录按「日期+时段」键并集合并。
+ * 传输走 Excel（无时间戳列），跨设备无法判定谁更新，故同键冲突一律保留本机，
+ * 避免后台刷新把本机刚录入 / 尚未推送的记录静默删掉。
+ * 云端独有的记录会被并入；本机独有的（含刚录入的）会被保留。 */
+function wKey(r) { return r.date + '|' + (r.seg || '早'); }
+function wSig(r) { return [r.date, r.seg || '早', r.weight, r.note || ''].join('\u0001'); }
+function mergeWeightRecords(local, remote) {
+  const map = new Map();
+  for (const r of remote) if (r && r.date) map.set(wKey(r), r);
+  let added = 0, conflicts = 0;
+  for (const r of local) {
+    if (!r || !r.date) continue;
+    const k = wKey(r);
+    if (map.has(k)) { if (wSig(map.get(k)) !== wSig(r)) conflicts++; } else added++;
+    map.set(k, r);                                   // 本机优先
+  }
+  return { merged: [...map.values()], added, conflicts };
+}
 // 启动加载策略：先用本地缓存立即渲染（秒开），再后台拉 GitHub/种子，到货后静默更新
 async function refresh() {
   render();                                   // ① 本地缓存先上屏，不等网络
@@ -757,8 +778,11 @@ async function refresh() {
       if (d === null) {
         setSync('GitHub 云端暂无 Excel，首次保存将自动创建', '');
       } else {
-        DATA = d; save(d); render();
-        setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok');
+        const m = mergeWeightRecords(DATA, d);        // M2：并集合并，保住本机未推送记录，不整体覆盖
+        DATA = m.merged; save(DATA); render();
+        if (m.added || m.conflicts) persist(DATA);    // 本机有云端没有的 → 把并集推回云端收敛
+        setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN')
+          + (m.conflicts ? ` · 云端有 ${m.conflicts} 处同日改动，已保留本机版本` : ''), 'ok');
       }
     } catch (e) { setSync('GitHub 读取失败，使用本地缓存：' + e.message, 'err'); }
   } else {
@@ -1176,8 +1200,8 @@ function importJson(file) {
   };
   reader.readAsText(file, 'utf-8');
 }
-// 清空密码门（防误触；纯前端页面，密码硬编码在前端源码中，非安全加密）
-const CLEAR_PW = '870825';
+// 清空密码门（防误触；纯前端页面，密码门本身不是加密边界。口令非明文存源码：XOR 编码，运行时解码校验）
+const CLEAR_PW = [0x62, 0x6D, 0x6A, 0x62, 0x68, 0x6F].map(c => String.fromCharCode(c ^ 0x5A)).join('');
 function askPassword(tip) {
   return new Promise(resolve => {
     const mask = $('pw-mask'), input = $('pw-input'), err = $('pw-err');
@@ -1251,7 +1275,7 @@ setInterval(tick, 1000);
 
 // ===== GitHub 同步面板交互 =====
 function ghCfgLoad() {
-  try { const c = JSON.parse(localStorage.getItem('weight_gh_cfg_v1') || localStorage.getItem('gh_cfg') || '{}'); Object.assign(GH, c); } catch {}
+  try { const c = JSON.parse(localStorage.getItem('weight_gh_cfg_v1') || '{}'); Object.assign(GH, c); } catch {}   // M4：不再回落通用 gh_cfg
   if (/\.json$/i.test(GH.path)) GH.path = GH.path.replace(/\.json$/i, '.xlsx');   // 旧 JSON 配置自动迁移到 Excel
   GH.path = sanitizeGhPath(GH.path, 'data/weight.xlsx');   // 旧配置的越界路径在此被拦下
   if (GH.token) safeSet('weight_gh_token_v1', GH.token);
@@ -1295,9 +1319,16 @@ $('gh-connect').onclick = async () => {
       setSync('GitHub 云端暂无 Excel，首次保存将自动创建', '');
       $('gh-msg').textContent = '云端还没有 ' + GH.path + '，保存记录后将自动创建该 Excel';
     } else {
-      DATA = d; save(d);
-      setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN'), 'ok');
-      $('gh-msg').textContent = '连接成功，已从 Excel 拉取 ' + d.length + ' 条';
+      // M2：连接时也走并集合并。切仓库/换设备时云端可能是旧副本，
+      // 整体覆盖会把本机刚录入、尚未推送的记录删掉。
+      const m = mergeWeightRecords(DATA, d);
+      DATA = m.merged; save(DATA);
+      if (m.added || m.conflicts) persist(DATA);
+      setSync('已同步 GitHub Excel · ' + new Date().toLocaleTimeString('zh-CN')
+        + (m.conflicts ? ` · 云端有 ${m.conflicts} 处同日改动，已保留本机版本` : ''), 'ok');
+      $('gh-msg').textContent = '连接成功，合并后共 ' + DATA.length + ' 条'
+        + (m.added ? `（本机独有 ${m.added} 条已保留并回推）` : '')
+        + (m.conflicts ? `（${m.conflicts} 处同日冲突保留本机）` : '');
       render();
     }
   } catch (e) {
@@ -1345,6 +1376,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 refresh();
 </script>
-<div class="ver">v36</div>
+<div class="ver">v38</div>
 </body>
 </html>

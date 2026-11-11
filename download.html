@@ -55,11 +55,11 @@
   <div class="sub">GitHub Pages 整包覆盖上传用</div>
 
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v118.zip</div>
-    <div class="meta" id="meta">🆕 最新 v118：33 个文件 · 1817 KB</div>
+    <div class="nm" id="nm">sumer-pages-v120.zip</div>
+    <div class="meta" id="meta">🆕 最新 v120：33 个文件 · 1825 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="sumer-pages-v118.zip" download="sumer-pages-v118.zip">⬇ 下载 sumer-pages-v118.zip</a>
+  <a class="btn" id="dl" href="sumer-pages-v120.zip" download="sumer-pages-v120.zip">⬇ 下载 sumer-pages-v120.zip</a>
   <script>
   /* 下载地址自适应：
      沙箱网关有自己的文件白名单 —— 只放行页面与 assets/lib，.zip 会被它拦成 403，
@@ -75,20 +75,29 @@
   </script>
 
   <div class="chg">
-    <h2 id="chg-title">本次更新 · v118</h2>
+    <h2 id="chg-title">本次更新 · v120</h2>
     <ul id="chg">
-      <li><span class=tag>修复</span>门户点开工具后被弹回门户页面 —— 工具 iframe 请求带 ?v=NN，但服务器对所有 HTML 发的是 Cache-Control: no-store（浏览器压根不缓存它），这个参数对破缓存毫无用处，却恰好是旧版 Service Worker 缓存未命中的元凶：旧 SW 的回落是「任何未命中的 URL 都返回门户首页」，于是门户首页被塞进了工具 iframe。现在 iframe 主路径改为不带参数，新旧 SW 都能命中缓存</li>
-      <li><span class=tag>修复</span>去掉「新 Service Worker 接管后自动刷新页面」—— 自动刷新会把人从正在看的工具页弹回门户首页（正在填的内容全丢）；新 SW 自带 skipWaiting + clients.claim()，不刷新也会自动接管</li>
-      <li><span class=tag>新增</span>工具页加载后自动体检：发现内容被门户首页占用 / 页面空白 / 离线提示页，自动换地址重试（最多 3 次）；仍失败则显示明确提示，并提供「再试一次」与「清除缓存并重载」两个按钮</li>
-      <li><span class=tag>修复</span>断网时体重簿的日期选择器整个失效（报 flatpickr is not defined）—— Service Worker 只预缓存了 xlsx，漏掉 flatpickr.min.js / zh.js / flatpickr.min.css，现已一并预缓存</li>
-      <li><span class=tag>修复</span>Service Worker 的断网回落再加固：只要请求的不是门户首页，就绝不回落到门户首页（原来还依赖浏览器对 iframe 请求 destination 的判定，各家取值不一致）——已用单元测试逐条验证「缓存命中 / 带参请求 / 工具页回落 / 首页回落 / 第三方库」五条分支</li>
-      <li><span class=tag>修复</span>发版时可能把线上整站打挂：重启服务改用「精确按 PID 停止 → 等端口真正释放 → setsid 单层启动」，原来用 `nohup npm run start &amp;` 是 npm → sh → node 三层进程，nohup 只挡住最外层，发版脚本一退出整个进程组被连带带走，服务刚打印完启动日志就被杀掉，线上直接 504</li>
-      <li><span class=tag>新增</span>门户服务保活守护：3000 端口一旦没人监听，5 秒内自动把服务重新拉起，避免任何意外导致网址打不开</li>
-      <li><span class=tag>优化</span>Service Worker 缓存号升至 p612-v148，第三方库缓存号升至 p612-lib-v4</li>
+      <li><span class=tag>合并</span>采纳第三方安全修复包：新增 Content-Security-Policy、iframe sandbox、分类名与 id 白名单转义、GitHub 同步改为并集合并（不再整体覆盖本机数据）、密码门口令改为运行时解码（源码内无明文）、Service Worker 逐个预缓存且缓存键剥掉 query、manifest 的 id 与 scope 对齐</li>
+      <li><span class=tag>修复</span>单文件版在 CSP 下 Excel 功能全废 —— 第三方库是用 blob URL 注入 srcdoc 的，而父文档的 CSP 会被 iframe 继承并覆盖 iframe 自己的 meta；构建时给 script-src 补上 blob: 即可</li>
+      <li><span class=tag>优化</span>各工具版本角标与门户 TOOLS_VER 对齐（time 33 / weight 38 / budget 43 / storage 29 / ledger 21 / analysis 24 / daily 5），避免门户与页面显示不一致</li>
+      <li><span class=tag>新增</span>CSP + iframe sandbox 专项测试（tools/test_csp_sandbox.py）与单文件版降级测试（tools/test_standalone_fallback.py）</li>
     </ul>
     <details id="chg-hist-box">
-      <summary>更早的更新（<b id="chg-hist-n">176</b> 条）</summary>
+      <summary>更早的更新（<b id="chg-hist-n">189</b> 条）</summary>
       <ul id="chg-hist">
+        <li><span class=tag>修复</span>置物箱打不开（列表一片空白、像坏了）—— IndexedDB 打不开时（无痕模式 / iframe 里第三方存储被禁 / 存储配额满），初始化链在读数据那一步直接断掉，原来的兜底只有一句 alert，而 alert 在 iframe 里常被拦截，用户既看不到提示、页面也永远不会渲染出来。现在改为三层降级：IndexedDB → localStorage → 内存，任何一种环境下都能正常打开使用</li>
+        <li><span class=tag>修复</span>历年收支簿同款问题同款修复（它的初始化链结构和置物箱一模一样）</li>
+        <li><span class=tag>新增</span>存储降级时页面顶部出现明确提示条，写明当前处于「兼容模式」还是「临时模式」，以及数据会不会丢；不再靠弹窗（弹窗在 iframe 里经常被拦）</li>
+        <li><span class=tag>优化</span>IndexedDB 写入中途失败（配额满）会自动把已有数据搬到 localStorage 并继续用，用户不会看到数据「凭空消失」</li>
+        <li><span class=tag>新增</span>置物箱、历年收支簿的存储故障注入测试（tools/test_storage_fallback.py、tools/test_ledger_fallback.py），覆盖「正常 / IDB 被禁 / IDB 报错 / localStorage 也被禁」四种场景</li>
+        <li><span class=tag>修复</span>门户点开工具后被弹回门户页面 —— 工具 iframe 请求带 ?v=NN，但服务器对所有 HTML 发的是 Cache-Control: no-store（浏览器压根不缓存它），这个参数对破缓存毫无用处，却恰好是旧版 Service Worker 缓存未命中的元凶：旧 SW 的回落是「任何未命中的 URL 都返回门户首页」，于是门户首页被塞进了工具 iframe。现在 iframe 主路径改为不带参数，新旧 SW 都能命中缓存</li>
+        <li><span class=tag>修复</span>去掉「新 Service Worker 接管后自动刷新页面」—— 自动刷新会把人从正在看的工具页弹回门户首页（正在填的内容全丢）；新 SW 自带 skipWaiting + clients.claim()，不刷新也会自动接管</li>
+        <li><span class=tag>新增</span>工具页加载后自动体检：发现内容被门户首页占用 / 页面空白 / 离线提示页，自动换地址重试（最多 3 次）；仍失败则显示明确提示，并提供「再试一次」与「清除缓存并重载」两个按钮</li>
+        <li><span class=tag>修复</span>断网时体重簿的日期选择器整个失效（报 flatpickr is not defined）—— Service Worker 只预缓存了 xlsx，漏掉 flatpickr.min.js / zh.js / flatpickr.min.css，现已一并预缓存</li>
+        <li><span class=tag>修复</span>Service Worker 的断网回落再加固：只要请求的不是门户首页，就绝不回落到门户首页（原来还依赖浏览器对 iframe 请求 destination 的判定，各家取值不一致）——已用单元测试逐条验证「缓存命中 / 带参请求 / 工具页回落 / 首页回落 / 第三方库」五条分支</li>
+        <li><span class=tag>修复</span>发版时可能把线上整站打挂：重启服务改用「精确按 PID 停止 → 等端口真正释放 → setsid 单层启动」，原来用 `nohup npm run start &amp;` 是 npm → sh → node 三层进程，nohup 只挡住最外层，发版脚本一退出整个进程组被连带带走，服务刚打印完启动日志就被杀掉，线上直接 504</li>
+        <li><span class=tag>新增</span>门户服务保活守护：3000 端口一旦没人监听，5 秒内自动把服务重新拉起，避免任何意外导致网址打不开</li>
+        <li><span class=tag>优化</span>Service Worker 缓存号升至 p612-v148，第三方库缓存号升至 p612-lib-v4</li>
         <li><span class=tag>修复</span>门户下所有工具打不开（点任意工具都显示「欢迎使用我的百宝箱」）—— Service Worker 联网失败回落时把门户首页塞进了工具 iframe，形成套娃；现在工具页会命中自己的缓存，实在没有缓存时显示明确的离线提示，不再返回首页</li>
         <li><span class=tag>修复</span>门户 iframe 请求带版本号 ?v=NN，而 SW 安装时缓存的是不带参数的地址，缓存一直匹配不上；回落改为忽略参数再查一次</li>
         <li><span class=tag>优化</span>门户打开工具时遮罩 12 秒后自动撤掉，避免网络异常时一直转圈</li>
@@ -281,7 +290,7 @@
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v148），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v152），否则页面看起来"没变化"</div>
 </div>
 </body>
 </html>

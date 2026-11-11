@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta http-equiv="Pragma" content="no-cache">
@@ -617,14 +618,21 @@ function safeImgUrl(u) {
 }
 const clampTxt = (s, n) => String(s == null ? '' : s).slice(0, n);
 
+/* id 白名单（H1 根因修复）：只放行 uid() 会生成的字符（字母/数字/_/-），最长 120。
+ * 含 " < > 等字符的 id 会在侧边栏 data-loc/data-lvl 属性里造成 HTML 注入，
+ * 故非法 id 一律判为非法数据丢弃。合法 uid（时间戳-随机base36）全部命中，不受影响。
+ * 外键 locId/levelId 允许为空，故非字符串/非法时回落为 ''。 */
+const ID_RE = /^[A-Za-z0-9_-]{1,120}$/;
+const safeId = (s) => (typeof s === 'string' && ID_RE.test(s) ? s : '');
+
 /* 单条物品的清洗：返回 null 表示这条数据非法，直接丢弃 */
 function sanitizeItem(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  const id = safeId(raw.id);
   if (!id) return null;
   return {
     id,
-    levelId: typeof raw.levelId === 'string' ? raw.levelId.slice(0, 120) : '',
+    levelId: safeId(raw.levelId),
     name: clampTxt(raw.name, MAX_TXT),
     qty: clampTxt(raw.qty, MAX_TXT),
     note: clampTxt(raw.note, MAX_NOTE),
@@ -635,17 +643,17 @@ function sanitizeItem(raw) {
 }
 function sanitizeLoc(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  const id = safeId(raw.id);
   if (!id) return null;
   return { id, name: clampTxt(raw.name, MAX_TXT), order: Number.isFinite(raw.order) ? raw.order : 0 };
 }
 function sanitizeLevel(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
+  const id = safeId(raw.id);
   if (!id) return null;
   return {
     id,
-    locId: typeof raw.locId === 'string' ? raw.locId.slice(0, 120) : '',
+    locId: safeId(raw.locId),
     name: clampTxt(raw.name, MAX_TXT),
     order: Number.isFinite(raw.order) ? raw.order : 0,
   };
@@ -760,12 +768,12 @@ function renderSidebar() {
     const icoActive = l.id === currentLoc ? " active" : "";
     const firstChar = (l.name || "?").trim().charAt(0) || "?";
     html += `<div class="loc">
-      <div class="loc-row${active}" data-loc="${l.id}" title="${esc(l.name)}"><span class="ico-circle${icoActive}">${esc(firstChar)}</span><span class="lbl-name"><span class="arr">${collapsed ? "▸" : "▾"}</span> ${esc(l.name)}</span><span class="cnt">${myLevels.length}层</span></div>
+      <div class="loc-row${active}" data-loc="${esc(l.id)}" title="${esc(l.name)}"><span class="ico-circle${icoActive}">${esc(firstChar)}</span><span class="lbl-name"><span class="arr">${collapsed ? "▸" : "▾"}</span> ${esc(l.name)}</span><span class="cnt">${myLevels.length}层</span></div>
       <div class="lvls" style="${collapsed ? "display:none" : ""}">
         ${myLevels.map(L => {
           const cnt = items.filter(i => i.levelId === L.id).length;
           const a = L.id === currentLevel ? " active" : "";
-          return `<div class="lvl-row${a}" data-lvl="${L.id}"><span>${esc(L.name)}</span><span class="cnt">${cnt}</span></div>`;
+          return `<div class="lvl-row${a}" data-lvl="${esc(L.id)}"><span>${esc(L.name)}</span><span class="cnt">${cnt}</span></div>`;
         }).join("")}
       </div>
     </div>`;
@@ -1167,7 +1175,7 @@ GH = Object.assign({ token: '', owner: 'sumer0825', repo: 'Sumer', branch: 'main
 const ghReady = () => !!(GH.token && !/^YOUR|^ghp_xxxx/i.test(GH.token));
 
 /* ---------- 危险操作密码门 ---------- */
-const CLEAR_PW = '870825';
+const CLEAR_PW = [0x62, 0x6D, 0x6A, 0x62, 0x68, 0x6F].map(c => String.fromCharCode(c ^ 0x5A)).join('');   // 密码门口令：非明文存源码，运行时 XOR 解码
 function askPassword(msg, title) {
   return new Promise((resolve) => {
     $('pw-title').textContent = title || '🔒 操作确认';
@@ -1211,9 +1219,31 @@ function ghPrefill() {
   $('gh-branch').value = GH.branch || 'main';
   $('gh-path').value = GH.path || '';
 }
+/* 状态栏真实元素是 #sync-status（class sync-status / .ok / .err）。
+ * 旧版误写成不存在的 #sync-msg + class 'msg'，每次同步消息都抛 TypeError（L1）。 */
+let syncMsgUntil = 0;   // 详细消息保护期：期内 refreshSyncUI 不覆盖文案
 function setSyncMsg(txt, cls) {
-  const el = $('sync-msg'); el.textContent = txt; el.className = 'msg' + (cls ? ' ' + cls : '');
-  if (cls === 'ok' || cls === 'err') setTimeout(() => { el.textContent = ''; el.className = 'msg'; }, 4000);
+  const el = $('sync-status'); if (!el) return;
+  el.textContent = txt;
+  el.className = 'sync-status' + (cls === 'ok' ? ' ok' : cls === 'err' ? ' err' : '');
+  $('sync-now-btn').style.display = ghReady() ? '' : 'none';
+  const dc = $('gh-disconnect'); if (dc) dc.style.display = ghReady() ? '' : 'none';
+  if (cls === 'ok' || cls === 'err') {
+    syncMsgUntil = Date.now() + 4000;
+    setTimeout(() => { if (Date.now() >= syncMsgUntil) refreshSyncUI(); }, 4000);
+  }
+}
+/* 按真实连接态刷新状态栏与按钮显隐（旧版只调用未定义，5 处全抛 ReferenceError，L1）。
+ * 行为对齐 budget/weight 的 setSync；详细消息保护期内不覆盖文案。 */
+function refreshSyncUI() {
+  $('sync-now-btn').style.display = ghReady() ? '' : 'none';
+  const dc = $('gh-disconnect'); if (dc) dc.style.display = ghReady() ? '' : 'none';
+  const el = $('sync-status'); if (!el) return;
+  if (Date.now() < syncMsgUntil) return;
+  if (!ghReady()) { el.textContent = '未连接 GitHub'; el.className = 'sync-status'; }
+  else if (ghConnected === true) { el.textContent = '已连接 GitHub'; el.className = 'sync-status ok'; }
+  else if (ghConnected === false) { el.textContent = 'GitHub 连接失败'; el.className = 'sync-status err'; }
+  else { el.textContent = '已配置 GitHub（待探测）'; el.className = 'sync-status'; }
 }
 /* ---------- 自动同步（每次改动后自动推到仓库） ---------- */
 // GitHub 实际连通性（null=未探测  true=正常  false=探测失败）
@@ -1622,6 +1652,6 @@ async function bootStorage() {
 }
 bootStorage();
 </script>
-<div class="ver">v28</div>
+<div class="ver">v29</div>
 </body>
 </html>

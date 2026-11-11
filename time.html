@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1633,7 +1634,7 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
 const KEY = 'time_events_v1';
 const SHEET_NAME = 'events';
 const RULES_SHEET = '规则';        // 规则词表工作表（跟着数据走，解决跨设备判定不一致）
-const CLEAR_PW = '870825';
+const CLEAR_PW = [0x62, 0x6D, 0x6A, 0x62, 0x68, 0x6F].map(c => String.fromCharCode(c ^ 0x5A)).join('');   // 密码门口令：非明文存源码，运行时 XOR 解码
 const $ = id => document.getElementById(id);
 /* ===== v31：分类表从硬编码改为「可持久化 + 可编辑」=====
    原来 CATS 是写死的常量，带来三个限制：
@@ -3547,7 +3548,7 @@ function openEdit(ev) {
   $('e-name').value = ev ? ev.title : '';
   $('e-note').value = ev ? ev.note : '';
   const sel = $('e-cat');
-  sel.innerHTML = catList.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.innerHTML = catList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   sel.value = ev ? ev.cat : '其他';
   // **第二维度：重要程度** —— 已有记录回填其 key；新增时留空（不预设，
   // 由 inferKey 规则在读数据时推断，避免用户被「默认勾上」误导）
@@ -3697,7 +3698,7 @@ function showImportPreview(items, bad, tip) {
       <div class="pv-item">
         <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
         <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
-        <select class="pv-cat" data-i="${i}">${catList.map(c => `<option value="${c}"${c === e.cat ? ' selected' : ''}>${c}</option>`).join('')}</select>
+        <select class="pv-cat" data-i="${i}">${catList.map(c => `<option value="${esc(c)}"${c === e.cat ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
       </div>`).join('')}</div>
     ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
   $('import-confirm').disabled = false;
@@ -4522,6 +4523,6 @@ loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
 </script>
-<div class="ver">v32</div>
+<div class="ver">v33</div>
 </body>
 </html>

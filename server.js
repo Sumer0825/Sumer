@@ -4,7 +4,7 @@ const path = require('path');
 
 const DIR = __dirname;
 const PORT = process.env.PORT || 3000;
-const ZIP = path.join(DIR, 'sumer-pages-v118.zip');
+const ZIP = path.join(DIR, 'sumer-pages-v120.zip');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -45,7 +45,7 @@ http.createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': stat.size,
-      'Content-Disposition': 'attachment; filename="sumer-pages-v118.zip"',
+      'Content-Disposition': 'attachment; filename="sumer-pages-v120.zip"',
       'Cache-Control': 'no-store'
     });
     return fs.createReadStream(ZIP).pipe(res);
