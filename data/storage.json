@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-11-12T03:39:39.712Z",
+  "exportedAt": "2026-11-12T03:39:43.745Z",
   "locations": [
     {
       "id": "1790229205580-hsk7u",
@@ -60,6 +60,12 @@
       "locId": "1794454500140-a7exk",
       "name": "A箱",
       "order": 0
+    },
+    {
+      "id": "1794454783136-hrk1k",
+      "locId": "1794454500140-a7exk",
+      "name": "B箱",
+      "order": 1
     }
   ],
   "items": [
