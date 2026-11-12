@@ -1,11 +1,16 @@
 {
   "version": 1,
-  "exportedAt": "2026-09-24T05:53:26.189Z",
+  "exportedAt": "2026-11-12T03:28:13.355Z",
   "locations": [
     {
       "id": "1790229205580-hsk7u",
       "name": "卧室大货架",
       "order": 0
+    },
+    {
+      "id": "1794454092747-oow1f",
+      "name": "房间床尾衣柜",
+      "order": 1
     }
   ],
   "levels": [],
