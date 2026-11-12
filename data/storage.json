@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-11-12T03:36:08.358Z",
+  "exportedAt": "2026-11-12T03:36:48.349Z",
   "locations": [
     {
       "id": "1790229205580-hsk7u",
@@ -49,5 +49,16 @@
       "order": 3
     }
   ],
-  "items": []
+  "items": [
+    {
+      "id": "1794454607745-yidgb",
+      "levelId": "1794454545661-ec6e3",
+      "name": "纸箱A",
+      "qty": "",
+      "note": "",
+      "url": "",
+      "src": "",
+      "createdAt": 1794454607745
+    }
+  ]
 }
