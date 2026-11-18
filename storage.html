@@ -313,6 +313,55 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     box-shadow: 0 8px 24px rgba(0,0,0,.14); display: none; white-space: pre-wrap;
   }
   .store-notice.show { display: block; }
+
+  /* ===== 排序：位置 + 层 ===== */
+  .sidebar .sb-top { display: flex; gap: 6px; align-items: stretch; margin-bottom: 10px; }
+  .sidebar .sb-top .sb-toggle { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
+  /* 侧栏折叠后只有 56px（内容区 44px），塞不下两个按钮：
+     「展开」按钮会被挤成 4px 宽的小箭头，根本点不着。
+     所以折叠时把排序按钮收起来，宽度全留给展开按钮。 */
+  .sidebar.collapsed .sb-top .sb-sort-btn { display: none; }
+  .sidebar.collapsed .sb-top { margin-bottom: 0; }
+  .sidebar.collapsed .sb-top .sb-toggle { flex: 1 1 100%; }
+  .sb-sort-btn {
+    font-family: inherit; font-size: 13px; color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    transition: all .15s; white-space: nowrap; flex: 0 0 auto; min-width: 34px; padding: 0 8px;
+  }
+  .sb-sort-btn:hover { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+  body.sorting .sb-sort-btn { color: #fff; background: var(--brand); border-color: var(--brand); padding: 0 12px; }
+
+  .sb-sort-tip {
+    display: none; margin: 0 0 8px; padding: 8px 10px; border-radius: 8px;
+    background: var(--brand-soft); color: var(--brand); font-size: 11.5px; line-height: 1.6;
+  }
+  body.sorting .sb-sort-tip { display: block; }
+
+  .sidebar .sort-move { display: none; gap: 2px; flex: 0 0 auto; }
+  body.sorting .sidebar .sort-move { display: inline-flex; }
+  body.sorting .sidebar .loc-row .cnt { display: none; }
+  body.sorting .sidebar .loc-row .lbl-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.sorting .sidebar .lvl-row .cnt { display: none; }
+  body.sorting .sidebar .lvl-row > span:first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .sidebar .sort-move button {
+    font-family: inherit; width: 22px; height: 22px; line-height: 1; font-size: 11px;
+    color: var(--muted); background: #fff; border: 1px solid var(--line);
+    border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    transition: all .12s;
+  }
+  .sidebar .sort-move button:hover:not(:disabled) { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+  .sidebar .sort-move button:disabled { opacity: .3; cursor: not-allowed; }
+
+  .sidebar .loc-row .drag-handle { display: none; font-size: 12px; color: var(--muted); cursor: grab; flex: 0 0 12px; }
+  body.sorting .sidebar .loc-row .drag-handle { display: inline-block; }
+  .sidebar .loc-row.dragging { opacity: .45; }
+  .sidebar .loc-row.drop-target { box-shadow: inset 0 2px 0 var(--brand); }
+  /* 注意：别给 .lvl-row 改背景 —— .lvl-row.active 用白字，
+     盖掉它的底色就会出现「白字 + 浅底」= 那行字直接看不见。 */
+  body.sorting .sidebar .lvl-row.active { background: var(--brand); color: #fff; }
+
 </style>
 </head>
 <body>
@@ -475,7 +524,9 @@ const $ = (id) => document.getElementById(id);
 const DB_NAME = "home-storage", VER = 1;
 const LS_PREFIX = "home-storage-ls:";
 let db = null;
-let storeMode = "idb";            // idb | ls | mem
+let storeMode = "idb";
+let sortMode = false;          // 排序模式（位置 + 层）
+let dragLocId = null;          // 正在拖动的位置 id            // idb | ls | mem
 const memStore = { locations: [], levels: [], items: [] };
 
 function openDB() {
@@ -745,6 +796,42 @@ async function load() {
 }
 
 /* ---------- 渲染 ---------- */
+
+/* ---------- 排序：位置 + 层 ---------- */
+function orderedLocs() {
+  return locations.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+function orderedLevels(locId) {
+  return levels.filter(x => x.locId === locId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+async function moveLoc(id, dir) {
+  const list = orderedLocs();
+  const i = list.findIndex(x => x.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  const tmp = list[i].order; list[i].order = list[j].order; list[j].order = tmp;
+  await Promise.all(list.map(x => put("locations", x)));
+  render();
+}
+async function swapLoc(fromId, toId) {
+  const list = orderedLocs();
+  const i = list.findIndex(x => x.id === fromId);
+  const j = list.findIndex(x => x.id === toId);
+  if (i < 0 || j < 0 || i === j) return;
+  const tmp = list[i].order; list[i].order = list[j].order; list[j].order = tmp;
+  await Promise.all(list.map(x => put("locations", x)));
+  render();
+}
+async function moveLevel(id, dir) {
+  const list = orderedLevels(currentLoc);
+  const i = list.findIndex(x => x.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  const tmp = list[i].order; list[i].order = list[j].order; list[j].order = tmp;
+  await Promise.all(list.map(x => put("levels", x)));
+  render();
+}
+
 function render() {
   renderSidebar();
   renderContent();
@@ -756,24 +843,40 @@ function renderSidebar() {
   sb.classList.toggle("collapsed", sbCollapsed);
   const ico = sbCollapsed ? "›" : "‹";
   const icoLbl = sbCollapsed ? "展开" : "收起";
-  let html = `<button class="sb-toggle" id="sbToggle" title="${sbCollapsed ? '展开侧边栏' : '收起侧边栏'}"><span class="ic">${ico}</span><span class="lbl">${icoLbl}</span></button>`;
+  let html = `<div class="sb-top">` +
+    `<button class="sb-toggle" id="sbToggle" title="${sbCollapsed ? '展开侧边栏' : '收起侧边栏'}"><span class="ic">${ico}</span><span class="lbl">${icoLbl}</span></button>` +
+    `<button class="sb-sort-btn${sortMode ? " on" : ""}" id="sbSortBtn" title="${sortMode ? "完成排序" : "调整位置与层的顺序"}">${sortMode ? "✓ 完成" : "⇅"}</button>` +
+    `</div>`;
+  html += `<div class="sb-sort-tip">位置和层都能排：点位置名展开它的层，再用 ↑↓ 调整；位置左侧的手柄可拖动。</div>`;
   html += `<div class="sb-title">位置</div>`;
   if (!locations.length) {
     html += `<div class="sb-empty" style="font-size:13px;color:var(--muted);padding:6px 10px;">还没有位置</div>`;
   }
-  locations.forEach(l => {
+  const locList = sortMode
+    ? locations.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    : locations;
+  locList.forEach((l, li) => {
     const myLevels = levels.filter(x => x.locId === l.id).sort((a, b) => a.order - b.order);
     const collapsed = collapsedLocs.has(l.id);
     const active = l.id === currentLoc ? " active" : "";
     const icoActive = l.id === currentLoc ? " active" : "";
     const firstChar = (l.name || "?").trim().charAt(0) || "?";
+    const upBtn = sortMode
+      ? `<span class="sort-move"><button data-up="${esc(l.id)}" title="位置上移"${li === 0 ? " disabled" : ""}>↑</button>` +
+        `<button data-down="${esc(l.id)}" title="位置下移"${li === locList.length - 1 ? " disabled" : ""}>↓</button></span>`
+      : "";
+    const handle = sortMode ? `<span class="drag-handle" title="拖动排序">⣿</span>` : "";
     html += `<div class="loc">
-      <div class="loc-row${active}" data-loc="${esc(l.id)}" title="${esc(l.name)}"><span class="ico-circle${icoActive}">${esc(firstChar)}</span><span class="lbl-name"><span class="arr">${collapsed ? "▸" : "▾"}</span> ${esc(l.name)}</span><span class="cnt">${myLevels.length}层</span></div>
+      <div class="loc-row${active}" data-loc="${esc(l.id)}" title="${esc(l.name)}"${sortMode ? ' draggable="true"' : ""}>${handle}<span class="ico-circle${icoActive}">${esc(firstChar)}</span><span class="lbl-name"><span class="arr">${collapsed ? "▸" : "▾"}</span> ${esc(l.name)}</span>${upBtn}<span class="cnt">${myLevels.length}层</span></div>
       <div class="lvls" style="${collapsed ? "display:none" : ""}">
-        ${myLevels.map(L => {
+        ${myLevels.map((L, li2) => {
           const cnt = items.filter(i => i.levelId === L.id).length;
           const a = L.id === currentLevel ? " active" : "";
-          return `<div class="lvl-row${a}" data-lvl="${esc(L.id)}"><span>${esc(L.name)}</span><span class="cnt">${cnt}</span></div>`;
+          const lmv = sortMode
+            ? `<span class="sort-move"><button data-lup="${esc(L.id)}" title="层上移"${li2 === 0 ? " disabled" : ""}>↑</button>` +
+              `<button data-ldown="${esc(L.id)}" title="层下移"${li2 === myLevels.length - 1 ? " disabled" : ""}>↓</button></span>`
+            : "";
+          return `<div class="lvl-row${a}" data-lvl="${esc(L.id)}"><span>${esc(L.name)}</span>${lmv}<span class="cnt">${cnt}</span></div>`;
         }).join("")}
       </div>
     </div>`;
@@ -781,11 +884,55 @@ function renderSidebar() {
   html += `<button class="btn sm ghost sb-new" id="sbNewLoc">＋ 新建位置</button>`;
   html += `<button class="sb-new-collapsed" id="sbNewLocMini" title="新建位置">＋</button>`;
   sb.innerHTML = html;
-  $("sbToggle").onclick = () => toggleSidebar();
+  $("sbToggle").onclick = () => {
+    if (sortMode) { sortMode = false; render(); }   // 收起前先退出排序模式
+    toggleSidebar();
+  };
+  const sortBtn = $("sbSortBtn");
+  // 样式靠 body.sorting 开关（按钮与提示条默认 display:none），这里同步状态类
+  document.body.classList.toggle("sorting", sortMode);
+  if (sortBtn) sortBtn.onclick = () => {
+    sortMode = !sortMode;
+    if (sortMode) {
+      collapsedLocs.clear();               // 进入排序模式就把位置全部展开，方便看到层
+      if (sbCollapsed) toggleSidebar(true); // 折叠态看不见排序按钮，先把侧栏展开
+    }
+    render();
+  };
+  if (sortMode) {
+    sb.querySelectorAll("[data-up]").forEach(b => b.onclick = (e) => { e.stopPropagation(); moveLoc(b.dataset.up, -1); });
+    sb.querySelectorAll("[data-down]").forEach(b => b.onclick = (e) => { e.stopPropagation(); moveLoc(b.dataset.down, 1); });
+    sb.querySelectorAll("[data-lup]").forEach(b => b.onclick = (e) => { e.stopPropagation(); moveLevel(b.dataset.lup, -1); });
+    sb.querySelectorAll("[data-ldown]").forEach(b => b.onclick = (e) => { e.stopPropagation(); moveLevel(b.dataset.ldown, 1); });
+    sb.querySelectorAll(".loc-row[draggable]").forEach(r => {
+      r.addEventListener("dragstart", (e) => {
+        dragLocId = r.dataset.loc;
+        r.classList.add("dragging");
+        try { e.dataTransfer.setData("text/plain", dragLocId); e.dataTransfer.effectAllowed = "move"; } catch (err) {}
+      });
+      r.addEventListener("dragend", () => { dragLocId = null; r.classList.remove("dragging"); sb.querySelectorAll(".drop-target").forEach(x => x.classList.remove("drop-target")); });
+      r.addEventListener("dragover", (e) => { e.preventDefault(); r.classList.add("drop-target"); });
+      r.addEventListener("dragleave", () => r.classList.remove("drop-target"));
+      r.addEventListener("drop", (e) => {
+        e.preventDefault();
+        r.classList.remove("drop-target");
+        const from = dragLocId, to = r.dataset.loc;
+        dragLocId = null;
+        if (from && to && from !== to) swapLoc(from, to);
+      });
+    });
+  }
   $("sbNewLoc").onclick = () => openLocModal();
   const mini = $("sbNewLocMini");
   if (mini) mini.onclick = () => openLocModal();
   sb.querySelectorAll("[data-loc]").forEach(r => r.onclick = () => {
+    if (sortMode) {
+      // 排序模式下点位置名 = 展开/收起它的层列表（方便给层排序）
+      const sid = r.dataset.loc;
+      if (collapsedLocs.has(sid)) collapsedLocs.delete(sid); else collapsedLocs.add(sid);
+      render();
+      return;
+    }
     const id = r.dataset.loc;
     // 收起状态下：单击图标 = 选中位置 + 展开侧边栏；展开状态下：单击行为同原（折叠/展开 位置树）
     if (sbCollapsed) {
@@ -1652,6 +1799,6 @@ async function bootStorage() {
 }
 bootStorage();
 </script>
-<div class="ver">v29</div>
+<div class="ver">v31</div>
 </body>
 </html>

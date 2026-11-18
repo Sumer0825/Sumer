@@ -1358,6 +1358,206 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
     .pv-views { grid-template-columns: repeat(2, 1fr); }
   }
 
+
+  /* ====================== v126：年为主骨架 ====================== */
+
+  /* --- 左栏：年份目录（第一层） --- */
+  .yr-dir {
+    display: flex; flex-direction: column; gap: 0; margin-bottom: 12px;
+    max-height: 40vh; overflow-y: auto; padding-right: 2px;
+    overscroll-behavior: contain;
+  }
+  .yr-dir .yd-row { padding: 1px 7px; gap: 7px; border-radius: 6px; }
+  .yr-dir .yd-y { font-size: 12.5px; min-width: 33px; }
+  .yr-dir .yd-n { font-size: 10.5px; }
+  .yr-dir .yd-bar { height: 6px; }
+  .yr-dir .yd-key { font-size: 10px; }
+  .yr-dir::-webkit-scrollbar { width: 5px; }
+  .yr-dir::-webkit-scrollbar-thumb { background: var(--line-ctl); border-radius: 3px; }
+  .yr-dir-hint { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+  .yd-row {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 6px 8px; border: 1px solid transparent; border-radius: 8px;
+    background: transparent; cursor: pointer; text-align: left;
+    font: inherit; color: var(--text); transition: background .12s ease;
+  }
+  .yd-row:hover { background: var(--primary-soft); }
+  .yd-row.on {
+    background: var(--primary-soft); border-color: var(--primary);
+    box-shadow: 0 1px 4px rgba(79,124,255,.14);
+  }
+  .yd-y {
+    font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+    flex: 0 0 auto; letter-spacing: .2px; min-width: 38px;
+  }
+  .yd-row.on .yd-y { color: var(--primary); }
+  .yd-n { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+  .yd-bar {
+    flex: 1 1 auto; height: 9px; border-radius: 4px; overflow: hidden;
+    display: flex; gap: 1px; min-width: 20px;
+  }
+  .yd-bar i { display: block; height: 100%; }
+  .yd-bar i:first-child { border-radius: 4px 0 0 4px; }
+  .yd-bar i:last-child { border-radius: 0 4px 4px 0; }
+  .yd-key { color: var(--warn); font-size: 11px; flex: 0 0 auto; }
+  .yd-all { margin-bottom: 3px; border-bottom: 1px solid var(--line); border-radius: 0 0 6px 6px; padding-bottom: 4px; }
+  .yd-bar-all { display: none; }
+
+  /* --- 分类压缩成一行 chip --- */
+  /* .pv-cats 原本是 flex-direction:column（竖排大块），
+     选择器优先级比 .pv-cats-compact 高，所以必须 !important 才能覆盖 */
+  .pv-cats-compact {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin-bottom: 12px; padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  .pv-cats-compact .chip {
+    flex: 0 0 auto !important; width: auto !important;
+    min-width: 0 !important; max-width: none !important;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 12px; border: 1px solid var(--line-ctl); background: var(--card);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .pv-cats-compact .chip .cc { font-size: 10.5px; opacity: .65; font-variant-numeric: tabular-nums; }
+  .pv-cats-compact .chip.on { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+  .pv-cats-compact .chip.on .cc { opacity: .85; }
+  .pv-cats-compact .chip.empty-cat { opacity: .45; }
+
+  /* --- 右栏：年视图 --- */
+  .pv-year { display: flex; flex-direction: column; min-height: 0; }
+  .yv-head { margin-bottom: 14px; }
+  .yv-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .yv-y {
+    font-size: 40px; font-weight: 800; line-height: 1.05; letter-spacing: -.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .yv-meta { font-size: 13px; color: var(--muted); }
+  .yv-meta b { color: var(--text); font-size: 15px; font-weight: 700; }
+  .yv-filtered {
+    font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+    background: var(--primary-soft); color: var(--primary);
+  }
+  .yv-stats { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin-top: 12px; }
+  .yv-stats i {
+    display: block; height: 100%; position: relative; cursor: pointer;
+    transition: opacity .12s ease;
+  }
+  .yv-stats i:hover { opacity: .78; }
+  .yv-stats-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 9px; }
+  .yv-stats-legend span {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; color: var(--muted); cursor: pointer;
+  }
+  .yv-stats-legend b { color: var(--text); font-weight: 700; }
+  .yv-stats-legend em { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+
+  /* 全览：按年分组 */
+  .yv-yblock { margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .yv-yhead {
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
+    padding: 12px 16px; background: var(--card);
+    transition: background .12s ease;
+  }
+  .yv-yhead:hover { background: var(--primary-soft); }
+  .yv-ybig {
+    font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums;
+    letter-spacing: -.2px; min-width: 56px;
+  }
+  .yv-ymeta { font-size: 12px; color: var(--muted); flex: 1 1 auto; }
+  .yv-ychev {
+    font-size: 17px; color: var(--muted); transition: transform .16s ease;
+    display: inline-block; line-height: 1;
+  }
+  .yv-yblock.open .yv-ychev { transform: rotate(90deg); }
+  .yv-ybody { display: none; padding: 4px 16px 16px; }
+  .yv-yblock.open .yv-ybody { display: block; }
+
+  /* 该年的事件（按分类分组） */
+  .yv-grp { margin-top: 18px; }
+  .yv-grp-h {
+    display: flex; align-items: baseline; gap: 9px; margin-bottom: 8px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  }
+  .yv-grp-h b { font-size: 14.5px; font-weight: 700; }
+  .yv-grp-h span { font-size: 12px; color: var(--muted); }
+  .yv-grp-h .catdot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .yv-ev {
+    display: flex; align-items: flex-start; gap: 10px; padding: 8px 11px;
+    border: 1px solid var(--line); border-radius: 9px; margin-bottom: 6px;
+    background: var(--card); cursor: pointer; transition: border-color .12s ease;
+  }
+  .yv-ev:hover { border-color: var(--primary); }
+  .yv-ev .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: 0 0 8px; }
+  .yv-ev .bd { flex: 1 1 auto; min-width: 0; }
+  .yv-ev .t { font-size: 13.5px; line-height: 1.45; }
+  .yv-ev .m { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .yv-ev.key-ev { border-left: 3px solid var(--warn); }
+  .yv-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .yv-empty .ico { font-size: 34px; margin-bottom: 10px; }
+
+  /* --- v126：自定义分类颜色（色盘） --- */
+  .color-grid {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 7px; margin: 4px 0 14px;
+  }
+  /* ★ v129：当前颜色指示 —— 让用户随时看得见"现在是什么色" */
+  .color-now {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    margin: 10px 0 14px; padding: 9px 11px; border-radius: 9px;
+    background: rgba(255,255,255,.5); border: 1px solid var(--line);
+  }
+  html[data-theme="dark"] .color-now { background: rgba(27,10,49,.5); }
+  .cn-label { font-size: 12px; color: var(--muted); flex: none; }
+  .cn-swatch {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  }
+  .cn-hex {
+    font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums; color: var(--text); flex: none;
+  }
+  .cn-hint { font-size: 11px; color: var(--muted); flex: 1 1 100%; }
+  .cg {
+    width: 100%; aspect-ratio: 1; border-radius: 8px; border: 2px solid transparent;
+    cursor: pointer; padding: 0; transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .cg:hover { transform: scale(1.14); }
+  .cg.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--card) inset; }
+  .cm-dot {
+    width: 13px; height: 13px; border-radius: 4px; flex: 0 0 13px;
+    display: inline-block; margin-right: 8px;
+  }
+  .cm-custom { color: var(--primary); font-size: 12px; margin-left: 2px; }
+  .pv-cats-compact .chip .cdot {
+    width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px;
+    display: inline-block;
+  }
+  /* ★ v126：分类管理行多了一个色点和一个色盘按钮 → 网格从 3 段变 4 段
+     （色点 | 名称 | 计数 | 按钮）。原来的 3 段会把按钮挤到下一行。 */
+  .cm-row { grid-template-columns: auto 1fr auto auto auto; }
+  .cm-row .cm-dot { margin-right: 0; }
+  .cm-row button.cm-color { padding: 4px 7px; }
+
+  @media (max-width: 640px) {
+    .yv-y { font-size: 32px; }
+    .yr-dir .yd-n { display: none; }
+    .yv-ybig { font-size: 18px; min-width: 48px; }
+  }
+
+  /* ★ v127：地点标签 —— 与分类标签区分开（带 📍） */
+  .tag.place-tag {
+    background: rgba(79,124,255,.10); color: var(--primary);
+    border-color: rgba(79,124,255,.28);
+  }
+  html[data-theme="dark"] .tag.place-tag {
+    background: rgba(187,124,228,.14); color: #c9a8f0;
+    border-color: rgba(187,124,228,.34);
+  }
+  /* 导入预览里的地点标记 —— 确认前要能一眼看出地点对不对 */
+  .pv-item .pv-place { color: var(--primary); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1375,6 +1575,7 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
              用户反馈「完全看不懂」。代码全部保留在下面（renderChapters 等），
              以后想恢复，把这一行加回来 + curView 改回 'chapter' 即可。
              现在默认展示「关联图谱」，图谱排在第一个。 -->
+        <button class="tab" data-view="year" role="tab">按年</button>
         <button class="tab" data-view="graph" role="tab">图谱</button>
         <button class="tab" data-view="axis" role="tab">时间轴</button>
         <button class="tab" data-view="list" role="tab">列表</button>
@@ -1404,18 +1605,26 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
       </div>
       <div class="srch-hint" id="srch-hint" style="display:none"></div>
 
-      <!-- 分类：竖排，固定显示 6 项 + 超出滚动；标题行带「增改分类」入口 -->
+      <!-- ★ v126：年份 = 第一层骨架，年份目录放在最上面 -->
       <div class="pv-cats-head">
-        <span class="pv-cats-t">分类</span>
+        <span class="pv-cats-t">年份浏览</span>
+        <span class="yr-dir-hint" id="yrDirHint"></span>
+      </div>
+      <div class="yr-dir" id="yrDir"></div>
+
+      <!-- ★ v126：分类降级为一行紧凑筛选参数（不再是主角，放在年份之后） -->
+      <div class="pv-cats-head">
+        <span class="pv-cats-t">分类筛选</span>
         <button class="pv-cats-btn" id="cat-manage-btn" title="新增 / 修改 / 删除分类" aria-label="新增或修改分类">⚙ 分类</button>
       </div>
-      <div class="cats pv-cats" id="cats"></div>
+      <div class="cats pv-cats pv-cats-compact" id="cats"></div>
 
       <!-- 操作区 -->
       <div class="toolbar pv-toolbar">
         <button class="tb pri" id="add-btn">+ 新增事件</button>
         <button class="tb" id="import-btn">导入</button>
         <button class="tb" id="export-btn">导出</button>
+        <button class="tb" id="dedupe-btn" style="display:none;color:var(--danger);border-color:rgba(192,80,60,.35)">⚠ 清理重复</button>
         <button class="tb" id="sync-btn">⚙ 云端</button>
         <button class="tb" id="clear-btn" style="color:var(--danger);border-color:rgba(192,80,60,.3)">清空</button>
       </div>
@@ -1444,6 +1653,12 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
     </div>
 
     <div class="axis" id="axis"></div>
+
+    <!-- ★ v126：年视图（年 → 分类统计 → 事件） -->
+    <section class="pv-year" id="view-year" style="display:none">
+      <div class="yv-head" id="yvHead"></div>
+      <div class="yv-body" id="yvBody"></div>
+    </section>
 
     <!-- 关联图谱 -->
     <div class="axis" id="graph-wrap" style="display:none">
@@ -1486,6 +1701,7 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
     </div>
     <div class="fld"><label>事件</label><input type="text" id="e-name" placeholder="如：居住在北京清河宝盛西里"></div>
     <div class="fld"><label>分类</label><select id="e-cat"></select></div>
+    <div class="fld"><label>地点（可选）</label><input type="text" id="e-place" maxlength="60" placeholder="如 北京 / 上海 / 青海" autocomplete="off"></div>
     <div class="fld"><label>备注（可选）</label><textarea id="e-note" placeholder="想补充的细节…（可换行，多行会分行显示）"></textarea></div>
     <label class="key-pick" id="e-key-pick" title="标记为人生节点 / 重要时刻">
       <input type="checkbox" id="e-key">
@@ -1689,7 +1905,7 @@ let curCat = 'ALL';
 /* ===== 查看体验改版：新增状态 ===== */
 let curQ = '';        // 搜索关键词
 /* ★ v32：默认视图改为「图谱」（章节视图暂时下线，见页签处说明） */
-let curView = 'graph';   // 'graph'(默认) | 'axis' | 'list' | 'chapter'(暂时下线，代码保留)
+let curView = 'year';   // ★ v126：'year'(默认，年=第一层骨架) | 'graph' | 'axis' | 'list' | 'chapter'(下线)
 /* 第二维度筛选：只看重要事件 */
 let onlyKey = false;
 let openEvId = null;  // 手机端点开的卡片
@@ -1781,11 +1997,62 @@ function parseText(text) {
   return { items: out, bad };
 }
 
+/* ---------- 去重：统一键 + 批内去重 ----------
+   ★ v123 修复：之前拉取云端时只用「本机已有记录」做比对（localKeys），
+   云端文件**内部**自己重复的行彼此不比对 —— 于是那份重复数据每次拉取
+   都会被当成"新记录"全量收进来，再推回云端固化，形成"越同步越乱"的回环。
+   现在统一成一个键函数，且**批内也去重**：
+   · 完全相同（起止+标题+分类+备注+重要标记 全等）→ 视为同一条，只留一条
+   · 起止+标题相同但分类/备注不同 → 视为不同记录，都保留（可能是用户改过分类）
+   导入（confirmImport）与云端拉取（doPull）用的是同一个函数，不会再各判各的。 */
+function eventKey(e) {
+  // ★ v127：地点也纳入去重键 —— 同一段时间同一标题但地点不同，是两条不同的记录
+  return [e.from || '', e.to || '', e.title || '', e.cat || '', e.place || '',
+          e.note || '', e.key === undefined ? '' : e.key].join('\u0001');
+}
+/** 批内去重：同 key 只留第一条，返回 [保留项, 被去掉的项] */
+function dedupeList(arr) {
+  const seen = new Set(), keep = [], dropped = [];
+  for (const e of arr) {
+    const k = eventKey(e);
+    if (seen.has(k)) { dropped.push(e); continue; }
+    seen.add(k);
+    keep.push(e);
+  }
+  return [keep, dropped];
+}
+
+
+/* ★ v126：年为主骨架 —— 常量（必须早于首次 render 执行） */
+/* ★ 统一分类配色：全站唯一来源。
+   原文件里并存两套分类色（图谱 G_CAT_COLOR / 章节 CH_COLORS），
+   同一个「旅行」在不同视图里颜色不同。现在统一成一套 ——
+   任何视图、任何年份、任何深浅主题下，同一分类都是同一个颜色。 */
+var CAT_COLOR = {
+  '观演': '#d45ec1', '学业': '#278de8', '工作': '#359b63', '居住': '#c27912',
+  '家庭': '#e55e6c', '旅行': '#389a81', '其他': '#9087a2',
+};
+/* ★ 深色主题用**同色相的亮版** ——
+   浅色底上颜色太浅看不清（对比度 <2），要压暗；
+   深色底上颜色太暗看不见（对比度 <2），要提亮。
+   两版色相完全一致，所以「旅行」在两个主题里都是同一个青绿色。 */
+var CAT_COLOR_DARK = {
+  '观演': '#e08ad2', '学业': '#6fb3f0', '工作': '#7ed3a4', '居住': '#f0b45e',
+  '家庭': '#e8737f', '旅行': '#8fd6c4', '其他': '#9d95ad',
+};
+/* ★ 用户自定义的分类颜色映射 { 分类名: '#rrggbb' } */
+var catColors = {};
+var CATS_COLOR_KEY = 'time_catcolors_v1';
+/* 当前选中的年份（null = 全览） */
+var curYear = null;
+
 /* ---------- 存储 ---------- */
 /* 事件清洗 —— localStorage / 云端 Excel 两条来源都要过这里。
  * 字段白名单 + 日期格式白名单 + 分类白名单 + 文本长度上限，
  * 保证渲染层拿到的永远是安全字符串。 */
 const EV_MAX_TITLE = 200, EV_MAX_NOTE = 2000;
+/* ★ v127：地点字段上限 —— 与标题同量级即可（地名不会太长） */
+const EV_MAX_PLACE = 60;
 
 /* ============================================================
    主题切换（深色 / 浅色）
@@ -1833,10 +2100,8 @@ function initTheme() {
    一张卡 = 一个章节（一个住处 / 一段时期），卡内是迷你时间轴。
    ============================================================ */
 let chCat = '';            // 章节骨架分类（空 = 自动）
-const CH_COLORS = {
-  '居住': '#bb7ce4', '工作': '#ff9a5a', '家庭': '#ff6b9d',
-  '学业': '#5ab0ff', '观演': '#2fd8a8', '旅行': '#ffd24a', '其他': '#9d95ad',
-};
+/* ★ v126：章节配色也引用统一表（页签已下线，代码保留） */
+const CH_COLORS = CAT_COLOR;
 /* 章节骨架的评分规则（v24 修正）：
    原版只按「条数」排序 → 旅行类记录最多（46 条）就选旅行，
    但旅行多是三五天的短期行程，撑不起「章节」这个概念。
@@ -2005,22 +2270,22 @@ function renderChapters(list, years) {
                + innerSingles.filter(e => evKey(e) === 1).length;
     const cntTxt = Object.keys(cnt).map(k => `${cnt[k]} 段${k}`).join(' · ');
     const legend = Object.keys(cnt).map(k =>
-      `<span><i style="background:${CH_COLORS[k] || CH_COLORS['其他']}"></i>${esc(k)}</span>`).join('');
+      `<span><i style="background:${catColor(k)}"></i>${esc(k)}</span>`).join('');
     // 迷你时间轴
     let tl = '';
-    const cc = CH_COLORS[cat] || '#bb7ce4';
+    const cc = catColor(cat);
     const wx = f => windowX(f, f1, f2);
     tl += `<div class="ch-lane l0"><div class="ch-bar" style="left:${wx(f1).toFixed(2)}%;width:${Math.max(1.5, wx(f2) - wx(f1)).toFixed(2)}%;background:linear-gradient(90deg,${cc},rgba(123,47,247,.55));border:1px solid ${cc}"></div></div>`;
     // **按 li 真正分行** —— 原来 li 算了却没用，全部画在 l1 一条泳道上，
     // 同章里互相重叠的时间段会叠成一条（看起来像只有一段状态）。
     placed.forEach(p => {
-      const c = CH_COLORS[p.e.cat] || CH_COLORS['其他'];
+      const c = catColor(p.e.cat);
       const l = Math.max(0, wx(p.a)), r = Math.min(100, wx(p.b));
       const lane = Math.min(p.li, 2);   // 最多 3 条泳道，超过的仍归到第 3 条
       tl += `<div class="ch-lane l${1 + lane}"><div class="ch-bar" style="left:${l.toFixed(2)}%;width:${Math.max(1.2, r - l).toFixed(2)}%;background:${c};opacity:.85"></div></div>`;
     });
     innerSingles.forEach(e => {
-      const c = CH_COLORS[e.cat] || CH_COLORS['其他'];
+      const c = catColor(e.cat);
       tl += `<div class="ch-card-dot" style="left:calc(${wx(yearFrac(e.from)).toFixed(2)}% - 2px);background:${c}"></div>`;
     });
     const desc = innerSingles.length
@@ -2240,6 +2505,17 @@ function sanitizeEvent(raw) {
   if (!id) return null;
   const from = normDatePart(raw.from);
   let to = normDatePart(raw.to) || from;
+  // ★ v123：**非法的年月（如 2017-22）一律丢弃**，不拿它当日期渲染。
+  //   原来 normDatePart 会把 '2025-13' 放行成 '2025-13-01'，
+  //   页面上就出现「2017-22-01 → 2017-22-01」这种看不懂的条目。
+  if (/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    const tm = +to.slice(5, 7), td = +to.slice(8, 10);
+    if (tm < 1 || tm > 12 || td < 1 || td > 31) to = '';
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+    const fm = +from.slice(5, 7), fd = +from.slice(8, 10);
+    if (fm < 1 || fm > 12 || fd < 1 || fd > 31) return null;   // 开始日期非法 → 整条丢弃
+  }
   // **倒挂收敛** —— 外部数据（Excel / 云端）能造出「2015 → 2010」，
   // 渲染时轴上会出现起止颠倒的条目。倒挂时收敛成单日。
   if (from && to && to < from) to = from;
@@ -2253,6 +2529,8 @@ function sanitizeEvent(raw) {
     // 渲染时就会显示成「2024-09-09 → 2024-09-09 1天」这种自相矛盾的东西。
     span: !!(from && to && from !== to),
     title: String(raw.title == null ? '' : raw.title).slice(0, EV_MAX_TITLE),
+    // ★ v127：地点 —— 独立字段（用户的表格里有「地点」这一列）
+    place: String(raw.place == null ? '' : raw.place).slice(0, EV_MAX_PLACE),
     // **分类必须在 catList 里** —— 不在就落到兜底分类「其他」。
     // 注意：catList 必须在读数据**之前**就绪（见 init 顺序），
     // 否则用户新建的分类会被当成非法值打回「其他」。
@@ -2302,7 +2580,14 @@ function loadLocal() {
   migrateKeySemantics(parsed);
   const out = [];
   for (const it of parsed) { const e = sanitizeEvent(it); if (e) out.push(e); }
-  return out;
+  // ★ v123：**读取本机数据时也要去重** ——
+  //   之前只在这里清洗字段，不去重，所以被污染过的历史重复会一直躺在本机，
+  //   每次同步又被推回云端。现在读进来的重复就地丢掉（只留第一条）。
+  const [uniq] = dedupeList(out);
+  if (uniq.length !== out.length) {
+    console.warn('本机数据里有 ' + (out.length - uniq.length) + ' 条重复，已自动去重');
+  }
+  return uniq;
 }
 /** 旧数据语义迁移 —— 只做一次（靠 DATA_VER_KEY 标记） */
 function migrateKeySemantics(list) {
@@ -2409,11 +2694,16 @@ function catCounts(arr) {
 const GN = { nodes: [], links: [], alpha: 1, raf: 0, drag: null, mode: 1, W: 0, H: 0, timer: null };
 const GNS = 'http://www.w3.org/2000/svg';
 /** 分类配色 —— 与页面其它地方的分类色一致 */
-const G_CAT_COLOR = {
-  '观演': '#e08ad2', '学业': '#6fb3f0', '工作': '#7ed3a4', '居住': '#f0b45e',
-  '家庭': '#e8737f', '旅行': '#8fd6c4', '其他': '#9d95ad',
-};
-function gCatColor(c) { return G_CAT_COLOR[c] || '#9d95ad'; }
+/* ★ v126：图谱的分类色改为引用全站统一表（单一数据源）——
+   原来这里和章节视图各有一份，导致同一分类在不同视图里颜色不同。 */
+const G_CAT_COLOR = CAT_COLOR;
+/* ★ v129：图谱的分类色**直接走 catColor()** ——
+   原来这里自己查 CAT_COLOR / CAT_COLOR_DARK 两张默认表，
+   **不查用户自定义色映射** → 用户改了分类颜色，图谱上的节点还是旧色
+   （实测：catColor 返回 #ff5f5f，gCatColor 返回 #e08ad2，同一分类两个颜色）。
+   现在统一走 catColor()，它已经包含「自定义色 > 默认表 > 按名哈希」三级优先
+   以及深浅主题的同色相明暗调整。 */
+function gCatColor(c) { return catColor(c); }
 
 /** 由记录列表构建图谱数据 */
 function buildGraphData(list) {
@@ -2798,6 +3088,13 @@ function renderCats() {
     // 横排时是「观演 3」一串文字；竖排时左边标签、右边数字，
     // 计数能右对齐成一条竖线，扫读时更容易比较大小。
     if (n != null) {
+      // ★ v126：chip 上加色点 —— 分类在哪儿出现都是同一个颜色
+      if (key !== 'ALL') {
+        const dot = document.createElement('i');
+        dot.className = 'cdot';
+        dot.style.background = catColor(key);
+        b.appendChild(dot);
+      }
       const t = document.createElement('span');
       t.textContent = label;
       const c = document.createElement('span');
@@ -2959,6 +3256,8 @@ function matchQ(ev, q) {
 
 function render() {
   const cnt = $('head-cnt');
+  // v123：每次渲染都刷新「清理重复」按钮的显示与计数
+  if (typeof refreshDedupeBtn === 'function') { try { refreshDedupeBtn(); } catch (e) {} }
   // **DOM 重建后旧的 open 状态已失效** —— 不清的话，
   // openEvId 仍指向旧卡片，点它会走「收起」分支（而它本来就没展开），
   // 表现为「重渲染后第一次点击没反应，必须点第二次」。
@@ -3029,6 +3328,8 @@ function render() {
     curView = 'axis';
     syncViewTabs();
   }
+  // ★ v126：年视图本身支持搜索 / 只看重要（按年分组显示命中项），
+  // 所以在年视图里搜索**不切走** —— 切走反而让人找不到结果。
 
   // 搜索提示行
   const hint = $('srch-hint');
@@ -3047,6 +3348,12 @@ function render() {
   renderCats();
   renderPvStats();       // v30：左栏概览（记录数 / 跨年数 / 重要数）
   renderPvStatus(list);  // v30：右栏筛选状态条
+  // ★ v126：年份目录（第一层骨架）
+  if (typeof renderYearDir === 'function') { try { renderYearDir(); } catch (e) { console.warn('年份目录渲染失败', e); } }
+  // ★ v126：年视图容器显隐 —— 必须在这里统一控制。
+  //   少了这一行，切到图谱/时间轴/列表时年视图不会被隐藏，
+  //   它会 flex 定位压在别的视图上面（实测：切到图谱页看到的是按年内容）。
+  if ($('view-year')) $('view-year').style.display = (curView === 'year') ? 'flex' : 'none';
 
   const axis = $('axis');
   axis.innerHTML = '';
@@ -3081,6 +3388,17 @@ function render() {
     return;
   }
 
+  // ★ v126：年视图（年 → 分类 → 事件）
+  if (curView === 'year') {
+    $('yr-all-btn').style.display = 'none';
+    $('yrbar').style.display = 'none';
+    $('ovbar').style.display = 'none';
+    $('axis').style.display = 'none';
+    $('view-year').style.display = 'flex';
+    renderYearView();
+    return;
+  }
+
   // 列表视图
   if (curView === 'list') {
     $('yr-all-btn').style.display = 'none';   // 同上
@@ -3105,6 +3423,7 @@ function render() {
           </div>
           <div class="lv-r2">
             <span class="tag">${esc(ev.cat)}</span>
+            ${ev.place ? `<span class="tag place-tag">📍${esc(ev.place)}</span>` : ''}
             ${note1 ? `<span class="lv-n">${hl(note1.slice(0, 80), q)}</span>` : ''}
             <span class="lv-act">
               <button class="op" data-act="edit" data-id="${esc(ev.id)}">编辑</button>
@@ -3158,6 +3477,7 @@ function render() {
           <div class="ev-meta">
             <span class="ev-d">${dateTxt}</span>
             <span class="tag">${esc(ev.cat)}</span>
+            ${ev.place ? `<span class="tag place-tag">📍${esc(ev.place)}</span>` : ''}
             ${isKey ? '<span class="tag key-tag" title="重要事件">★ 重要</span>' : ''}
             ${lk ? '<span class="tag lock-tag" title="超过一年的记录不可删除，编辑不受限">🔒</span>' : ''}
           </div>
@@ -3480,7 +3800,7 @@ function clearSearch() {
   safeClr();
   // 清空搜索后，若视图是被搜索自动切走的（用户没手动选过），回主视图
   // （只看重要也一并解除 —— 否则筛选清空后还停在时间轴上）
-  if (!viewPinned && curView === 'axis') { curView = 'graph'; syncViewTabs(); }   // ★ v32：回默认视图（图谱）
+  if (!viewPinned && curView === 'axis') { curView = 'year'; syncViewTabs(); }   // ★ v126：回默认视图（按年）
   if (!onlyKey) filterOpen = false;
   render(); qEl.focus();
 }
@@ -3546,6 +3866,7 @@ function openEdit(ev) {
   $('e-from-txt').value = ev && !isFull(ev.from) ? ev.from : '';
   $('e-to-txt').value = ev && ev.span && !isFull(ev.to) ? ev.to : '';
   $('e-name').value = ev ? ev.title : '';
+  $('e-place').value = ev ? (ev.place || '') : '';   // ★ v127：地点回填
   $('e-note').value = ev ? ev.note : '';
   const sel = $('e-cat');
   sel.innerHTML = catList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -3599,6 +3920,7 @@ function saveEdit() {
   const title = $('e-name').value.trim();
   if (!title) { toast('请填写事件'); return; }
   const cat = $('e-cat').value;
+  const place = $('e-place').value.trim();          // ★ v127：地点
   const note = $('e-note').value.trim();
   const sortKey = from.length === 4 ? from + '-00-00'
                 : from.length === 7 ? from + '-00' : from;
@@ -3628,10 +3950,33 @@ function saveEdit() {
   // 不带这个字段就会把唯一的恢复途径弄丢（v26 里手动/推断本就无法区分）。
   const prevRec = isEdit ? DATA.find(x => x.id === editingId) : null;
   const obj = { id: editingId || ('e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
-                from, to, sortKey, span, title, note, cat, key,
+                from, to, sortKey, span, title, note, cat, place, key,
                 keyLegacy: prevRec ? prevRec.keyLegacy : undefined };
-  const next = isEdit ? DATA.map(x => x.id === obj.id ? obj : x)
-                      : DATA.concat([obj]);
+  // ★ v123：新增时也查重 —— 之前直接 concat，加一条和已有完全相同的记录
+  //   就会多一条（"上海·路演" 那条重复就是这么来的）。
+  //   编辑时不查重（本来就是替换同一条）。
+  let next;
+  if (isEdit) {
+    next = DATA.map(x => x.id === obj.id ? obj : x);
+    // ★ v123：编辑后可能与另一条已有记录变成完全一样（把 A 改成 B，而 B 已存在）
+    //   → 也要拦，否则又是一条重复。
+    const k2 = eventKey(obj);
+    const dup2 = next.find(x => x.id !== obj.id && eventKey(x) === k2);
+    if (dup2) {
+      toast('⚠ 改成这样会与另一条已有记录重复，已放弃修改');
+      closeEdit();
+      return;
+    }
+  } else {
+    const k = eventKey(obj);
+    const dup = DATA.find(x => eventKey(x) === k);
+    if (dup) {
+      toast('⚠ 已存在完全相同的记录，不重复添加');
+      closeEdit();
+      return;
+    }
+    next = DATA.concat([obj]);
+  }
   const msg = isEdit ? `✓ 已更新「${title}」` : `✓ 已记录「${title}」`;
   closeEdit();
   save(next, msg);
@@ -3697,7 +4042,7 @@ function showImportPreview(items, bad, tip) {
     <div class="pv-list">${items.map((e, i) => `
       <div class="pv-item">
         <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
-        <span class="t">${esc(e.title)}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
+        <span class="t">${esc(e.title)}${e.place ? ' · <b class="pv-place">📍' + esc(e.place) + '</b>' : ''}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
         <select class="pv-cat" data-i="${i}">${catList.map(c => `<option value="${esc(c)}"${c === e.cat ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
       </div>`).join('')}</div>
     ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
@@ -3710,12 +4055,17 @@ function confirmImport() {
     const it = pendingImport[+sel.dataset.i];
     if (it) it.cat = sel.value;
   });
-  const existKeys = new Set(DATA.map(e => e.from + '|' + e.title));
-  const fresh = pendingImport.filter(e => !existKeys.has(e.from + '|' + e.title));
+  // ★ v123：统一用 eventKey，且**批内也去重** ——
+  //   原来键是 from|title（漏了结束日/分类/备注），且只跟本机比，
+  //   同一份表格里自己重复的行会全部被收进来。
+  const existKeys = new Set(DATA.map(eventKey));
+  const [uniqImport, droppedInFile] = dedupeList(pendingImport);
+  const fresh = uniqImport.filter(e => !existKeys.has(eventKey(e)));
   const dup = pendingImport.length - fresh.length;
   const next = DATA.concat(fresh);
   closeImport();
-  save(next, `✓ 已导入 ${fresh.length} 条记录${dup ? `（跳过重复 ${dup} 条）` : ''}`);
+  save(next, `✓ 已导入 ${fresh.length} 条记录${dup ? `（跳过重复 ${dup} 条）` : ''}`
+    + (droppedInFile.length ? `（表格内自身重复 ${droppedInFile.length} 条已忽略）` : ''));
 }
 $('import-file').onchange = e => {
   const f = e.target.files[0];
@@ -3742,17 +4092,31 @@ $('import-file').onchange = e => {
         toast('✓ 已同时导入分类表');
       }
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
-      // **结构化识别** —— 表头里有「事件/标题」列且列数 ≥4 时，按列解析：
-      //   这样才能正确带上「分类」和「重要(手动)」两列。
-      //   （原来一律把每行拼成一句话再解析，导致分类和重要标记被混进标题 ——
-      //    导出的表格再导入，标题里会多出「★」和分类名。）
-      const head = (rows[0] || []).map(c => String(c == null ? '' : c).trim());
-      const structured = head.length >= 4 && head.some(h => /^(事件|标题|事项|title|记录)$/i.test(h));
-      if (structured) {
-        const items = rowsToEvents(rows);
+      // ★ v127：按**表头语义**认列 —— 支持用户格式（说明行 + 开始时间/结束时间/
+      //   分类/地点/事件描述），也兼容工具自己的旧导出格式。
+      //   旧逻辑只认「表头含 事件/标题 且列数≥4」，用户那张表表头是「事件描述」
+      //   → 识别失败 → 掉进"每行一句话"回退分支 → 标题/分类/地点糊成一团。
+      const parsed = rowsToEventsByCols(rows);
+      if (parsed) {
+        const items = parsed.items;
         const bad = [];
-        showImportPreview(items, bad, '按表格列导入');
-        toast('✓ 已读取 Excel，请确认预览');
+        // ★ v127：**把表格里出现的分类并入分类表** ——
+        //   用户的表格用的是「住宿/友情/追星/旅游/亲情」这类自定义分类，
+        //   不在 catList 里的话，sanitizeEvent 会把它们全打成兜底分类「其他」
+        //   （实测：64 条全变成「观演/学业/工作/其他」，分类信息整个丢掉）。
+        //   这里在解析后立刻扩表，事件入库时分类就能原样保住。
+        const newCats = [];
+        items.forEach(e => {
+          const c = String(e.cat || '').trim();
+          if (c && !catList.includes(c) && !newCats.includes(c)) newCats.push(c);
+        });
+        if (newCats.length) {
+          catList = catList.concat(newCats).slice(0, 60);
+          saveCats();
+          toast('✓ 已新增分类：' + newCats.join('、'));
+        }
+        showImportPreview(items, bad, '按表格列导入 · 表头在第 ' + (parsed.headerRow + 1) + ' 行');
+        toast('✓ 已读取 Excel（' + items.length + ' 条），请确认预览');
         return;
       }
       // 回退：用户自制的「每行一条」小表
@@ -3900,6 +4264,168 @@ function kcIsNotKey(v) {
   if (!t) return false;
   return t === '☆' || /^(否|no|n|false|0|不重要|普通)$/i.test(t);
 }
+
+/* ============================================================
+   ★ v127：Excel 表格格式适配
+   ------------------------------------------------------------
+   用户实际在用的表格长这样（见 时光自撰集.xlsx）：
+     第 1 行  说明行：「说明：结束时间为空，则为单日事件」
+     第 2 行  表头：  开始时间 | 结束时间 | 分类 | 地点 | 事件描述
+     第 3 行起 数据：  日期是 20100720 这样的数字
+
+   旧逻辑只认「表头含 事件/标题 且列数≥4」→ 用户这张表识别不出来，
+   会掉进"每行一句话"回退分支，把标题/分类/地点拼成一坨。
+   现在按**表头语义**认列，认哪列算哪列，多余的列忽略。
+
+   同时兼容三种历史表头（导入自己的旧导出文件不能坏）：
+     · 开始日期 / 结束日期 / 事件 / 分类 / 备注       （工具旧导出）
+     · 开始时间 / 结束时间 / 分类 / 地点 / 事件描述   （用户新表）
+     · 开始 / 结束 / 标题 / 分类 / 备注              （更早的）
+   ============================================================ */
+
+/* 表头 → 列语义映射 */
+const XLSX_COL_ALIASES = {
+  from:    ['开始时间', '开始日期', '起始日期', '起始时间', '开始', '起始', '日期', 'start', 'from', 'date'],
+  to:      ['结束时间', '结束日期', '终止日期', '终止时间', '结束', '终止', 'to', 'end'],
+  title:   ['事件描述', '事件', '标题', '事项', '记录', '内容', 'title', 'event', 'description', 'desc'],
+  cat:     ['分类', '类别', '类型', 'category', 'cat', 'type'],
+  place:   ['地点', '位置', '地址', '城市', 'place', 'location', 'city', 'where'],
+  note:    ['备注', '说明', 'note', 'remark', 'comment'],
+  keyMan:  ['重要(手动)', '重要标记', '手动标记'],
+  keyRule: ['规则判定', '重要'],
+};
+
+/* 找出表头所在行 —— 用户的表第 1 行是说明，第 2 行才是表头。
+   做法：在前 5 行里找「命中列语义最多」的那行当表头。 */
+function findHeaderRow(rows) {
+  let best = -1, bestHit = 0;
+  const lim = Math.min(5, rows.length);
+  for (let i = 0; i < lim; i++) {
+    const r = rows[i] || [];
+    let hit = 0;
+    const seen = new Set();
+    for (const c of r) {
+      const h = String(c == null ? '' : c).trim().toLowerCase();
+      if (!h) continue;
+      for (const sem in XLSX_COL_ALIASES) {
+        if (seen.has(sem)) continue;
+        if (XLSX_COL_ALIASES[sem].some(a => a.toLowerCase() === h)) { seen.add(sem); hit++; break; }
+      }
+    }
+    if (hit > bestHit) { bestHit = hit; best = i; }
+  }
+  // 至少要认出「开始」+「标题/事件」两列才算结构化表
+  return bestHit >= 2 ? best : -1;
+}
+
+/* 按表头语义解析出列下标 */
+function mapHeaderCols(head) {
+  const map = { from: -1, to: -1, title: -1, cat: -1, place: -1, note: -1, keyMan: -1, keyRule: -1 };
+  const used = new Set();
+  head.forEach((c, i) => {
+    const h = String(c == null ? '' : c).trim().toLowerCase();
+    if (!h) return;
+    for (const sem in XLSX_COL_ALIASES) {
+      if (used.has(sem)) continue;
+      if (XLSX_COL_ALIASES[sem].some(a => a.toLowerCase() === h)) { map[sem] = i; used.add(sem); break; }
+    }
+  });
+  return map;
+}
+
+/* 宽松日期解析 —— 接受 Excel 数字日期、YYYYMMDD、YYYY-MM-DD、带斜杠等 */
+function parseLooseDate(v) {
+  if (v == null || v === '') return '';
+  // Excel 序列号（1900 日期系统）
+  if (typeof v === 'number' && isFinite(v)) {
+    if (v > 20000101 && v < 30001232) {                 // 看着像 20100720 这种数字
+      const s = String(Math.round(v));
+      return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8);
+    }
+    if (v > 20000 && v < 80000) {                        // 真正的序列号（≈1954~2119）
+      const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+      if (!isNaN(d.getTime())) {
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      }
+    }
+    return '';
+  }
+  let s = String(v).trim();
+  if (!s) return '';
+  s = s.replace(/[年月]/g, '-').replace(/日/g, '').replace(/[./]/g, '-').trim();
+  // 20100720
+  if (/^\d{8}$/.test(s)) return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8);
+  // 2010-7-2 / 2010-07-02
+  let m = s.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (m) {
+    const mo = String(+m[2]).padStart(2, '0');
+    const dd = m[3] ? String(+m[3]).padStart(2, '0') : '01';
+    return m[1] + '-' + mo + '-' + dd;
+  }
+  // 2010 / 2010-07
+  m = s.match(/^(\d{4})(?:-(\d{1,2}))?$/);
+  if (m) return m[1] + '-' + (m[2] ? String(+m[2]).padStart(2, '0') : '01') + '-01';
+  return '';
+}
+
+/* 按列语义把表格行转成事件 —— 支持用户格式与工具旧格式 */
+function rowsToEventsByCols(rows) {
+  const hi = findHeaderRow(rows);
+  if (hi < 0) return null;
+  const cols = mapHeaderCols((rows[hi] || []).map(c => String(c == null ? '' : c).trim()));
+  if (cols.from < 0 || cols.title < 0) return null;
+  const out = [];
+  const g = (r, i) => (i >= 0 && i < r.length) ? r[i] : '';
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const fRaw = g(r, cols.from), tRaw = g(r, cols.to);
+    const titleRaw = g(r, cols.title), catRaw = g(r, cols.cat);
+    const placeRaw = g(r, cols.place), noteRaw = g(r, cols.note);
+    const f = parseLooseDate(fRaw), t = parseLooseDate(tRaw);
+    const title = String(titleRaw == null ? '' : titleRaw).trim();
+    if (!f && !title) continue;                 // 空行
+    if (!f) continue;                           // 没有开始日期 → 跳过（日期是主键）
+    const to = t || f;
+    const kc = g(r, cols.keyMan);
+    out.push({
+      id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + i,
+      from: f,
+      to: to,
+      sortKey: f,
+      span: f !== to,
+      title: title || '(未命名)',
+      cat: String(catRaw == null ? '' : catRaw).trim() || FALLBACK_CAT,
+      place: String(placeRaw == null ? '' : placeRaw).trim(),
+      note: String(noteRaw == null ? '' : noteRaw),
+      key: (cols.keyMan >= 0)
+        ? (kcIsKey(kc) ? 1 : (kcIsNotKey(kc) ? 0 : undefined))
+        : undefined,
+    });
+  }
+  return { items: out, headerRow: hi, cols: cols };
+}
+
+/* 分类表工作表读取 —— 兼容没有颜色列的老表 */
+function readCatsFromBook(wb) {
+  const ws = wb.Sheets[CATS_SHEET];
+  if (!ws) return null;
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const list = [];
+  const colors = {};
+  for (const r of rows) {
+    const v = normCatName(r[0]);
+    if (!v) continue;
+    if (r[0] === '分类' || r[0] === '类别') continue;   // 表头行
+    if (!list.includes(v)) list.push(v);
+    const hex = normHex(r[1]);
+    if (hex) colors[v] = hex;
+  }
+  if (!list.length) return null;
+  if (!list.includes(FALLBACK_CAT)) list.push(FALLBACK_CAT);
+  readCatsFromBook.colors = colors;
+  return list;
+}
+
 function rowsToEvents(rows) {
   const out = [];
   // **按表头判断各列语义**（三张表都能读）：
@@ -3960,7 +4486,14 @@ function normDatePart(s) {
     if (mo >= 1 && mo <= 12 && dd >= 1 && dd <= 31) return v;
     return v.slice(0, 7) + '-01';   // 非法月日 → 收敛到当月 1 号
   }
-  if (/^\d{4}-\d{2}$/.test(v)) return v + '-01';
+  // ★ v123：补校验月份 —— 原来 '2025-13' 这种非法月份会被放行，
+  //   变成 '2025-13-01'，渲染出来就是「2025-13-01」这种看不懂的日期。
+  //   （云端历史里真出现过 to=2017-22-01，22 月。）
+  if (/^\d{4}-\d{2}$/.test(v)) {
+    const mo = +v.slice(5, 7);
+    if (mo >= 1 && mo <= 12) return v + '-01';
+    return v.slice(0, 4) + '-01-01';
+  }
   if (/^\d{4}$/.test(v)) return v + '-01-01';
   if (!v) return '';
   // 含非日期字符 → 提取前 10 个字符里的合法日期前缀，实在没有就用占位
@@ -3971,6 +4504,10 @@ function normDatePart(s) {
   }
   return '';
 }
+/* ★ v127：导出改成用户熟悉的格式 ——
+     第 1 行说明 + 第 2 行表头 + 数据行，日期写成 20100720 这样的数字。
+     工具自己的旧格式（重要(手动)/规则判定 两列）仍然保留在末尾，
+     这样「手动标记」往返不会丢。 */
 function eventsToRows(arr) {
   // 末两列：
   //   「重要(手动)」= ★ 手动重要 / ☆ 手动不重要 / 空 未表态
@@ -3978,18 +4515,30 @@ function eventsToRows(arr) {
   //   「规则判定」  = ★ / 空 —— **当前词表实时算出的结果**，纯文档用途
   //       （记录导出当时规则怎么判的，方便人工核对；导入方不拿它当手动标记）
   // 表头带后缀，是为了让导入端认出这是新语义；旧表格第 6 列表头是「重要」。
-  const rows = [['开始日期', '结束日期', '事件', '分类', '备注', '重要(手动)', '规则判定']];
+  const rows = [
+    ['说明：结束时间为空，则为单日事件'],
+    ['开始时间', '结束时间', '分类', '地点', '事件描述', '重要(手动)', '规则判定'],
+  ];
   sortDesc(arr).forEach(e => {
     const k = (e.key === 1 || e.key === true) ? '★'
             : (e.key === 0 || e.key === false) ? '☆' : '';
     const rk = inferKey(e) ? '★' : '';
-    rows.push([e.from, e.to, e.title, e.cat, e.note, k, rk]);
+    // 单日事件的结束时间留空 —— 与用户表格的约定一致（「结束时间为空=单日」）
+    const toCell = (e.span && e.to && e.to !== e.from) ? ymdToNum(e.to) : '';
+    rows.push([ymdToNum(e.from), toCell, e.cat, e.place || '', e.title, k, rk]);
   });
   return rows;
 }
+
+/* YYYY-MM-DD → 20100720（Excel 里显示为 20100720） */
+function ymdToNum(s) {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(s || '');
+  return m[1] + m[2] + m[3];
+}
 function buildXlsx(arr) {
   const ws = XLSX.utils.aoa_to_sheet(eventsToRows(arr));
-  ws['!cols'] = [{ wch: 13 }, { wch: 13 }, { wch: 34 }, { wch: 8 }, { wch: 24 }, { wch: 11 }, { wch: 9 }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 44 }, { wch: 11 }, { wch: 9 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
   // **规则词表跟着数据一起走** —— 只存本机的话，
@@ -4009,7 +4558,9 @@ function buildXlsx(arr) {
   // 只存本机的话，用户在 A 设备新建的分类到 B 设备就没了
   // （B 设备读表时会把该分类的记录全打成「其他」—— 数据看似丢了）。
   // 写进第三个工作表，任何设备拉下来都能对齐。
-  const cs = XLSX.utils.aoa_to_sheet([['分类'], ...catList.map(c => [c])]);
+  // ★ v126：分类表加一列「颜色」—— 自定义颜色跟着数据走（换设备也不丢）
+  const cs = XLSX.utils.aoa_to_sheet([['分类', '颜色'],
+    ...catList.map(c => [c, normHex(catColors[c]) || ''])]);
   cs['!cols'] = [{ wch: 14 }];
   XLSX.utils.book_append_sheet(wb, cs, CATS_SHEET);
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
@@ -4036,23 +4587,7 @@ function readRulesFromBook(wb) {
   } catch (e) { return null; }
 }
 /** 从工作簿里读回分类表（没有该表就返回 null，调用方保留本地表） */
-function readCatsFromBook(wb) {
-  try {
-    const ws = wb.Sheets[CATS_SHEET];
-    if (!ws) return null;
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const list = [];
-    for (const r of rows) {
-      const v = normCatName(r[0]);
-      if (!v) continue;
-      if (r[0] === '分类') continue;   // 表头行
-      if (!list.includes(v)) list.push(v);
-    }
-    if (!list.length) return null;
-    if (!list.includes(FALLBACK_CAT)) list.push(FALLBACK_CAT);
-    return list;
-  } catch (e) { return null; }
-}
+
 async function ghPull() {
   const r = await fetch(ghApi() + `?t=${Date.now()}`, { headers: ghHeaders() });
   if (r.status === 404) return null;           // 云端还没有 → 保留本地
@@ -4075,9 +4610,34 @@ async function ghPull() {
   if (remoteCats) {
     catList = remoteCats;
     saveCats();
+    // ★ v126：云端表格里带的自定义颜色一并生效（换设备后颜色不变）
+    const rc = readCatsFromBook.colors;
+    if (rc && Object.keys(rc).length) {
+      catColors = Object.assign({}, catColors, rc);
+      saveCatColors();
+    }
   }
-  return rowsToEvents(XLSX.utils.sheet_to_json(
-    wb.Sheets[SHEET_NAME], { header: 1, defval: '' }));
+  // ★ v127：云端表格也用**表头语义**解析 ——
+  //   导出格式改成了用户格式（说明行 + 开始时间/结束时间/分类/地点/事件描述），
+  //   这里如果还用旧的固定列下标（第 3 列当标题、第 4 列当分类），
+  //   云端数据会被解析成"标题=地点、分类=事件描述"，整个错位。
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_NAME], { header: 1, defval: '' });
+  const parsed = rowsToEventsByCols(rows);
+  if (parsed) {
+    // 用户表格没有「分类」工作表时，事件里出现的分类也要并入分类表
+    const remoteNewCats = [];
+    parsed.items.forEach(e => {
+      const c = String(e.cat || '').trim();
+      if (c && !catList.includes(c) && !remoteNewCats.includes(c)) remoteNewCats.push(c);
+    });
+    if (remoteNewCats.length) {
+      catList = catList.concat(remoteNewCats).slice(0, 60);
+      saveCats();
+    }
+    return parsed.items;
+  }
+  // 兜底：老格式（表头无法识别）→ 走旧的按列解析
+  return rowsToEvents(rows);
 }
 async function ghPush(arr) {
   // 云端已有文件但本地没拿到 sha → 先补拉，避免 422 "sha wasn't supplied"
@@ -4129,14 +4689,22 @@ async function doPull(silent) {
         catList = merged;
         saveCats();
       }
-      const localKeys = new Set(DATA.map(e => e.from + '|' + e.title + '|' + e.to));
-      const fresh = remote.filter(e => !localKeys.has(e.from + '|' + e.title + '|' + e.to));
+      // ★ v123：统一用 eventKey，且**云端文件内部也要先去重** ——
+      //   原来只跟本机已有记录比，云端自己重复的行每次都被当成新记录收进来，
+      //   再推回云端固化，形成"越同步越乱"的回环。这是重复数据的真正来源。
+      const [uniqRemote, dupInCloud] = dedupeList(remote);
+      const localKeys = new Set(DATA.map(eventKey));
+      const [mergedFresh] = dedupeList(uniqRemote.filter(e => !localKeys.has(eventKey(e))));
+      const fresh = mergedFresh;
       if (fresh.length) {
         DATA = DATA.concat(fresh);
         persist(DATA, silent, silent);        // 静默启动拉取时只写本地，不自动回写云端
         render();
       }
-      if (!silent) $('sync-msg').textContent = `✓ 已拉取云端数据（本次新增 ${fresh.length} 条）`;
+      if (!silent) {
+        $('sync-msg').textContent = `✓ 已拉取云端数据（本次新增 ${fresh.length} 条）`
+          + (dupInCloud.length ? `　⚠ 云端文件里有 ${dupInCloud.length} 条重复，已自动忽略并去重` : '');
+      }
     } else if (!silent) {
       $('sync-msg').textContent = '云端文件是空的';
     }
@@ -4246,59 +4814,6 @@ let catEditing = null;    // 正在改名的分类（原名），null = 不在�
 
 
 /** 渲染分类管理列表 */
-function renderCatMan() {
-  const box = $('cat-man-list');
-  if (!box) return;
-  const counts = catCounts(DATA);
-  box.innerHTML = catList.map(c => {
-    const locked = c === FALLBACK_CAT;
-    const editing = catEditing === c;
-    const nameCell = editing
-      ? `<input type="text" class="cm-edit" value="${esc(c)}" maxlength="12" autocomplete="off">`
-      : `<span class="cm-name">${esc(c)}</span>`;
-    return `<div class="cm-row${locked ? ' locked' : ''}" data-cat="${esc(c)}">
-      ${nameCell}
-      <span class="cm-n">${counts[c] || 0}</span>
-      <span class="cm-act">
-        ${editing
-          ? `<button class="ok">✓</button><button class="cancel">✕</button>`
-          : `<button class="ed"${locked ? ' disabled' : ''}>改</button><button class="del"${locked ? ' disabled' : ''}>删</button>`}
-      </span>
-    </div>`;
-  }).join('');
-  // 绑定每行的事件（用事件委托，避免反复重建时重复绑定）
-  box.querySelectorAll('.cm-row').forEach(row => {
-    const cat = row.getAttribute('data-cat');
-    const ok = row.querySelector('button.ok'), cancel = row.querySelector('button.cancel');
-    const ed = row.querySelector('button.ed'), del = row.querySelector('button.del');
-    if (ok) ok.onclick = () => {
-      const inp = row.querySelector('.cm-edit');
-      const r = renameCat(cat, inp ? inp.value : '');
-      if (!r.ok) { toast(r.msg); renderCatMan(); return; }
-      catEditing = null;
-      toast(r.msg + (r.moved ? `（${r.moved} 条记录已跟着改）` : ''));
-      renderCatMan(); render();
-    };
-    if (cancel) cancel.onclick = () => { catEditing = null; renderCatMan(); };
-    if (ed) ed.onclick = () => {
-      if (ed.disabled) return;
-      catEditing = cat; renderCatMan();
-      const inp = $('cat-man-list').querySelector('.cm-edit');
-      if (inp) { inp.focus(); inp.select(); }
-    };
-    if (del) del.onclick = () => {
-      if (del.disabled) return;
-      const n = counts[cat] || 0;
-      const msg = n
-        ? `删除「${cat}」？该分类下 ${n} 条记录会归到「其他」。`
-        : `删除「${cat}」？`;
-      if (!confirm(msg)) return;
-      const r = delCat(cat);
-      toast(r.msg + (r.moved ? `（${r.moved} 条记录已归到「其他」）` : ''));
-      renderCatMan(); render();
-    };
-  });
-}
 /** 打开分类管理 */
 function openCats() {
   catEditing = null;
@@ -4484,13 +4999,71 @@ $('import-confirm').onclick = confirmImport;
 $('import-mask').onclick = e => { if (e.target === $('import-mask')) closeImport(); };
 $('export-btn').onclick = exportXlsx;
 
+/* ---------- 清理重复记录（v123） ----------
+   ★ 为什么会重复：老版本拉取云端时只跟「本机已有记录」比对，
+   云端文件内部自己重复的行彼此不比对 —— 每次拉取都把重复行当成新记录收进来，
+   再推回云端固化，形成回环。v123 已从根上修好（eventKey + 批内去重），
+   但**已经被污染的历史数据**还在，本按钮用来一次性清掉。
+
+   判定标准与 eventKey 一致：起止 + 标题 + 分类 + 备注 + 重要标记 全等
+   才算重复；同标题但分类/备注不同的都保留（那可能是你改过分类的真实记录）。 */
+function countDupes(arr) {
+  const seen = new Set();
+  let n = 0;
+  for (const e of arr) {
+    const k = eventKey(e);
+    if (seen.has(k)) n++;
+    else seen.add(k);
+  }
+  return n;
+}
+function refreshDedupeBtn() {
+  const btn = $('dedupe-btn');
+  if (!btn) return;
+  const n = countDupes(DATA);
+  btn.style.display = n ? '' : 'none';
+  btn.textContent = `⚠ 清理重复 ${n} 条`;
+  btn.title = `有 ${n} 条完全重复的记录，点击清理（会同步修正云端）`;
+}
+$('dedupe-btn').onclick = async () => {
+  const [keep, dropped] = dedupeList(DATA);
+  if (!dropped.length) { toast('✓ 没有重复记录'); refreshDedupeBtn(); return; }
+  // 按标题分组展示，方便用户核对删掉的是哪些
+  const groups = new Map();
+  for (const e of dropped) {
+    const k = e.from + ' ' + e.title;
+    groups.set(k, (groups.get(k) || 0) + 1);
+  }
+  const list = Array.from(groups.entries()).map(([k, v]) => `· ${k} ×${v}`).join('\n');
+  const ok = await askPassword(
+    `将删除 <b>${dropped.length}</b> 条完全重复的记录（保留每组第一条）：\n\n${list}\n\n` +
+    `同时会修正云端表格里的重复。\n此操作不可恢复，请先「导出」备份一份。\n请输入密码继续`);
+  if (!ok) return;
+  save(keep, `✓ 已清理 ${dropped.length} 条重复记录`);
+  refreshDedupeBtn();
+};
+
 /* ---------- 清空全部（密码门） ---------- */
 $('clear-btn').onclick = async () => {
   if (!DATA.length) { toast('没有记录可清空'); return; }
   const n = DATA.length;
-  const ok = await askPassword(`将清空<b>全部 ${n} 条</b>时光记录，<br>此操作不可恢复。请输入密码继续`);
+  const cloudTip = ghReady()
+    ? '<br>本机与<b>云端</b>都会清空（否则刷新后云端会把旧数据拉回来）'
+    : '';
+  const ok = await askPassword(`将清空<b>全部 ${n} 条</b>时光记录${cloudTip}，<br>此操作不可恢复。请输入密码继续`);
   if (!ok) return;
+  // ★ v127：先清本机
   save([], `✓ 已清空 ${n} 条时光记录`);
+  // ★ v127：再清云端 —— 传空数组，ghPush 会把云端表格写成只有表头的空表
+  if (ghReady()) {
+    try {
+      await ghPush([]);
+      toast('✓ 本机与云端都已清空，可重新导入');
+    } catch (err) {
+      toast('⚠ 本机已清空，但云端清空失败：' + (err && err.message ? err.message : '未知错误')
+        + '（刷新后云端旧数据可能回来，可到「⚙ 分类」旁的同步设置里检查）');
+    }
+  }
 };
 
 // iOS 键盘收起后视口残留修正：同位置滚动一次，触发 Safari 重算布局（不改变滚动位置）
@@ -4515,6 +5088,7 @@ keyRules = loadRules();   // 关键词表必须先加载：旧数据迁移要用
 // 「分类是否在 catList 里」，不在就打成「其他」。
 // 顺序反了的话，用户自定义的分类会在读数据时被吃掉。
 catList = loadCats();
+loadCatColors();          // ★ v126：加载自定义分类颜色（要在首次 render 前）
 DATA = loadLocal();
 // **再把「数据里实际在用、但表里没有」的分类补进表** ——
 // 换设备/从 Excel 导入时可能带来新分类，不补的话那些记录会全变「其他」。
@@ -4522,7 +5096,652 @@ if (ensureCatsForData(DATA)) render();
 loadGh();
 render();
 if (ghReady()) doPull(true);   // 有 Token：静默拉取云端
+/* ============================================================
+   v125 预览：自定义分类颜色
+   ------------------------------------------------------------
+   · 分类名表 catList 保持「字符串数组」不变（不破坏已有数据和 Excel 往返）
+   · 新增独立的颜色映射 catColors：{ 分类名: 色值 }
+   · 优先级：用户自定义色 > 默认配色表 > 按名字哈希自动生成
+   · 改分类名时颜色跟着迁移；删分类时颜色一并清掉
+   · 颜色跟随主题（浅色底加深版 / 深色底亮版，同色相）
+   ============================================================ */
+
+/* ---------- 颜色映射的存取 ---------- */
+/* catColors / CATS_COLOR_KEY 已在主脚本靠前位置声明（必须早于首次 render） */
+
+function loadCatColors() {
+  try {
+    const raw = localStorage.getItem(CATS_COLOR_KEY);
+    if (!raw) { catColors = {}; return; }
+    const obj = JSON.parse(raw);
+    catColors = (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  } catch (e) { catColors = {}; }
+}
+function saveCatColors() {
+  try { safeSet(CATS_COLOR_KEY, JSON.stringify(catColors)); } catch (e) {}
+}
+
+/* ---------- 颜色规范化 ---------- */
+function normHex(c) {
+  if (typeof c !== 'string') return '';
+  let s = c.trim().toLowerCase();
+  if (!s) return '';
+  if (s[0] === '#') s = s.slice(1);
+  if (/^[0-9a-f]{3}$/.test(s)) s = s.split('').map(x => x + x).join('');
+  if (!/^[0-9a-f]{6}$/.test(s)) return '';
+  return '#' + s;
+}
+
+/* ---------- 取某个分类的颜色（主题感知）---------- */
+function catColor(c) {
+  const name = String(c == null ? '' : c);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  // 1) 用户自定义（存的是基准色，深浅主题自动调整明度）
+  const custom = normHex(catColors[name]);
+  if (custom) return adjustForTheme(custom, isDark);
+  // 2) 默认表（CAT_COLOR_DARK 可能还没注入 —— 运行时判断，别在顶层引用）
+  // ⚠ CAT_COLOR / CAT_COLOR_DARK 是 var 声明但**赋值在后面**（注入位置靠后），
+  //   首次调用时它们是 undefined（不是 ReferenceError）——
+  //   所以必须判空，不能只靠 typeof。
+  const lightTbl = (CAT_COLOR && typeof CAT_COLOR === 'object') ? CAT_COLOR : {};
+  const darkTbl = (CAT_COLOR_DARK && typeof CAT_COLOR_DARK === 'object') ? CAT_COLOR_DARK : {};
+  const tbl = isDark ? darkTbl : lightTbl;
+  if (tbl[name]) return tbl[name];
+  if (lightTbl[name]) return lightTbl[name];
+  // 3) 未知分类 → 按名字哈希生成一个稳定颜色
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return isDark ? ('hsl(' + hue + ' 62% 62%)') : ('hsl(' + hue + ' 58% 42%)');
+}
+
+/* ---------- 自定义色按主题调明度（保持色相）---------- */
+function adjustForTheme(hexc, isDark) {
+  const h = hexc.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  // RGB → HSL
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  let hh = 0, ss = 0; const ll = (mx + mn) / 2;
+  if (mx !== mn) {
+    const d = mx - mn;
+    ss = ll > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    if (mx === r) hh = ((g - b) / d + (g < b ? 6 : 0));
+    else if (mx === g) hh = ((b - r) / d + 2);
+    else hh = ((r - g) / d + 4);
+    hh /= 6;
+  }
+  // 深色底提亮、浅色底压暗 —— 同一色相，两边都看得清
+  const target = isDark ? 0.72 : 0.45;
+  let l2 = ll;
+  if (isDark) { if (l2 < target) l2 = Math.min(0.88, l2 + (target - l2) * 0.85); }
+  else { if (l2 > target) l2 = Math.max(0.24, l2 - (l2 - target) * 0.85); }
+  ss = Math.min(1, Math.max(0.28, ss));
+  // HSL → RGB
+  const hue2rgb = (p, q, t2) => {
+    if (t2 < 0) t2 += 1; if (t2 > 1) t2 -= 1;
+    if (t2 < 1 / 6) return p + (q - p) * 6 * t2;
+    if (t2 < 1 / 2) return q;
+    if (t2 < 2 / 3) return p + (q - p) * (2 / 3 - t2) * 6;
+    return p;
+  };
+  let rr, gg, bb;
+  if (ss === 0) { rr = gg = bb = l2; }
+  else {
+    const q = l2 < 0.5 ? l2 * (1 + ss) : l2 + ss - l2 * ss;
+    const p = 2 * l2 - q;
+    rr = hue2rgb(p, q, hh + 1 / 3);
+    gg = hue2rgb(p, q, hh);
+    bb = hue2rgb(p, q, hh - 1 / 3);
+  }
+  const to = x => Math.max(0, Math.min(255, Math.round(x * 255))).toString(16).padStart(2, '0');
+  return '#' + to(rr) + to(gg) + to(bb);
+}
+
+/* ---------- 色盘预设（供选择器用）---------- */
+var CAT_PALETTE = [
+  '#e8737f', '#e08ad2', '#8b6fe8', '#6fb3f0', '#4f9fe0', '#5ab0ff',
+  '#7ed3a4', '#4fae7f', '#f0b45e', '#e0952b', '#f07f4f', '#c85f92',
+  '#8fd6c4', '#6bbfb0', '#9d95ad', '#5b6478',
+];
+
+/* ---------- 分类改名时迁移颜色 / 删除时清理 ---------- */
+function moveCatColor(from, to) {
+  const f = normHex(catColors[from]);
+  if (!f) return;
+  if (!catColors[to]) catColors[to] = f;      // 目标已有自定义色就不覆盖
+  delete catColors[from];
+  saveCatColors();
+}
+function dropCatColor(name) {
+  if (catColors[name]) { delete catColors[name]; saveCatColors(); }
+}
+
+/* ---------- 分类管理面板：加色盘 ----------
+   ⚠ DOM 结构必须沿用正式文件原有的 class（.cm-row / .cm-name / .cm-n /
+     .cm-act / .cm-edit），CSS 是按这些 class 写的 —— 换名字样式会全丢。
+     这里只是在原结构上**多插一个色点 + 一个色盘按钮**。 */
+function renderCatMan() {
+  const box = $('cat-man-list');
+  if (!box) return;
+  const counts = catCounts(DATA);
+  box.innerHTML = '';
+  catList.forEach(c => {
+    const locked = c === FALLBACK_CAT;
+    const editing = catEditing === c;
+    const row = document.createElement('div');
+    row.className = 'cm-row' + (locked ? ' locked' : '');
+    row.setAttribute('data-cat', c);
+    const color = catColor(c);
+    const custom = !!normHex(catColors[c]);
+    const nameCell = editing
+      ? '<input type="text" class="cm-edit" value="' + esc(c) + '" maxlength="12" autocomplete="off">'
+      : '<span class="cm-name">' + esc(c) + '</span>';
+    row.innerHTML =
+      '<i class="cm-dot" style="background:' + color + '" title="' + esc(c) + '的颜色"></i>' +
+      nameCell +
+      '<span class="cm-n">' + (counts[c] || 0) + '</span>' +
+      (custom ? '<span class="cm-custom" title="已自定义颜色">✎</span>' : '') +
+      '<span class="cm-act">' +
+      '<button class="cm-color" title="选择颜色">🎨</button>' +
+      (editing
+        ? '<button class="ok">✓</button><button class="cancel">✕</button>'
+        : '<button class="ed"' + (locked ? ' disabled' : '') + '>改</button>' +
+          '<button class="del"' + (locked ? ' disabled' : '') + '>删</button>') +
+      '</span>';
+    box.appendChild(row);
+  });
+  // 色盘按钮
+  box.querySelectorAll('.cm-color').forEach(b => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const c = b.closest('.cm-row').getAttribute('data-cat');
+      openColorPicker(c);
+    };
+  });
+  // 改名
+  box.querySelectorAll('.cm-row .ed').forEach(b => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (b.disabled) return;
+      catEditing = b.closest('.cm-row').getAttribute('data-cat');
+      renderCatMan();
+      const inp = $('cat-man-list').querySelector('.cm-edit');
+      if (inp) { inp.focus(); inp.select(); }
+    };
+  });
+  // 取消改名
+  box.querySelectorAll('.cm-row .cancel').forEach(b => {
+    b.onclick = (e) => { e.stopPropagation(); catEditing = null; renderCatMan(); };
+  });
+  // 确认改名
+  box.querySelectorAll('.cm-row .ok').forEach(b => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const row = b.closest('.cm-row');
+      const old = row.getAttribute('data-cat');
+      const inp = row.querySelector('.cm-edit');
+      const nv = normCatName(inp ? inp.value : '');
+      const r = renameCat(old, nv);
+      if (!r.ok) { toast(r.msg); renderCatMan(); return; }
+      catEditing = null;
+      moveCatColor(old, nv);                // ★ 颜色跟着改名迁移
+      toast(r.msg + (r.moved ? '（' + r.moved + ' 条记录已跟着改）' : ''));
+      renderCatMan(); render();
+    };
+  });
+  // 删除
+  box.querySelectorAll('.cm-row .del').forEach(b => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (b.disabled) return;
+      const c = b.closest('.cm-row').getAttribute('data-cat');
+      const n = counts[c] || 0;
+      const msg = n
+        ? '删除「' + c + '」？该分类下 ' + n + ' 条记录会归到「其他」。'
+        : '删除「' + c + '」？';
+      if (!confirm(msg)) return;
+      const r = delCat(c);
+      dropCatColor(c);                      // 颜色一并清掉
+      toast(r.msg + (r.moved ? '（' + r.moved + ' 条记录已归到「其他」）' : ''));
+      renderCatMan(); render();
+    };
+  });
+  // 行内改名输入框（回车确认 / Esc 取消）
+  box.querySelectorAll('.cm-row .cm-edit').forEach(inp => {
+    inp.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') { catEditing = null; renderCatMan(); }
+    };
+    inp.onblur = () => {
+      const old = catEditing;
+      catEditing = null;
+      const nv = normCatName(inp.value);
+      if (!nv || nv === old) { renderCatMan(); return; }
+      if (catList.includes(nv)) { toast('「' + nv + '」已存在'); renderCatMan(); return; }
+      const r = renameCat(old, nv);
+      if (!r.ok) { toast(r.msg); renderCatMan(); return; }
+      moveCatColor(old, nv);                // ★ 颜色跟着改名迁移
+      toast(r.msg);
+      renderCatMan(); render();
+    };
+  });
+}
+
+/* ---------- 色盘弹层 ---------- */
+function openColorPicker(cat) {
+  const m = $('color-mask');
+  const list = $('color-grid');
+  const title = $('color-title');
+  if (!m || !list) return;
+  title.textContent = '「' + cat + '」的颜色';
+  list.innerHTML = '';
+  // 当前颜色（还原成基准色，即未做主题调整的那版）
+  const cur = normHex(catColors[cat]) || pickBaseColor(cat);
+  CAT_PALETTE.forEach(hex => {
+    const b = document.createElement('button');
+    b.className = 'cg' + (hex.toLowerCase() === cur.toLowerCase() ? ' on' : '');
+    b.style.background = hex;
+    b.title = hex;
+    b.onclick = () => {
+      catColors[cat] = hex;
+      saveCatColors();
+      toast('✓ 「' + cat + '」的颜色已设为 ' + hex);
+      closeColorPicker();
+      renderCatMan(); render();     // ★ 全站重绘
+    };
+    list.appendChild(b);
+  });
+  // ---- 当前颜色指示 ----
+  const swatch = $('color-swatch');
+  const hexEl = $('color-hex');
+  const showNow = (hex) => {
+    if (swatch) swatch.style.background = hex;
+    if (hexEl) hexEl.textContent = hex;
+  };
+  showNow(cur);
+
+  // ---- 统一的「应用颜色」入口 ----
+  // 预设色与取色器都走这里，保证行为一致：保存 + 落盘 + 刷新全站。
+  const applyColor = (hex, close) => {
+    const v = normHex(hex);
+    if (!v) return;
+    catColors[cat] = v;
+    saveCatColors();
+    showNow(v);
+    renderCatMan();
+    render();                       // ★ 全站重绘：所有用 catColor() 的地方一起变
+    // ★ v129：图谱页要**重建**才能用上新颜色 ——
+    //   力导向图的节点颜色是建图时写进 SVG 的 fill 属性，光 render() 不会重画它。
+    if (curView === 'graph' && typeof initGraph === 'function') {
+      try { initGraph(curListCache && curListCache.length ? curListCache : DATA); } catch (e) {}
+    }
+    if (close) {
+      toast('✓ 「' + cat + '」的颜色已设为 ' + v);
+      closeColorPicker();
+    }
+  };
+
+  // 原生取色器（可任选颜色）
+  const native = $('color-native');
+  if (native) {
+    native.value = cur;
+    // ★ v129：**oninput 实时预览** ——
+    //   原来只有 onchange（系统取色器面板关闭时才触发），
+    //   而那个面板正好盖住「完成」按钮 → 选了色点不到确认 → 弹层卡住。
+    //   现在拖动色条时页面就跟着变，用户能立刻看到效果、不需要"确定"这一步。
+    native.oninput = () => {
+      const v = normHex(native.value);
+      if (!v) return;
+      list.querySelectorAll('.cg').forEach(b => b.classList.toggle('on', b.title.toLowerCase() === v));
+      showNow(v);
+      applyColor(v, false);          // 实时应用，但不关弹层
+    };
+    native.onchange = () => {
+      const v = normHex(native.value);
+      if (!v) return;
+      applyColor(v, true);           // 面板关闭 → 落定并收起弹层
+    };
+  }
+  m.classList.add('show');
+}
+/* 没自定义色时，取默认表里的基准色（浅色版） */
+function pickBaseColor(cat) {
+  const tbl = (CAT_COLOR && typeof CAT_COLOR === 'object') ? CAT_COLOR : {};
+  if (tbl[cat]) return tbl[cat];
+  let h = 0;
+  for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
+  return 'hsl(' + (h % 360) + ' 58% 52%)';
+}
+function closeColorPicker() {
+  const m = $('color-mask');
+  if (m) m.classList.remove('show');
+}
+
+/* ============================================================
+   v126 正式版：年为主骨架
+   ------------------------------------------------------------
+   年   = 第一层骨架
+          · 左栏「年份浏览」目录（年份 / 条数 / 分类色带 / ★）
+          · 右栏两种形态：
+              ① 全览：按年份顺序列出每年一块，每块 = 年标题 + 分类统计条
+                      + 按分类分组的事件
+              ② 单年：只显示所选年份，结构同上（年 → 分类 → 事件）
+   分类 = 年下面的统计维度 + 可选筛选参数（不是主角）
+   事件 = 主体内容
+   ============================================================ */
+
+/* 分类配色常量（CAT_COLOR / CAT_COLOR_DARK / catColors / curYear）
+   已在主脚本靠前位置声明 —— 必须早于首次 render()，否则 TDZ 报错。
+   catColor() 定义在 cat-color.js 里（带主题感知 + 自定义色）。 */
+
+
+/* ---------- 左栏：年份目录 ---------- */
+function renderYearDir() {
+  const box = $('yrDir');
+  if (!box) return;
+  const years = [];
+  const seen = new Set();
+  DATA.forEach(e => {
+    const y = yearOf(e.sortKey || e.from);
+    if (!y || y === '未知' || seen.has(y)) return;
+    seen.add(y); years.push(y);
+  });
+  years.sort();
+  years.reverse();   // 与时间轴一致：最近的排在最上面
+
+  // 每年：条数 + 分类分布（迷你色带）+ 重要事件标记
+  const byY = new Map();
+  DATA.forEach(e => {
+    const y = yearOf(e.sortKey || e.from);
+    if (!y || y === '未知') return;
+    if (!byY.has(y)) byY.set(y, []);
+    byY.get(y).push(e);
+  });
+
+  box.innerHTML = '';
+  // 「全部年份」入口 —— 单年视图里点它回到全览
+  const allBtn = document.createElement('button');
+  allBtn.className = 'yd-row yd-all' + (curYear === null ? ' on' : '');
+  allBtn.innerHTML =
+    '<span class="yd-y">全部</span>' +
+    '<span class="yd-n">' + DATA.length + ' 条</span>' +
+    '<span class="yd-bar yd-bar-all"></span>';
+  allBtn.onclick = () => { curYear = null; curCat = 'ALL'; render(); };
+  box.appendChild(allBtn);
+
+  years.forEach(y => {
+    const evs = byY.get(y) || [];
+    const cnt = new Map();
+    evs.forEach(e => cnt.set(e.cat, (cnt.get(e.cat) || 0) + 1));
+    const sorted = [...cnt.entries()].sort((a, b) => b[1] - a[1]);
+    const hasKey = evs.some(e => evKey(e) === 1);
+    const b = document.createElement('button');
+    b.className = 'yd-row' + (curYear === y ? ' on' : '');
+    b.dataset.year = y;
+    const bar = sorted.map(([c, n]) =>
+      '<i style="width:' + (n / evs.length * 100).toFixed(1) + '%;background:' + catColor(c) + '"></i>'
+    ).join('');
+    b.innerHTML =
+      '<span class="yd-y">' + esc(y) + '</span>' +
+      '<span class="yd-n">' + evs.length + ' 条</span>' +
+      '<span class="yd-bar">' + bar + '</span>' +
+      (hasKey ? '<span class="yd-key" title="这一年有重要事件">★</span>' : '');
+    b.onclick = () => {
+      curYear = (curYear === y) ? null : y;
+      if (curYear) { curCat = 'ALL'; }     // 换年时清掉分类筛选，避免"空年"的困惑
+      render();
+      const sel = box.querySelector('.yd-row.on');
+      if (sel) sel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    box.appendChild(b);
+  });
+  const hint = $('yrDirHint');
+  if (hint) hint.textContent = years.length ? years.length + ' 年' : '';
+}
+
+/* ---------- 分类统计条（单年 / 全览共用） ---------- */
+function yvStatsHtml(groups, total) {
+  if (!groups.length || !total) return '';
+  const bar = groups.map(([c, evs]) =>
+    '<i style="width:' + (evs.length / total * 100).toFixed(2) + '%;background:' + catColor(c) + '" ' +
+    'title="' + esc(c) + ' ' + evs.length + ' 条" data-cat="' + esc(c) + '"></i>').join('');
+  const legend = groups.map(([c, evs]) =>
+    '<span data-cat="' + esc(c) + '"><em style="background:' + catColor(c) + '"></em>' +
+    esc(c) + ' <b>' + evs.length + '</b></span>').join('');
+  return '<div class="yv-stats">' + bar + '</div>' +
+         '<div class="yv-stats-legend">' + legend + '</div>';
+}
+
+/* ---------- 事件分组（按分类） ---------- */
+function yvGroupsHtml(groups) {
+  return groups.map(([c, evs]) => {
+    const rows = evs.slice().sort((a, b) =>
+      (a.sortKey || a.from) < (b.sortKey || b.from) ? -1 : 1).map(e => {
+        const isKey = evKey(e) === 1;
+        const dd = spanDays(e);
+        const dateTxt = e.span
+          ? esc(e.from) + ' → ' + esc(e.to) + (dd ? ' <b>' + dd + '天</b>' : '')
+          : esc(e.from);
+        return '<div class="yv-ev' + (isKey ? ' key-ev' : '') + '" data-eid="' + esc(e.id) + '">' +
+          '<span class="dot" style="background:' + catColor(c) + '"></span>' +
+          '<div class="bd"><div class="t">' + esc(e.title || '(未命名)') + '</div>' +
+          '<div class="m">' + dateTxt +
+          (e.place ? ' · 📍' + esc(e.place) : '') +
+          (e.note ? ' · ' + esc(oneLine(e.note)) : '') + '</div></div>' +
+          '</div>';
+      }).join('');
+    return '<div class="yv-grp">' +
+      '<div class="yv-grp-h"><em class="catdot" style="background:' + catColor(c) + '"></em>' +
+      '<b>' + esc(c) + '</b><span>' + evs.length + ' 条</span></div>' +
+      rows + '</div>';
+  }).join('');
+}
+
+/* ---------- 右栏：年视图 ---------- */
+function renderYearView() {
+  const head = $('yvHead'), body = $('yvBody');
+  if (!head || !body) return;
+  // 单年视图自带大标题 + 统计条，旧的筛选状态条是重复信息 → 隐藏
+  const st = $('pv-status');
+  if (st) st.style.display = (curView === 'year') ? 'none' : '';
+
+  /* 筛选（搜索 / 只看重要）激活时忽略年份限制 ——
+     搜索是全局的，"在 2017 里搜"如果搜不到就永远看不到结果了。
+     所以：一旦有搜索/只看重要，就退回全览（按年分组），每组只留命中的事件。 */
+  const filtering = !!((curQ && curQ.trim()) || onlyKey);
+  const singleYear = (!filtering && curYear) ? curYear : null;
+
+  // 基础集合
+  let list = DATA;
+  if (singleYear) list = list.filter(e => yearOf(e.sortKey || e.from) === singleYear);
+  // 搜索
+  if (curQ && curQ.trim()) list = list.filter(e => matchQ(e, curQ.trim()));
+  // 只看重要
+  if (onlyKey) list = list.filter(e => evKey(e) === 1);
+  // 分类筛选（全局参数，作用于年视图）
+  if (curCat && curCat !== 'ALL') list = list.filter(e => e.cat === curCat);
+
+  // ---- 头部 ----
+  if (singleYear) {
+    const total = DATA.filter(e => yearOf(e.sortKey || e.from) === singleYear).length;
+    const byCat = new Map();
+    list.forEach(e => {
+      if (!byCat.has(e.cat)) byCat.set(e.cat, []);
+      byCat.get(e.cat).push(e);
+    });
+    const groups = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length);
+    head.innerHTML =
+      '<div class="yv-title"><span class="yv-y">' + esc(singleYear) + '</span>' +
+      '<span class="yv-meta"><b>' + total + '</b> 条记录 · ' + groups.length + ' 个分类</span></div>' +
+      yvStatsHtml(groups, list.length);
+  } else {
+    const yCount = new Set(list.map(e => yearOf(e.sortKey || e.from))
+      .filter(y => y && y !== '未知')).size;
+    const cCount = new Set(list.map(e => e.cat)).size;
+    head.innerHTML =
+      '<div class="yv-title"><span class="yv-y">全部年份</span>' +
+      '<span class="yv-meta"><b>' + list.length + '</b> 条记录 · 跨 ' + yCount +
+      ' 年 · ' + cCount + ' 个分类' +
+      (filtering ? ' · <em class="yv-filtered">筛选中</em>' : '') +
+      '</span></div>';
+  }
+
+  // ---- 主体 ----
+  if (!list.length) {
+    body.innerHTML = '<div class="yv-empty"><div class="ico">📭</div>' +
+      '<div>没有符合条件的记录</div></div>';
+  } else if (singleYear) {
+    const byCat = new Map();
+    list.forEach(e => {
+      if (!byCat.has(e.cat)) byCat.set(e.cat, []);
+      byCat.get(e.cat).push(e);
+    });
+    const groups = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length);
+    body.innerHTML = yvGroupsHtml(groups);
+  } else {
+    // 全览：按年份顺序分组，每年一块
+    const byY = new Map();
+    list.forEach(e => {
+      const y = yearOf(e.sortKey || e.from);
+      if (!y || y === '未知') return;
+      if (!byY.has(y)) byY.set(y, []);
+      byY.get(y).push(e);
+    });
+    const ys = [...byY.keys()].sort();
+    ys.reverse();
+    body.innerHTML = ys.map((y, idx) => {
+      const evs = byY.get(y);
+      const byCat = new Map();
+      evs.forEach(e => {
+        if (!byCat.has(e.cat)) byCat.set(e.cat, []);
+        byCat.get(e.cat).push(e);
+      });
+      const groups = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length);
+      // 默认只展开最近一年，其余折叠（首屏不是一堵卡片墙）
+      const open = filtering ? true : (idx === 0);
+      return '<section class="yv-yblock' + (open ? ' open' : '') + '" data-year="' + esc(y) + '">' +
+        '<div class="yv-yhead" role="button" tabindex="0" aria-expanded="' + open + '">' +
+        '<span class="yv-ybig">' + esc(y) + '</span>' +
+        '<span class="yv-ymeta">' + evs.length + ' 条 · ' + groups.length + ' 个分类</span>' +
+        '<span class="yv-ychev">›</span>' +
+        '</div>' +
+        '<div class="yv-ybody">' +
+        yvStatsHtml(groups, evs.length) +
+        yvGroupsHtml(groups) +
+        '</div></section>';
+    }).join('');
+  }
+
+  // 交互：统计条 / 图例 → 切分类筛选
+  head.querySelectorAll('[data-cat]').forEach(el => {
+    el.onclick = () => {
+      const c = el.getAttribute('data-cat');
+      curCat = (curCat === c) ? 'ALL' : c;
+      render();
+    };
+  });
+  body.querySelectorAll('[data-cat]').forEach(el => {
+    el.onclick = () => {
+      const c = el.getAttribute('data-cat');
+      curCat = (curCat === c) ? 'ALL' : c;
+      render();
+    };
+  });
+  // 全览里点年份标题 → 切到该年
+  body.querySelectorAll('.yv-yhead').forEach(el => {
+    const go = () => {
+      const y = el.parentElement.getAttribute('data-year');
+      curYear = y; curCat = 'ALL';
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    el.onclick = go;
+    el.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+    };
+  });
+  // 事件卡 → 打开编辑
+  body.querySelectorAll('.yv-ev').forEach(el => {
+    el.onclick = () => {
+      const id = el.getAttribute('data-eid');
+      const e = DATA.find(x => x.id === id);
+      if (e) { openEdit(e); }
+    };
+  });
+}
+
+/* 主题切换后颜色会变（浅色版/深色版），需要重绘 */
+(function patchThemeRedraw() {
+  const btn = document.getElementById('theme-btn');
+  if (!btn) return;
+  const old = btn.onclick;
+  btn.onclick = function () {
+    if (typeof old === 'function') old.call(this);
+    // 主题属性是异步切换的，等一拍再重绘
+    setTimeout(() => { try { render(); } catch (e) {} }, 60);
+  };
+})();
+
+/* 说明：渲染挂钩不在这里包装 render() ——
+   因为这段代码注入在主脚本末尾，而首次 render() 在更早的位置就执行了，
+   包装还没生效。改为在 render() 内部直接调用（见 port_v126.py）。 */
+
+/* 「按年」页签在正式版里是**静态写在 HTML 里**的（排在第一个），
+   所以不需要动态插入 + 重新绑定。
+   原生绑定代码 `document.querySelectorAll('.pv-views .tab').forEach(...)`
+   在主脚本里执行时会自动带上这个新页签。 */
+
 </script>
-<div class="ver">v33</div>
+<!-- ★ v126：分类颜色色盘 -->
+<div class="mask" id="color-mask">
+  <div class="card" style="width:min(400px,100%)">
+    <div class="card-title">🎨 选择颜色</div>
+    <div class="card-tip" id="color-title">分类颜色</div>
+    <div class="color-grid" id="color-grid"></div>
+    <div class="fld">
+      <label>自定义颜色（取色器 · 拖动即生效）</label>
+      <input type="color" id="color-native" style="width:100%;height:38px;border:1px solid var(--line-ctl);border-radius:9px;background:none">
+    </div>
+    <!-- ★ v129：当前颜色 —— 原来没有任何地方显示"现在是什么色"，
+         用户选完色也看不到结果，只能靠猜。 -->
+    <div class="color-now">
+      <span class="cn-label">当前</span>
+      <i class="cn-swatch" id="color-swatch"></i>
+      <span class="cn-hex" id="color-hex">#000000</span>
+      <span class="cn-hint">拖动取色器即可实时预览，点下方「关闭」结束</span>
+    </div>
+    <div class="btns">
+      <button class="btn" id="color-reset">恢复默认</button>
+      <button class="btn pri" id="color-close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ★ v126：色盘弹层按钮绑定（DOM 就绪后执行） */
+(function () {
+  var closeBtn = document.getElementById('color-close');
+  var mask = document.getElementById('color-mask');
+  var resetBtn = document.getElementById('color-reset');
+  if (closeBtn) closeBtn.onclick = function () { closeColorPicker(); };
+  if (mask) mask.onclick = function (e) { if (e.target === mask) closeColorPicker(); };
+  if (resetBtn) resetBtn.onclick = function () {
+    var t = (document.getElementById('color-title') || {}).textContent || '';
+    var m = t.match(/「(.+?)」/);
+    var cat = m ? m[1] : '';
+    if (cat && catColors[cat]) {
+      delete catColors[cat];
+      saveCatColors();
+      toast('✓ 「' + cat + '」已恢复默认色');
+    }
+    closeColorPicker();
+    renderCatMan(); render();      // ★ 全站重绘
+  };
+})();
+</script>
+
+<div class="ver">v39 · 颜色修复</div>
 </body>
 </html>

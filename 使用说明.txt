@@ -1,0 +1,64 @@
+Planet 612 · 百宝箱工具箱
+================================================
+
+【包里有 6 个工具】
+  轻身时光簿    体重记录与趋势
+  刚需日用账    每日开销记账（浅色 / 深色主题）
+  时光自撰集    时间轴 · 关联图谱 · 分类管理
+  清居置物箱    物品分层收纳（可拍照存图）
+  历年收支簿    导入账单做收支分析
+  账单透视镜    钱花在哪了、哪些能省
+  随手记簿      隐藏工具（代码完整，改一行开关即可放出）
+
+
+【两种用法，看你需要哪种】
+
+  用法 A：网页版直接用（最快）
+    解压后双击 planet612-standalone.html —— 整个百宝箱压成了一个 HTML，
+    6 个工具 + 全部依赖库 + 背景图都在里面，不用装任何东西、不用联网。
+    建议拖到浏览器书签栏，或「发送到 → 桌面快捷方式」，以后一点就开。
+
+  用法 B：部署成自己的网站
+    把包里 index.html 起头的那些文件按原样放到任意静态托管
+    （GitHub Pages / Netlify / Vercel / 对象存储 / 自己的服务器都行）：
+      index.html  time.html  weight.html  budget.html  storage.html
+      ledger.html  analysis.html  daily.html  download.html  install.html
+      manifest.json  sw.js  assets/  lib/
+    想在本机跑成一个真服务（带 /dl 下载接口）：
+      node server.js      # 需要先 npm install（零依赖，其实不用装）
+
+    如果你是往 GitHub 仓库推：把包里这些文件直接覆盖到仓库根目录即可，
+    注意不要动仓库里的 data/（那是你的账本数据）。
+    git add -A && git commit -m "更新" && git push
+
+
+【⚠️ 数据存在哪里 —— 一定看】
+  数据保存在**当前浏览器本机**（localStorage / IndexedDB），不上传任何服务器。
+
+    · 换浏览器、换电脑 → 看不到原来的数据
+    · 清理浏览器数据 / 点「清除缓存」→ 数据会没
+    · 无痕（隐身）窗口 → 关掉就没了
+
+  所以请定期用各工具里的「导出 JSON」备份到网盘或电脑。
+  导入时会自动合并，不会覆盖本机已有的东西。
+
+
+【各工具都能连 GitHub 云同步】
+  每个工具的「同步设置」里填仓库 owner / 仓库名 / 分支 / Token 即可，
+  换设备时把数据拉回来。Token 只存在你本机浏览器里。
+
+  ⚠️ 如果你的仓库是 public，data/ 里的账本数据是公开可下载的 ——
+  建议按 CHANGES.md 里的「把 data/ 迁到私有仓库」流程处理。
+
+
+【文件说明】
+  CHANGES.md       完整改动清单、验证记录、以及 data/ 私有化迁移的 7 步流程
+  使用说明.txt      就是本文件
+  planet612-standalone.html   单文件版（用法 A）
+  assets/ lib/     背景图与第三方库
+  server.js        可选的本地服务器
+
+
+【版本】
+  v120 · Service Worker 缓存号 p612-v152
+  官方在线地址：https://sumer0825.github.io/Sumer/

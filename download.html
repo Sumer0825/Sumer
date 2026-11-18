@@ -55,11 +55,11 @@
   <div class="sub">GitHub Pages 整包覆盖上传用</div>
 
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v120.zip</div>
-    <div class="meta" id="meta">🆕 最新 v120：33 个文件 · 1825 KB</div>
+    <div class="nm" id="nm">sumer-pages-v129.zip</div>
+    <div class="meta" id="meta">🆕 最新 v129：36 个文件 · 3127 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="sumer-pages-v120.zip" download="sumer-pages-v120.zip">⬇ 下载 sumer-pages-v120.zip</a>
+  <a class="btn" id="dl" href="sumer-pages-v129.zip" download="sumer-pages-v129.zip">⬇ 下载 sumer-pages-v129.zip</a>
   <script>
   /* 下载地址自适应：
      沙箱网关有自己的文件白名单 —— 只放行页面与 assets/lib，.zip 会被它拦成 403，
@@ -75,16 +75,51 @@
   </script>
 
   <div class="chg">
-    <h2 id="chg-title">本次更新 · v120</h2>
+    <h2 id="chg-title">本次更新 · v129</h2>
     <ul id="chg">
-      <li><span class=tag>合并</span>采纳第三方安全修复包：新增 Content-Security-Policy、iframe sandbox、分类名与 id 白名单转义、GitHub 同步改为并集合并（不再整体覆盖本机数据）、密码门口令改为运行时解码（源码内无明文）、Service Worker 逐个预缓存且缓存键剥掉 query、manifest 的 id 与 scope 对齐</li>
-      <li><span class=tag>修复</span>单文件版在 CSP 下 Excel 功能全废 —— 第三方库是用 blob URL 注入 srcdoc 的，而父文档的 CSP 会被 iframe 继承并覆盖 iframe 自己的 meta；构建时给 script-src 补上 blob: 即可</li>
-      <li><span class=tag>优化</span>各工具版本角标与门户 TOOLS_VER 对齐（time 33 / weight 38 / budget 43 / storage 29 / ledger 21 / analysis 24 / daily 5），避免门户与页面显示不一致</li>
-      <li><span class=tag>新增</span>CSP + iframe sandbox 专项测试（tools/test_csp_sandbox.py）与单文件版降级测试（tools/test_standalone_fallback.py）</li>
+      <li><span class=tag>修复</span>自定义分类颜色后**无法确定** —— 原生取色器弹出的系统面板正好盖住色盘弹层的「完成」按钮，而颜色保存绑定在 onchange（面板关闭时才触发）→ 选了色点不到确认，弹层一直卡着。现在改成**拖动取色器即实时生效**（页面立刻跟着变），面板关闭时落定；「完成」按钮改为「关闭」，不再承担保存职责</li>
+      <li><span class=tag>新增</span>色盘弹层新增「当前颜色」指示：色块 + 十六进制值 + 提示文字，随时看得见现在是什么色</li>
+      <li><span class=tag>修复</span>修改既存分类的颜色后，**图谱页不跟着变** —— 图谱的 gCatColor() 只查默认色表、不查自定义色映射（实测同一分类：按年页 #ff6683、图谱页 #e08ad2）。现在图谱统一走 catColor()，全站一致</li>
+      <li><span class=tag>修复</span>改色后图谱需要重建才生效 —— 力导向图的节点颜色是建图时写进 SVG 的 fill，光重绘页面不会重画它。现在改色后自动重建图谱</li>
     </ul>
     <details id="chg-hist-box">
-      <summary>更早的更新（<b id="chg-hist-n">189</b> 条）</summary>
+      <summary>更早的更新（<b id="chg-hist-n">224</b> 条）</summary>
       <ul id="chg-hist">
+        <li><span class=tag>还原</span>「图谱」页还原为原本的力导向图 —— 大圆＝年份（大小按记录数）、中圆＝分类标签，可按住拖拽、按跳数分层联动、悬停出提示气泡、点分类直接筛选。上一版的「时间骨架图」（年份主干＋分类分支＋事件圆点的分层树）整体撤掉</li>
+        <li><span class=tag>修复</span>顺带修掉两个从旧版本带回来的缺陷：色盘弹层 HTML 被插入两次（页面上有两个 #color-mask，导致 #color-title 选择器冲突、色盘打不开）；分类管理面板 DOM 与样式 class 不匹配</li>
+        <li><span class=tag>保留</span>「按年」视图、全站统一分类色、地点字段、新表格格式导入导出 —— 均不受影响</li>
+        <li><span class=tag>新增</span>时光自撰集导入改为按**表头语义**认列 —— 支持你的表格格式（第 1 行说明 + 表头「开始时间 | 结束时间 | 分类 | 地点 | 事件描述」+ 日期为 20100720 这样的数字），导出也改成同一格式，可直接再导入</li>
+        <li><span class=tag>修复</span>导入你的表格时数据全乱 —— 旧逻辑只认「表头含 事件/标题 且列数≥4」才算结构化表，你那张表表头是「事件描述」→ 识别失败 → 掉进&quot;每行一句话&quot;回退分支，把标题、分类、地点拼成一坨</li>
+        <li><span class=tag>新增</span>新增「地点」字段：独立表单输入框，时间轴 / 列表 / 按年视图 / 导入预览都显示（📍 标记），去重键也纳入地点</li>
+        <li><span class=tag>修复</span>导入时表格里的自定义分类（住宿/友情/追星/旅游/亲情）不在本机分类表里，会被全部打成兜底分类「其他」—— 现在导入时自动把这些分类并入分类表</li>
+        <li><span class=tag>修复</span>云端表格解析同步改成表头语义 —— 导出格式变了，云端读取不改会把「地点」当标题、「事件描述」当分类，整体错位</li>
+        <li><span class=tag>修复</span>「清空」现在连云端一起清 —— 原来只清本机，而云端合并逻辑是并集，刷新后云端旧数据会全部灌回来（表现为&quot;明明清空了，一刷新又全回来了&quot;）</li>
+        <li><span class=tag>新增</span>时光自撰集重构为「年为主骨架」：左栏「分类」大块改为「年份浏览」目录（年份 / 条数 / 分类分布色带 / 重要标记 ★），新增「按年」页并排在页签第一位、进入页面默认落在这一屏 —— 年是第一层骨架，分类降级为年下面的统计维度 + 一行紧凑筛选 chip</li>
+        <li><span class=tag>新增</span>「按年」页两种形态：全览按年份顺序列出每年一块（年标题 + 分类统计条 + 按分类分组的事件，默认只展开最近一年）；点某年只看那一年。搜索 / 只看重要激活时自动退回全览，避免&quot;在 2017 里搜不到就永远看不到结果&quot;</li>
+        <li><span class=tag>新增</span>「图谱」页改造为「时间骨架图」：年份按编年顺序排成主干，分类挂在年份上做分支，事件挂在分类下（可悬停看详情、点击打开编辑），工具条新增「旧 → 新 / 新 → 旧」排序切换；原先年份与分类平级的力导向二部图整体移除，分类不再抢主角</li>
+        <li><span class=tag>优化</span>全站分类配色统一：原文件并存三套不一致的配色，同一个「旅行」在不同视图里颜色不同；现在任何视图、任何年份、深浅两套主题下同一分类都是同一个颜色（深浅同色相不同明暗）</li>
+        <li><span class=tag>新增</span>分类管理支持自定义颜色：每个分类有 🎨 色盘按钮（16 个预设色 + 取色器 + 恢复默认），改名时颜色跟着迁移、删除时一并清理，Excel 分类表增加「颜色」列跟着云端数据走，换设备后颜色不变</li>
+        <li><span class=tag>修复</span>切到其它视图时年视图容器没有统一显隐，内容会叠在别的视图上面；色盘弹层被插入两次导致选择器冲突；分类管理面板新版 DOM 与原有样式不匹配导致弹窗样式全丢、改名输入框找不到；图谱网格增加元素后按钮被挤到下一行</li>
+        <li><span class=tag>修复</span>时光自撰集还有三条路径能造出重复记录（v123 只堵住了云端拉取和导入两条）：①读取本机数据时不去重 —— 被污染过的历史重复一直躺在本机，每次同步又被推回云端，现在读进来就地丢掉；②手动新增记录不查重 —— 加一条和已有完全相同的记录就会多一条，现在会拦下并提示「已存在完全相同的记录」；③编辑记录不查重 —— 把 A 改成 B 而 B 已存在会产生新重复，现在会拦下并提示「改成这样会与另一条已有记录重复」</li>
+        <li><span class=tag>修复</span>历年收支簿导入时同样是「只跟本机比、不批内去重」，同一份文件内部自己重复的行会全部被收进来，现已补上批内去重</li>
+        <li><span class=tag>新增</span>全站重复数据普查工具（tools/scan_all_dupes.py）：对云端 data/ 下每个文件分三个维度检测 —— 真重复（所有字段全等，该清）、键冲突（同日期同金额但分类备注不同，多半是真实的��笔消费，不该删）、非法数据；并审计每个工具页的云端合并逻辑是否还有「越同步越乱」的回环</li>
+        <li><span class=tag>新增</span>全站云端数据去重修复工具（tools/fix_all_dupes.py）：处理时光/体重/收支三个文件，严格保守（只删全字段完全一致的），带完整性校验与重试，复检通过才输出；加 --push 可直接推回仓库（先自动备份原文件）</li>
+        <li><span class=tag>优化</span>工具版本角标与门户 TOOLS_VER 对齐（time 35 / ledger 22）</li>
+        <li><span class=tag>修复</span>时光自撰集数据出现重复、越同步越乱 —— 云端 data/time.xlsx 里的重复行，每次拉取都会被当成&quot;新记录&quot;全量收进本机，再推回云端固化，形成回环。根因：拉取时只用「本机已有记录」做去重比对（键是 from|title|to），云端文件**内部**自己重复的行彼此从不比对，所以那份重复数据每拉一次就被复制一份。现在统一成一个去重键（起止+标题+分类+备注+重要标记 全等），并且**批内也去重**；导入与云端拉取共用同一个函数，不再各判各的</li>
+        <li><span class=tag>新增</span>时光自撰集左侧工具栏新增「⚠ 清理重复」按钮：只在检测到重复时出现并显示条数，点击后（密码门确认）列出将删除的分组供核对，清理本机并同步修正云端；没有重复时按钮自动隐藏</li>
+        <li><span class=tag>修复</span>非法日期被放行 —— 原来 normDatePart 只校验 YYYY-MM-DD 的月/日，&#x27;2017-22&#x27; 这种非法年月会被放行成 &#x27;2017-22-01&#x27;，页面上出现「2017-22-01 → 2017-22-01」这种看不懂的条目；现在年月越界一律收敛，开始日期非法则整条丢弃</li>
+        <li><span class=tag>新增</span>时光自撰集重复数据专项测试（tools/test_time_dedupe.py 19 项、tools/test_time_dedupe_btn.py 14 项）：覆盖云端内部重复、批内去重、导入去重、回环是否断开、非法日期、按钮出现与隐藏、落盘持久化、误删保护</li>
+        <li><span class=tag>新增</span>云端数据去重修复工具（tools/fix_time_dupes.py、tools/fix_time_cloud.sh）：拉取仓库里的 data/time.xlsx，诊断并生成去重 + 修好非法日期的版本，复检通过才输出；加 --push 可直接推回仓库（会先自动备份原文件）</li>
+        <li><span class=tag>修复</span>侧栏折叠后「展开」按钮小到点不着 —— 折叠态侧栏只有 56px（内容区 44px），而排序按钮也占了 34px，把展开按钮挤成 4px 宽的一条细线。现在折叠时自动收起排序按钮，展开按钮独占整行（42×30px），一点就开</li>
+        <li><span class=tag>优化</span>排序模式与侧栏联动：折叠状态下看不到排序按钮，进入排序模式会自动把侧栏展开；排序模式下点「收起」会先退出排序再收起，不会让排序界面凭空消失</li>
+        <li><span class=tag>新增</span>置物箱支持调整顺序：位置和层都能排。侧栏顶部新增排序按钮（⇅ 图标常驻在「收起」旁边），点开后侧栏展开成「位置 → 层」完整树 —— 位置可用 ↑↓ 按钮或拖拽手柄调整，层用 ↑↓ 调整，改动即时保存</li>
+        <li><span class=tag>优化</span>置物箱位置列表改为按 order 排序（原来用的是数组顺序，只有层才按 order 排），否则调整后的顺序下次加载就会乱掉</li>
+        <li><span class=tag>优化</span>排序模式不记忆：退出或刷新后都回到常态，不会让人误以为还停在排序状态</li>
+        <li><span class=tag>新增</span>置物箱排序功能专项测试（tools/test_sort_preview.py）：覆盖位置排序、层排序、刷新后保持、拖拽、模式记忆策略等 21 项</li>
+        <li><span class=tag>合并</span>采纳第三方安全修复包：新增 Content-Security-Policy、iframe sandbox、分类名与 id 白名单转义、GitHub 同步改为并集合并（不再整体覆盖本机数据）、密码门口令改为运行时解码（源码内无明文）、Service Worker 逐个预缓存且缓存键剥掉 query、manifest 的 id 与 scope 对齐</li>
+        <li><span class=tag>修复</span>单文件版在 CSP 下 Excel 功能全废 —— 第三方库是用 blob URL 注入 srcdoc 的，而父文档的 CSP 会被 iframe 继承并覆盖 iframe 自己的 meta；构建时给 script-src 补上 blob: 即可</li>
+        <li><span class=tag>优化</span>各工具版本角标与门户 TOOLS_VER 对齐（time 33 / weight 38 / budget 43 / storage 29 / ledger 21 / analysis 24 / daily 5），避免门户与页面显示不一致</li>
+        <li><span class=tag>新增</span>CSP + iframe sandbox 专项测试（tools/test_csp_sandbox.py）与单文件版降级测试（tools/test_standalone_fallback.py）</li>
         <li><span class=tag>修复</span>置物箱打不开（列表一片空白、像坏了）—— IndexedDB 打不开时（无痕模式 / iframe 里第三方存储被禁 / 存储配额满），初始化链在读数据那一步直接断掉，原来的兜底只有一句 alert，而 alert 在 iframe 里常被拦截，用户既看不到提示、页面也永远不会渲染出来。现在改为三层降级：IndexedDB → localStorage → 内存，任何一种环境下都能正常打开使用</li>
         <li><span class=tag>修复</span>历年收支簿同款问题同款修复（它的初始化链结构和置物箱一模一样）</li>
         <li><span class=tag>新增</span>存储降级时页面顶部出现明确提示条，写明当前处于「兼容模式」还是「临时模式」，以及数据会不会丢；不再靠弹窗（弹窗在 iframe 里经常被拦）</li>
@@ -283,14 +318,14 @@
   <div class="note">
     <b>下载后：</b>
     <ol>
-      <li>解压得到 <b id="cnt">33</b> 个文件（<b>没有</b> md 说明文件）</li>
+      <li>解压得到 <b id="cnt">36</b> 个文件（<b>没有</b> md 说明文件）</li>
       <li>把解压出的文件<b>全量覆盖</b>上传到 GitHub 仓库根目录（<code>main</code> 分支）</li>
       <li>等 GitHub Pages 构建完成（约 1 分钟）</li>
       <li>浏览器 <b>Ctrl+Shift+R</b> 强制刷新</li>
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v152），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v156），否则页面看起来"没变化"</div>
 </div>
 </body>
 </html>

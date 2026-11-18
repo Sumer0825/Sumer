@@ -1003,7 +1003,9 @@ async function importExcelFile(file) {
       if (choice === 'merge') {
         // 去重：日期 + 金额 + 收支类型 一致即视为同一笔，不再追加，避免重复数据
         const existing = new Set(RECORDS.map(dupKey));
-        const fresh = allRecords.filter(r => !existing.has(dupKey(r)));
+        // ★ v123：先在文件内部去重，再跟本机比对
+        const uniqFile = dedupeBy(allRecords, dupKey);
+        const fresh = uniqFile.filter(r => !existing.has(dupKey(r)));
         dupCount = allRecords.length - fresh.length;
         finalRecords = RECORDS.concat(fresh); merged = true;   // 合并保留原 OPENING
       } else { finalRecords = allRecords; OPENING = parseFloat($('f-opening').value) || 0; }
@@ -1065,7 +1067,9 @@ async function importJsonBackup(file) {
       if (choice === 'cancel') return;
       if (choice === 'merge') {
         const existing = new Set(RECORDS.map(dupKey));
-        const fresh = out.filter(r => !existing.has(dupKey(r)));
+        // ★ v123：先在文件内部去重，再跟本机比对
+        const uniqFile = dedupeBy(out, dupKey);
+        const fresh = uniqFile.filter(r => !existing.has(dupKey(r)));
         dupCount = out.length - fresh.length;
         finalRecords = RECORDS.concat(fresh); merged = true;
       } else { finalRecords = out; OPENING = parseFloat($('f-opening').value) || 0; }
@@ -1084,6 +1088,21 @@ async function importJsonBackup(file) {
   }
 }
 // 去重标识：日期 + 金额 + 收支类型 三者一致即视为同一笔记录
+/* ---------- 批内去重（v123） ----------
+   导入合并时如果只跟「本机已有记录」比对，同一份文件**内部**自己重复的行
+   会全部被收进来（与 time.html v122 之前的同病）。
+   这里先在文件内部去重，再跟本机比对。 */
+function dedupeBy(arr, keyFn) {
+  const seen = new Set(), keep = [];
+  for (const r of arr) {
+    const k = keyFn(r);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    keep.push(r);
+  }
+  return keep;
+}
+
 function dupKey(r) { return r.date + '|' + r.amount + '|' + r.type; }
 function setImportMeta(n, skip, sheets, dup, err) {
   const el = $('import-meta');
@@ -1418,6 +1437,6 @@ async function bootStorage() {
 }
 bootStorage();
 </script>
-<div class="ver">v21</div>
+<div class="ver">v22</div>
 </body>
 </html>
