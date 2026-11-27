@@ -93,11 +93,11 @@
     </div>
   </div>
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v136.zip</div>
-    <div class="meta" id="meta">🆕 最新 v136：36 个文件 · 3137 KB</div>
+    <div class="nm" id="nm">sumer-pages-v139.zip</div>
+    <div class="meta" id="meta">🆕 最新 v139：35 个文件 · 1881 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="sumer-pages-v136.zip" download="sumer-pages-v136.zip">⬇ 下载 sumer-pages-v136.zip</a>
+  <a class="btn" id="dl" href="sumer-pages-v139.zip" download="sumer-pages-v139.zip">⬇ 下载 sumer-pages-v139.zip</a>
   <script>
   /* 下载地址自适应：
      沙箱网关有自己的文件白名单 —— 只放行页面与 assets/lib，.zip 会被它拦成 403，
@@ -115,14 +115,22 @@
   </script>
 
   <div class="chg">
-    <h2 id="chg-title">本次更新 · v136</h2>
+    <h2 id="chg-title">本次更新 · v139</h2>
     <ul id="chg">
-      <li><span class=tag>新增</span>门户首页新增「⬇ 下载部署包（zip）」按钮，和「📱 装到手机」并排 —— 之前首页里**一个下载入口都没有**，想要部署包只能自己敲 /download.html 地址才能找到</li>
-      <li><span class=tag>新增</span>下载页顶部加「← 返回首页」链接，从首页点进去下载后能一键回到门户</li>
+      <li><span class=tag>改版</span>编年页卡片墙按 **F 方案** 重做可读性：分类改成**药丸标签**（12.5px/800 字重、分类色底+描边）、时长改成**胶囊徽章**（13px/800，如「734天」）、日期与地点**各占一行**并加 **SVG 图标块**（自绘日历/定位针，13px 加粗）—— 分类、天数、城市三样一眼可见，不再是灰色小字</li>
+      <li><span class=tag>优化</span>年份角标改成实底反色（深色主题白底深字、浅色主题深底白字）、加大到 10.5px，卡头第一眼就能看到年份分界</li>
+      <li><span class=tag>修复</span>地点前的 📍 emoji 换成内联 SVG —— emoji 在部分设备/系统缺字形，会显示成空心方框</li>
+      <li><span class=tag>新增</span>门户打开工具后地址栏会记下当前工具（`?tool=time.html`）：**在工具里刷新不再跳回门户首页**，自动回到同一个工具页；点「← 返回首页」抹掉标记，浏览器后退也能回首页</li>
     </ul>
     <details id="chg-hist-box">
-      <summary>更早的更新（<b id="chg-hist-n">245</b> 条）</summary>
+      <summary>更早的更新（<b id="chg-hist-n">251</b> 条）</summary>
       <ul id="chg-hist">
+        <li><span class=tag>清理</span>发布包与仓库**不再包含 `planet612-standalone.html`**（单文件版，近 3 MB）—— 体积大、且历史上多次与在线版脱节。现在只在本地构建保留，不入包、不上线，线上访问该路径直接 404</li>
+        <li><span class=tag>新增</span>发版前新增**硬校验闸门**（`tools/verify_release.py`）：包里文件要齐全、每个文件都要与工作区**逐字节一致**（sha256）、不能混进清单之外的文件、根目录新增页面也不能漏发 —— 任何一条不通过就**中止发布**、线上保持上一版，保证每次发出去的都是最全、含最后修改的包</li>
+        <li><span class=tag>优化</span>`使用说明.txt` 的【版本】行改为发版时自动填充（以前是手写的，实际长期停在 v120 / p612-v152）</li>
+        <li><span class=tag>修复</span>**单文件版 `planet612-standalone.html` 一直是旧的** —— 过去每次发版只是把它原样复制进发布包，从不重新构建，所以包里嵌的仍是几版之前的 time.html 与首页（双击打开它、或在 GitHub Pages 上打开 `/planet612-standalone.html` 的人，看到的都是旧界面，还以为推送没生效）。现在每次发版前用 `tools/build_standalone.py` 重新构建，单文件版与在线版内容一致</li>
+        <li><span class=tag>新增</span>门户首页新增「⬇ 下载部署包（zip）」按钮，和「📱 装到手机」并排 —— 之前首页里**一个下载入口都没有**，想要部署包只能自己敲 /download.html 地址才能找到</li>
+        <li><span class=tag>新增</span>下载页顶部加「← 返回首页」链接，从首页点进去下载后能一键回到门户</li>
         <li><span class=tag>新增</span>编年页「全部年份」标题下加了一条**行程范围说明条**：**2025 年起只记录旅游 / 异地观看演出行程** —— 淡主题色底 + 3px 主色左边条 + 主文本色文字（13px），「2025 年起」用高亮色标出，鼠标悬停还有一句补充说明。一眼就能看懂为什么 2025 年之后只剩出行程类记录（单年视图里不显示这句话）</li>
         <li><span class=tag>修复</span>下载页底部**裸露出一整段 JavaScript 源码**、整张卡片被挤到左边变窄还多出一条横向滚动条 —— 那段「在线地址 + 一键复制」脚本漏了 `&lt;script&gt;` 标签，被浏览器当正文渲染，还顺带作为一个 flex 子项把布局撑歪了</li>
         <li><span class=tag>优化</span>下载页用 file:// 本地打开时不再发那个必然失败的 /dl 探测请求，控制台零报错</li>
@@ -377,14 +385,14 @@
   <div class="note">
     <b>下载后：</b>
     <ol>
-      <li>解压得到 <b id="cnt">36</b> 个文件（<b>没有</b> md 说明文件）</li>
+      <li>解压得到 <b id="cnt">35</b> 个文件（<b>没有</b> md 说明文件）</li>
       <li>把解压出的文件<b>全量覆盖</b>上传到 GitHub 仓库根目录（<code>main</code> 分支）</li>
       <li>等 GitHub Pages 构建完成（约 1 分钟）</li>
       <li>浏览器 <b>Ctrl+Shift+R</b> 强制刷新</li>
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v161），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v162），否则页面看起来"没变化"</div>
 </div>
 <script>
   /* 在线地址：域名兜底 + 一键复制 */

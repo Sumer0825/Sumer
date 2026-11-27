@@ -46,6 +46,9 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     /* 编年页「记录范围说明」提示条底色 —— 单独一个变量，
        不复用 --primary-soft（那个变量全站从未定义，只被引用，导致 hover/徽章底色失效）。 */
     --note-bg: rgba(191,154,125,.16);
+    /* 卡片上的年份角标（浅色主题：深底白字） */
+    --yb-bg: #241a35;
+    --yb-fg: #ffffff;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { -webkit-text-size-adjust: 100%; }
@@ -569,6 +572,9 @@ html[data-theme="dark"] {
   --card-2: #22103c;
   --page: #160b23;
   --note-bg: rgba(187,124,228,.20);
+  /* 年份角标（深色主题：浅底深字，在淡彩卡头上更跳） */
+  --yb-bg: rgba(255,255,255,.92);
+  --yb-fg: #1c1230;
   --grad-title: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
   --grad-rainbow: linear-gradient(90deg, #ff0000, #d077ff, #07abf7, #07f79b, #36f401);
   color-scheme: dark;
@@ -1486,11 +1492,10 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   .bk-d { position: relative; }
   .bd-y {
     flex: 0 0 auto;
-    font-size: 9.5px; font-weight: 800; line-height: 1;
-    padding: 3px 6px;
+    font-size: 10.5px; font-weight: 800; line-height: 1;
+    padding: 4px 8px;
     border-radius: 99px;
-    background: rgba(255,255,255,.16);
-    color: var(--text); opacity: .95;
+    background: var(--yb-bg); color: var(--yb-fg);
     font-variant-numeric: tabular-nums;
     pointer-events: none;
   }
@@ -1515,13 +1520,21 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   .bk-d:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.24); }
   .bk-d.k { box-shadow: inset 3px 0 0 var(--warn); }
   .bd-head {
-    display: flex; align-items: center; gap: 7px; padding: 8px 11px;
-    background: color-mix(in srgb, var(--c) 22%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+    display: flex; align-items: center; gap: 8px; padding: 9px 11px;
+    background: color-mix(in srgb, var(--c) 16%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--c) 34%, transparent);
   }
-  .bd-cat { font-size: 11px; font-weight: 700; color: var(--text); }
+  .bd-cat {
+    font-size: 12.5px; font-weight: 800; color: var(--text);
+    background: color-mix(in srgb, var(--c) 32%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c) 62%, transparent);
+    padding: 2px 10px; border-radius: 99px;
+  }
   .bd-dur {
-    margin-left: auto; font-size: 10px; color: var(--muted);
+    margin-left: auto; font-size: 13px; font-weight: 800; color: var(--text);
+    background: color-mix(in srgb, var(--c) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c) 42%, transparent);
+    padding: 2px 10px; border-radius: 99px;
     font-variant-numeric: tabular-nums;
   }
   .bd-star { color: var(--warn); font-size: 12px; }
@@ -1536,14 +1549,22 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   .bd-t.open {
     display: block; -webkit-line-clamp: unset; overflow: visible;
   }
-  .bd-m {
-    font-size: 11px; color: var(--muted); margin-top: 6px;
-    font-variant-numeric: tabular-nums;
+  /* F 方案：日期与地点各占一行，前面是带底色的 SVG 图标块 */
+  .bd-m, .bd-p {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    font-size: 12.5px; font-weight: 700; color: var(--text);
   }
-  .bd-p {
-    font-size: 11px; color: var(--muted); margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .bd-p { font-size: 13px; margin-top: 6px; }
+  .bd-m > span, .bd-p > span {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .ic {
+    font-style: normal; flex: none; width: 21px; height: 21px; border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--c) 18%, transparent);
+    color: var(--c);
+  }
+  .ic svg { width: 12px; height: 12px; display: block; }
   /* P3：展开 / 收起按钮 */
   .bd-more {
     position: absolute; right: 10px; bottom: 8px;
@@ -1553,8 +1574,15 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
     background: rgba(255,255,255,.10); color: var(--text);
     border: 1px solid var(--line);
     cursor: pointer; z-index: 3;
+    opacity: 0; transition: opacity .12s ease;
   }
   .bd-more:hover { background: rgba(255,255,255,.20); }
+  /* 位置固定在右下角，会压住「地点」那一行 —— 所以改成悬停才显现；
+     触屏设备没有 hover，用媒体查询让它常显。 */
+  .bk-d:hover .bd-more, .bd-more:focus-visible { opacity: 1; }
+  @media (hover: none) { .bd-more { opacity: 1; } }
+  /* 有展开按钮的卡片给底部留出位置（避免 ⋯ 压住地点文字） */
+  .bd-in.bd-more-room { padding-bottom: 28px; }
   .bd-spark {
     height: 3px; margin-top: auto;
     background: linear-gradient(90deg, var(--c), transparent);
@@ -5673,6 +5701,24 @@ function blkMeta(e) {
   };
 }
 
+/* ---------- 卡片里的两个小图标（自绘 SVG，不依赖 emoji 字体） ----------
+   📍 这类 emoji 在部分设备/系统里会显示成空心方框（缺字形），
+   所以日期与地点一律用内联 SVG，跨平台一致。 */
+/* ⚠️ 必须用**函数声明**而不是 const：
+   脚本在两千多行处就有顶层 render() 调用（早于这里），用 const 会触发
+   「Cannot access 'ICON_CAL' before initialization」（TDZ），卡片直接渲染不出来。
+   函数声明会被提升，任何调用点都拿得到。 */
+function iconCal() {
+  return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+    'stroke-linecap="round"><rect x="2" y="3.2" width="12" height="10.6" rx="2"/>' +
+    '<path d="M2 6.6h12M5.4 1.9v2.5M10.6 1.9v2.5"/></svg>';
+}
+function iconPin() {
+  return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+    'stroke-linejoin="round"><path d="M8 14.4S13 10 13 6.6A5 5 0 0 0 3 6.6C3 10 8 14.4 8 14.4z"/>' +
+    '<circle cx="8" cy="6.5" r="1.9"/></svg>';
+}
+
 /* ---------- 单块 ---------- */
 function blkD(e) {
   const m = blkMeta(e);
@@ -5688,13 +5734,15 @@ function blkD(e) {
     (m.isKey ? '<span class="bd-star">★</span>' : '') +
     '<span class="bd-dur">' + (e.span ? m.dd + '天' : esc(m.md)) + '</span>' +
     '</div>' +
-    '<div class="bd-in">' +
+    '<div class="bd-in' + (long ? ' bd-more-room' : '') + '">' +
     (long ? '<button class="bd-more" title="展开全文">⋯</button>' : '') +
     '<div class="bd-t' + (long ? ' has-tip' : '') + '"' +
     (long ? ' data-full="' + esc(full).replace(/\n/g, '&#10;') + '"' : '') + '>' +
     esc(title) + '</div>' +
-    '<div class="bd-m">' + esc(e.from) + (e.span ? ' → ' + esc(e.to) : '') + '</div>' +
-    (e.place ? '<div class="bd-p">📍' + esc(oneLine(e.place)) + '</div>' : '') +
+    '<div class="bd-m"><i class="ic">' + iconCal() + '</i><span>' +
+      esc(e.from) + (e.span ? ' → ' + esc(e.to) : '') + '</span></div>' +
+    (e.place ? '<div class="bd-p"><i class="ic">' + iconPin() + '</i><span>' +
+      esc(oneLine(e.place)) + '</span></div>' : '') +
     '</div>' +
     '<div class="bd-spark"></div></div>';
 }
@@ -5965,6 +6013,6 @@ function renderYearView() {
 })();
 </script>
 
-<div class="ver">v44 · 倒叙卡片墙 + 行程说明</div>
+<div class="ver">v45 · 卡片墙 F 方案</div>
 </body>
 </html>

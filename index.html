@@ -195,7 +195,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 44, 'weight.html': 38, 'budget.html': 43, 'storage.html': 31, 'ledger.html': 22, 'analysis.html': 24, 'daily.html': 5 };
+const TOOLS_VER = { 'time.html': 45, 'weight.html': 38, 'budget.html': 43, 'storage.html': 31, 'ledger.html': 22, 'analysis.html': 24, 'daily.html': 5 };
 
 TOOLS.forEach((t, i) => {
   if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里
@@ -223,6 +223,43 @@ let healTry = 0;       // 自愈重试次数
 let healFile = '';     // 当前正在打开的工具文件
 const PORTAL_H1 = '欢迎使用我的百宝箱';
 
+/* ---------------------------------------------------------------
+   记住当前打开的工具 —— 刷新后仍停留在工具页
+   用户反馈：「工具内刷新会跳回门户首页，很不方便」。
+   做法：把当前工具写进地址栏（?tool=time.html），刷新后自动恢复。
+   为什么用 query 而不是 hash：
+     · hash-only 的 pushState 条目在浏览器「前进」时不保证恢复 URL（实测会丢）；
+       query 是完整 URL 变化，前进/后退都可靠。
+     · query 放在顶层门户页上，不影响工具 iframe 自己的 src（仍是干净的 time.html），
+       也就不会碰到「?v=NN 被旧 SW 当成缓存键」那个老坑。
+     · file:// 下改不了 history 也只是少个书签，不影响功能（try/catch 已兜住）。
+   --------------------------------------------------------------- */
+function setToolUrl(file) {
+  try {
+    const u = location.pathname + '?tool=' + encodeURIComponent(file);
+    // 用 pushState 而不是 replaceState —— 这样浏览器「后退」能回到首页，符合直觉；
+    // 同一个工具重复打开才用 replaceState，免得堆一堆历史。
+    if (currentToolFromUrl() === file) history.replaceState({ tool: file }, '', u);
+    else history.pushState({ tool: file }, '', u);
+  } catch (e) {}
+}
+function clearToolUrl() {
+  try {
+    if (currentToolFromUrl()) history.replaceState(null, '', location.pathname);
+  } catch (e) {}
+}
+function currentToolFromUrl() {
+  let f = '';
+  try { f = new URLSearchParams(location.search).get('tool') || ''; } catch (e) {}
+  return f;
+}
+function toolIndexFromUrl() {
+  const f = currentToolFromUrl();
+  if (!f) return -1;
+  for (let i = 0; i < TOOLS.length; i++) if (TOOLS[i].file === f) return i;
+  return -1;
+}
+
 function openTool(i) {
   const t = TOOLS[i];
   healTry = 0;
@@ -233,7 +270,13 @@ function openTool(i) {
   const ld = document.getElementById('loading');
   ld.style.display = 'flex';                        // 打开时显示加载提示
   const hide = () => { ld.style.display = 'none'; };
-  frame.onload = function () { hide(); setTimeout(checkFrame, 120); };
+  frame.onload = function () {
+    hide();
+    // 自愈检查延后一点，且**只在还没确认渲染成功时**才做 ——
+    // 之前固定 120ms 后就查，页面大、加载慢时会误判成「内容为空」，
+    // 白白触发一次重试（重试会加 ?v=NN，恰恰是旧 SW 把首页塞进 iframe 的元凶）。
+    setTimeout(() => { if (loadPoll) checkFrame(); }, 500);
+  };
   if (loadPoll) clearInterval(loadPoll);            // 兜底：子页面真正渲染出内容即隐藏（防 iframe 空文档 load 误触发）
   loadPoll = setInterval(() => {
     try {
@@ -242,7 +285,7 @@ function openTool(i) {
     } catch (e) {}
   }, 150);
   // 12 秒兜底：无论 iframe 是否加载成功都撤掉遮罩，避免「一直转圈打不开」
-  setTimeout(() => { if (loadPoll) { clearInterval(loadPoll); loadPoll = null; } hide(); }, 12000);
+  setTimeout(() => { if (loadPoll) { clearInterval(loadPoll); loadPoll = null; } hide(); checkFrame(); }, 12000);
   // ⚠️ 不要再往地址后面加 ?v=NN：
   //   服务器对所有 HTML 都发 Cache-Control: no-store，浏览器本来就不会缓存它，
   //   这个参数对「破缓存」毫无用处；却恰好是旧版 Service Worker 缓存未命中的元凶 ——
@@ -251,6 +294,7 @@ function openTool(i) {
   //   不带 query 时，新旧 SW 都能命中缓存里的 ./xxx.html。
   frame.src = t.file;
   frame.title = t.name;
+  setToolUrl(t.file);             // 记住当前工具 → 刷新后自动回到这个工具
   crumb.innerHTML = `当前：<b>${t.name}</b>`;
   crumb.style.display = 'block';     // 显示当前工具名（顶部右侧指示器）
   back.style.display = 'block';      // 同时显示返回按钮
@@ -314,16 +358,38 @@ document.getElementById('feRetry').addEventListener('click', function () {
   setTimeout(checkFrame, 2600);
 });
 
-back.onclick = () => {
+function goHome(keepUrl) {
   frameBox.style.display = 'none';
-  frame.src = '';
+  frame.src = 'about:blank';     // 注意：不能写 '' —— 空 src 会重新加载当前页（把门户首页塞进 iframe）
   home.style.display = 'block';
   crumb.textContent = '首页';
   crumb.style.display = 'block';
   back.style.display = 'none';
   healTry = 0;
+  // ⚠️ 只有「用户主动点返回」才改写地址。
+  //   前进/后退（popstate）时**绝不能动 history** —— 那一刻浏览器可能还没更新
+  //   location，replaceState 会落到工具那一条历史上，把它的 URL 抹掉，
+  //   结果就是「前进回去时工具不见了」（实测踩过）。
+  if (!keepUrl) clearToolUrl();
   document.getElementById('frameErr').classList.remove('show');
-};
+}
+back.onclick = () => goHome(false);
+
+/* 刷新后恢复：地址栏里带着 ?tool=xxx 就直接打开那个工具 */
+(function restoreToolOnLoad() {
+  const i = toolIndexFromUrl();
+  if (i >= 0) setTimeout(() => openTool(i), 80);
+})();
+
+/* 前进 / 后退切换工具 → 同步界面 */
+window.addEventListener('popstate', () => {
+  const i = toolIndexFromUrl();
+  if (i >= 0) {
+    if (TOOLS[i].file !== healFile) openTool(i);
+  } else if (healFile) {
+    goHome(true);
+  }
+});
 
 // Service Worker：iOS 主屏幕模式下联网时永远加载最新版（file:// 环境自动跳过）
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
