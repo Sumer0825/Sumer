@@ -139,8 +139,9 @@
       <h1>欢迎使用我的百宝箱</h1>
       <div class="sub">点击下方按钮即可打开对应工具</div>
       <div class="tools" id="tools"><!-- 按钮卡片由 JS 根据 TOOLS 生成 --></div>
-      <div style="text-align:center;margin-top:22px">
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px">
         <a href="install.html" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:999px;background:#eef3ff;border:1px solid #d8e3ff;color:#4f7cff;text-decoration:none;font-size:13.5px;font-weight:600">📱 装到手机（独立图标 · 全屏 · 离线可用）</a>
+        <a href="download.html" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:999px;background:#f3f0ff;border:1px solid #e0d8fb;color:#6a4fd8;text-decoration:none;font-size:13.5px;font-weight:600">⬇ 下载部署包（zip）</a>
       </div>
       <div style="text-align:center;margin-top:14px">
         <button type="button" onclick="p612HardReset(this)" style="border:0;background:none;color:#8a94a6;font-size:12.5px;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;padding:4px 8px">⚙ 工具打不开？清除缓存并重载</button>
@@ -194,7 +195,7 @@ const back = document.getElementById('back');
 
 /* 资源版本号：以后更新了某个工具页面（如 weight.html），把对应版本号 +1，
    即可强制所有访问者绕过缓存加载新版 */
-const TOOLS_VER = { 'time.html': 39, 'weight.html': 38, 'budget.html': 43, 'storage.html': 31, 'ledger.html': 22, 'analysis.html': 24, 'daily.html': 5 };
+const TOOLS_VER = { 'time.html': 44, 'weight.html': 38, 'budget.html': 43, 'storage.html': 31, 'ledger.html': 22, 'analysis.html': 24, 'daily.html': 5 };
 
 TOOLS.forEach((t, i) => {
   if (t.hidden && !SHOW_HIDDEN) return;      // 隐藏工具：跳过渲染，索引 i 仍保留在 TOOLS 里

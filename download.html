@@ -46,20 +46,58 @@
   .chg summary:hover{color:#5a4fb0}
   .chg summary b{color:#5a4fb0;font-weight:700}
   .chg details ul{margin-top:9px;max-height:320px;overflow-y:auto}
+  /* 在线地址区块 */
+  .online{
+    margin-top:14px;padding:14px 16px;border-radius:12px;
+    background:linear-gradient(135deg,rgba(122,92,214,.08),rgba(255,138,61,.07));
+    border:1px solid rgba(122,92,214,.18);
+  }
+  .online-h{font-size:12.5px;color:#7d74a0;font-weight:700;margin-bottom:8px;
+            display:flex;align-items:center;gap:6px}
+  .online-h .ok{width:7px;height:7px;border-radius:50%;background:#2fb96a;
+                box-shadow:0 0 0 3px rgba(47,185,106,.18)}
+  .online-u{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .online-u a{
+    font:600 13.5px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color:#5a4fb0;text-decoration:none;word-break:break-all;
+    border-bottom:1px dashed rgba(90,79,176,.4);padding-bottom:1px;
+  }
+  .online-u a:hover{color:#3d3390;border-bottom-color:#3d3390}
+  .online-u .copy{
+    font:600 12px/1 system-ui,sans-serif;padding:5px 11px;border-radius:99px;
+    border:1px solid rgba(122,92,214,.28);background:#fff;color:#5a4fb0;cursor:pointer;
+  }
+  .online-u .copy:hover{background:#f3f1fb}
+  .online-note{font-size:11.5px;color:#a09aae;margin-top:8px;line-height:1.7}
   .tip{margin-top:14px;font-size:12px;color:#a09aae;text-align:center}
+  .back{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#8b8496;
+        text-decoration:none;margin-bottom:12px}
+  .back:hover{color:#5a4fb0}
 </style>
 </head>
 <body>
 <div class="card">
+  <a class="back" href="index.html">← 返回首页</a>
   <h1>Sumer 页面部署包</h1>
   <div class="sub">GitHub Pages 整包覆盖上传用</div>
 
+  <div class="online">
+    <div class="online-h"><span class="ok"></span>在线地址（免登录，直接打开）</div>
+    <div class="online-u">
+      <a id="online-url" href="https://a6ac3488091b49644.sh4.agentos-app.net" target="_blank" rel="noopener">https://a6ac3488091b49644.sh4.agentos-app.net</a>
+      <button class="copy" id="online-copy">复制</button>
+    </div>
+    <div class="online-note">
+      平台已把发布域名从 <code>app.workbuddy.host</code> 迁到 <code>sh4.agentos-app.net</code>，
+      老地址已下线。这个新地址<b>不需要任何参数</b>，直接打开就能用。
+    </div>
+  </div>
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v129.zip</div>
-    <div class="meta" id="meta">🆕 最新 v129：36 个文件 · 3127 KB</div>
+    <div class="nm" id="nm">sumer-pages-v136.zip</div>
+    <div class="meta" id="meta">🆕 最新 v136：36 个文件 · 3137 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="sumer-pages-v129.zip" download="sumer-pages-v129.zip">⬇ 下载 sumer-pages-v129.zip</a>
+  <a class="btn" id="dl" href="sumer-pages-v136.zip" download="sumer-pages-v136.zip">⬇ 下载 sumer-pages-v136.zip</a>
   <script>
   /* 下载地址自适应：
      沙箱网关有自己的文件白名单 —— 只放行页面与 assets/lib，.zip 会被它拦成 403，
@@ -68,6 +106,8 @@
   (function () {
     var a = document.getElementById('dl');
     if (!a) return;
+    // 本地 file:// 打开时没有 /dl 接口，发 fetch 只会留下 CORS 报错，直接跳过探测
+    if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
     fetch('/dl', { method: 'HEAD' }).then(function (r) {
       if (r.ok) a.setAttribute('href', '/dl');
     }).catch(function () {});
@@ -75,16 +115,35 @@
   </script>
 
   <div class="chg">
-    <h2 id="chg-title">本次更新 · v129</h2>
+    <h2 id="chg-title">本次更新 · v136</h2>
     <ul id="chg">
-      <li><span class=tag>修复</span>自定义分类颜色后**无法确定** —— 原生取色器弹出的系统面板正好盖住色盘弹层的「完成」按钮，而颜色保存绑定在 onchange（面板关闭时才触发）→ 选了色点不到确认，弹层一直卡着。现在改成**拖动取色器即实时生效**（页面立刻跟着变），面板关闭时落定；「完成」按钮改为「关闭」，不再承担保存职责</li>
-      <li><span class=tag>新增</span>色盘弹层新增「当前颜色」指示：色块 + 十六进制值 + 提示文字，随时看得见现在是什么色</li>
-      <li><span class=tag>修复</span>修改既存分类的颜色后，**图谱页不跟着变** —— 图谱的 gCatColor() 只查默认色表、不查自定义色映射（实测同一分类：按年页 #ff6683、图谱页 #e08ad2）。现在图谱统一走 catColor()，全站一致</li>
-      <li><span class=tag>修复</span>改色后图谱需要重建才生效 —— 力导向图的节点颜色是建图时写进 SVG 的 fill，光重绘页面不会重画它。现在改色后自动重建图谱</li>
+      <li><span class=tag>新增</span>门户首页新增「⬇ 下载部署包（zip）」按钮，和「📱 装到手机」并排 —— 之前首页里**一个下载入口都没有**，想要部署包只能自己敲 /download.html 地址才能找到</li>
+      <li><span class=tag>新增</span>下载页顶部加「← 返回首页」链接，从首页点进去下载后能一键回到门户</li>
     </ul>
     <details id="chg-hist-box">
-      <summary>更早的更新（<b id="chg-hist-n">224</b> 条）</summary>
+      <summary>更早的更新（<b id="chg-hist-n">245</b> 条）</summary>
       <ul id="chg-hist">
+        <li><span class=tag>新增</span>编年页「全部年份」标题下加了一条**行程范围说明条**：**2025 年起只记录旅游 / 异地观看演出行程** —— 淡主题色底 + 3px 主色左边条 + 主文本色文字（13px），「2025 年起」用高亮色标出，鼠标悬停还有一句补充说明。一眼就能看懂为什么 2025 年之后只剩出行程类记录（单年视图里不显示这句话）</li>
+        <li><span class=tag>修复</span>下载页底部**裸露出一整段 JavaScript 源码**、整张卡片被挤到左边变窄还多出一条横向滚动条 —— 那段「在线地址 + 一键复制」脚本漏了 `&lt;script&gt;` 标签，被浏览器当正文渲染，还顺带作为一个 flex 子项把布局撑歪了</li>
+        <li><span class=tag>优化</span>下载页用 file:// 本地打开时不再发那个必然失败的 /dl 探测请求，控制台零报错</li>
+        <li><span class=tag>改版</span>编年页进入时的形态改为**倒叙卡片墙** —— 全部事件按时间从新到旧连续平铺成 3 列块状卡片网格，每年的第一张卡在卡头标出年份（如「2024 住宿」）。不再按年份分块，你那 4 个只有 1 条记录的年份也不会各占一行留大片空白</li>
+        <li><span class=tag>删除</span>旧的「每年一块、可折叠」全览形态整体移除（渲染代码、CSS、事件绑定一并清掉）</li>
+        <li><span class=tag>保留</span>点左栏「年份浏览」某一年 → 右侧仍是现在的编年单年形态（年标题 + 分类统计条 + 按分类分组的事件）；左栏顶部「全部」按钮点一下即可回到卡片墙</li>
+        <li><span class=tag>说明</span>跨年的长时段事件按**开始日期**排序（与时间轴一致），所以「租住于松江区启民苑19栋1402」那条排在最前面</li>
+        <li><span class=tag>改名</span>「按年」页签改名为「**编年**」—— 与页面标题「个人编年史」、导出文件名「编年记事」用词统一，比「按年」更像一个正经的年表</li>
+        <li><span class=tag>修复</span>公网地址恢复：平台把发布应用的域名后缀从 `app.workbuddy.host` 迁到了 `sh4.agentos-app.net`，老地址被平台回收（返回「该应用尚未发布」）。新地址 **https://a6ac3488091b49644.sh4.agentos-app.net** 免访问凭据，裸链接直接打开，不需要任何参数</li>
+        <li><span class=tag>新增</span>下载页顶部新增「在线地址」区块：显示当前可用地址 + 一键复制；从哪个域名打开就显示哪个（GitHub Pages 上也正确）</li>
+        <li><span class=tag>改版</span>按年视图右栏改为**块状网格** —— 不再按分类分组，按时间顺序铺成 3 列网格，每张卡片带分类色卡头（分类名 + 重要星标 + 时长）。同色卡片不再被拆散，网格没有空洞，一屏能看到一年的全部事件</li>
+        <li><span class=tag>新增</span>超长标题（超过 3 行）在卡片上有两种查看方式：**悬停**弹出完整原文气泡（含换行）、点卡片右下角「⋯」**就地展开**全文再点收起。气泡浮层挂在页面层，不会被卡片裁掉</li>
+        <li><span class=tag>优化</span>事件描述里的换行统一折叠成空格显示（标题、地点、时间轴、列表、导入预览一致），卡片高度整齐</li>
+        <li><span class=tag>修复</span>编辑框的「事件」和「地点」字段从单行输入框改成多行文本域 —— `&lt;input type=&quot;text&quot;&gt;` 会按浏览器规范**把换行符直接吃掉**，Excel 里带换行的「事件描述」导进来后，打开编辑框换行就没了，一保存就永久丢失</li>
+        <li><span class=tag>修复</span>深色主题下编辑框出现**白底白字**（输入的内容看不见）—— 新样式误用了深色主题未定义的 `--bg` 变量，回落成浅色底配浅色字</li>
+        <li><span class=tag>优化</span>地点字段带换行时，时间轴/列表/导入预览里的地点标签不再被撑裂成两行</li>
+        <li><span class=tag>优化</span>左栏「年份浏览」区域从 40vh 缩到 24vh —— 16 个年份不再占满左栏，下面的「分类筛选」露出来了；每一条年份的样式（年份 / 条数 / 分类色带 / ★）一个字没改，滚动条照旧保留，超出照样能滚</li>
+        <li><span class=tag>修复</span>自定义分类颜色后**无法确定** —— 原生取色器弹出的系统面板正好盖住色盘弹层的「完成」按钮，而颜色保存绑定在 onchange（面板关闭时才触发）→ 选了色点不到确认，弹层一直卡着。现在改成**拖动取色器即实时生效**（页面立刻跟着变），面板关闭时落定；「完成」按钮改为「关闭」，不再承担保存职责</li>
+        <li><span class=tag>新增</span>色盘弹层新增「当前颜色」指示：色块 + 十六进制值 + 提示文字，随时看得见现在是什么色</li>
+        <li><span class=tag>修复</span>修改既存分类的颜色后，**图谱页不跟着变** —— 图谱的 gCatColor() 只查默认色表、不查自定义色映射（实测同一分类：按年页 #ff6683、图谱页 #e08ad2）。现在图谱统一走 catColor()，全站一致</li>
+        <li><span class=tag>修复</span>改色后图谱需要重建才生效 —— 力导向图的节点颜色是建图时写进 SVG 的 fill，光重绘页面不会重画它。现在改色后自动重建图谱</li>
         <li><span class=tag>还原</span>「图谱」页还原为原本的力导向图 —— 大圆＝年份（大小按记录数）、中圆＝分类标签，可按住拖拽、按跳数分层联动、悬停出提示气泡、点分类直接筛选。上一版的「时间骨架图」（年份主干＋分类分支＋事件圆点的分层树）整体撤掉</li>
         <li><span class=tag>修复</span>顺带修掉两个从旧版本带回来的缺陷：色盘弹层 HTML 被插入两次（页面上有两个 #color-mask，导致 #color-title 选择器冲突、色盘打不开）；分类管理面板 DOM 与样式 class 不匹配</li>
         <li><span class=tag>保留</span>「按年」视图、全站统一分类色、地点字段、新表格格式导入导出 —— 均不受影响</li>
@@ -325,7 +384,42 @@
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v156），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v161），否则页面看起来"没变化"</div>
 </div>
+<script>
+  /* 在线地址：域名兜底 + 一键复制 */
+  (function () {
+    var a = document.getElementById('online-url');
+    var btn = document.getElementById('online-copy');
+    if (!a) return;
+    // 用户从哪个域名打开就显示哪个（GitHub Pages 上打开时也正确）
+    var host = location.hostname || '';
+    if (host && host.indexOf('sh4.agentos-app.net') >= 0) {
+      var u = location.origin;
+      a.setAttribute('href', u);
+      a.textContent = u;
+    }
+    if (!btn) return;
+    btn.onclick = function () {
+      var txt = a.getAttribute('href') || a.textContent;
+      var done = function () {
+        btn.textContent = '已复制 ✓';
+        setTimeout(function () { btn.textContent = '复制'; }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(done, function () { fallback(txt, done); });
+      } else {
+        fallback(txt, done);
+      }
+    };
+    function fallback(txt, cb) {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); cb(); } catch (e) {}
+      ta.remove();
+    }
+  })();
+</script>
 </body>
 </html>

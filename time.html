@@ -43,6 +43,9 @@ catch (e) { document.documentElement.classList.add('in-frame'); }
     --card: #fff;
     --bg: #f4f1ec;
     --shadow: 0 2px 12px rgba(120,95,70,.09);
+    /* 编年页「记录范围说明」提示条底色 —— 单独一个变量，
+       不复用 --primary-soft（那个变量全站从未定义，只被引用，导致 hover/徽章底色失效）。 */
+    --note-bg: rgba(191,154,125,.16);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { -webkit-text-size-adjust: 100%; }
@@ -565,6 +568,7 @@ html[data-theme="dark"] {
   --card: #1b0a31;
   --card-2: #22103c;
   --page: #160b23;
+  --note-bg: rgba(187,124,228,.20);
   --grad-title: linear-gradient(180deg, #ffffff 20%, #a3a3a3 80%);
   --grad-rainbow: linear-gradient(90deg, #ff0000, #d077ff, #07abf7, #07f79b, #36f401);
   color-scheme: dark;
@@ -1364,7 +1368,7 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   /* --- 左栏：年份目录（第一层） --- */
   .yr-dir {
     display: flex; flex-direction: column; gap: 0; margin-bottom: 12px;
-    max-height: 40vh; overflow-y: auto; padding-right: 2px;
+    max-height: 24vh; overflow-y: auto; padding-right: 2px;
     overscroll-behavior: contain;
   }
   .yr-dir .yd-row { padding: 1px 7px; gap: 7px; border-radius: 6px; }
@@ -1441,6 +1445,24 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
     font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px;
     background: var(--primary-soft); color: var(--primary);
   }
+  /* 说明小字：放在大标题**下面**单独一行 —— 跟统计信息挤在同一行会把标题行撑得很长，
+     抢走「全部年份」这个 40px 大标题的视觉重心；单独一行则自然换行、窄屏也不挤。
+     样式上做成一条「提示条」：淡主题色底 + 3px 主色左边条 + 主文本色文字，
+     光靠 muted 灰字太弱，一眼扫过去根本注意不到（用户反馈「不是很突出」）。
+     注意：这里不能用 flex 排「圆点 + 文字」两块 —— flex 会把 <b>2025 年起</b> 和后面的
+     文字拆成两个并排子项，文案被折成两行。文字要包在 span 里当**一个** flex 子项。 */
+  .yv-note {
+    margin-top: 11px;
+    display: inline-flex; align-items: baseline;
+    padding: 7px 15px 7px 13px;
+    font-size: 13px; line-height: 1.45;
+    color: var(--text);
+    background: var(--note-bg);
+    border-left: 3px solid var(--primary);
+    border-radius: 8px;
+  }
+  .yv-note em { font-style: normal; font-weight: 700; color: var(--primary); margin-right: 5px; }
+  .yv-note b { color: var(--primary-dark); font-weight: 700; }
   .yv-stats { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin-top: 12px; }
   .yv-stats i {
     display: block; height: 100%; position: relative; cursor: pointer;
@@ -1455,26 +1477,103 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   .yv-stats-legend b { color: var(--text); font-weight: 700; }
   .yv-stats-legend em { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
 
-  /* 全览：按年分组 */
-  .yv-yblock { margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  .yv-yhead {
-    display: flex; align-items: center; gap: 12px; cursor: pointer;
-    padding: 12px 16px; background: var(--card);
-    transition: background .12s ease;
+  /* ★ v134：「每年一块、可折叠」的 CSS 已随该形态一起移除 */
+
+  /* ---------- v134：卡片上的年份角标 ----------
+     年份标在每年第一张卡的卡头里（**不绝对定位** —— 绝对定位会压住
+     分类名，2024 和「居住」叠在一起看不清）。
+     作为卡头的第一个 flex 子项，分类名自动被推到右边，互不遮挡。 */
+  .bk-d { position: relative; }
+  .bd-y {
+    flex: 0 0 auto;
+    font-size: 9.5px; font-weight: 800; line-height: 1;
+    padding: 3px 6px;
+    border-radius: 99px;
+    background: rgba(255,255,255,.16);
+    color: var(--text); opacity: .95;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
   }
-  .yv-yhead:hover { background: var(--primary-soft); }
-  .yv-ybig {
-    font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums;
-    letter-spacing: -.2px; min-width: 56px;
+  .bd-head { gap: 6px; }
+  .bk-d.first-of-year {
+    box-shadow: inset 0 0 0 2px rgba(167,139,250,.45);
   }
-  .yv-ymeta { font-size: 12px; color: var(--muted); flex: 1 1 auto; }
-  .yv-ychev {
-    font-size: 17px; color: var(--muted); transition: transform .16s ease;
-    display: inline-block; line-height: 1;
+
+  /* ---------- 按年视图 v131：混合网格块状 UI ----------
+     不按分类分组，按时间顺序铺成 3 列网格 —— 分类色收在卡头，
+     同色块不会被拆散，网格不出现空洞。 */
+  .bk-wrap.bk-d {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px; margin-top: 10px; align-items: stretch;
   }
-  .yv-yblock.open .yv-ychev { transform: rotate(90deg); }
-  .yv-ybody { display: none; padding: 4px 16px 16px; }
-  .yv-yblock.open .yv-ybody { display: block; }
+  .bk-d {
+    border-radius: 13px; overflow: hidden; cursor: pointer;
+    background: var(--card); border: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    transition: transform .14s ease, box-shadow .14s ease;
+  }
+  .bk-d:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.24); }
+  .bk-d.k { box-shadow: inset 3px 0 0 var(--warn); }
+  .bd-head {
+    display: flex; align-items: center; gap: 7px; padding: 8px 11px;
+    background: color-mix(in srgb, var(--c) 22%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  }
+  .bd-cat { font-size: 11px; font-weight: 700; color: var(--text); }
+  .bd-dur {
+    margin-left: auto; font-size: 10px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .bd-star { color: var(--warn); font-size: 12px; }
+  .bd-in { padding: 11px 12px 13px; position: relative; flex: 1; }
+  /* N3：标题三行截断（换行已在 JS 层折叠成空格） */
+  .bd-t {
+    font-size: 14px; font-weight: 700; line-height: 1.42; color: var(--text);
+    white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; overflow-wrap: anywhere;
+  }
+  .bd-t.open {
+    display: block; -webkit-line-clamp: unset; overflow: visible;
+  }
+  .bd-m {
+    font-size: 11px; color: var(--muted); margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bd-p {
+    font-size: 11px; color: var(--muted); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* P3：展开 / 收起按钮 */
+  .bd-more {
+    position: absolute; right: 10px; bottom: 8px;
+    width: 20px; height: 20px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; line-height: 1; font-weight: 700;
+    background: rgba(255,255,255,.10); color: var(--text);
+    border: 1px solid var(--line);
+    cursor: pointer; z-index: 3;
+  }
+  .bd-more:hover { background: rgba(255,255,255,.20); }
+  .bd-spark {
+    height: 3px; margin-top: auto;
+    background: linear-gradient(90deg, var(--c), transparent);
+  }
+  /* P2：悬停全文气泡（浮层挂 body，不受卡片 overflow:hidden 影响） */
+  .bd-tip {
+    position: fixed; z-index: 9999;
+    max-width: 340px; min-width: 200px;
+    padding: 9px 11px; border-radius: 9px;
+    background: #0a0810; color: #ece8f6;
+    font-size: 12px; font-weight: 400; line-height: 1.6;
+    box-shadow: 0 10px 28px rgba(0,0,0,.5);
+    border: 1px solid rgba(160,150,190,.3);
+    white-space: pre-wrap; word-break: break-word;
+    opacity: 0; pointer-events: none;
+    transition: opacity .13s ease;
+  }
+  .bd-tip.on { opacity: 1; }
+  .bd-t.has-tip { cursor: help; }
 
   /* 该年的事件（按分类分组） */
   .yv-grp { margin-top: 18px; }
@@ -1544,10 +1643,20 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   @media (max-width: 640px) {
     .yv-y { font-size: 32px; }
     .yr-dir .yd-n { display: none; }
-    .yv-ybig { font-size: 18px; min-width: 48px; }
+    /* ★ v134：yv-ybig 已移除 */
   }
 
   /* ★ v127：地点标签 —— 与分类标签区分开（带 📍） */
+  /* v131：标题输入框改成 textarea 后，样式对齐备注框
+     ⚠ 背景与文字色**继承 .fld textarea**（深浅主题都正确）——
+        不要在这里写 background: var(--bg) ——
+        深色主题没有定义 --bg，会回落成浅色底 + 浅色字 = 白底白字。 */
+  #e-name { min-height: 62px; resize: vertical; }
+  /* v131.1：地点（rows=1）—— 视觉上仍是单行，但能存换行 */
+  #e-place {
+    min-height: 38px; resize: vertical;
+    overflow: hidden;
+  }
   .tag.place-tag {
     background: rgba(79,124,255,.10); color: var(--primary);
     border-color: rgba(79,124,255,.28);
@@ -1575,7 +1684,7 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
              用户反馈「完全看不懂」。代码全部保留在下面（renderChapters 等），
              以后想恢复，把这一行加回来 + curView 改回 'chapter' 即可。
              现在默认展示「关联图谱」，图谱排在第一个。 -->
-        <button class="tab" data-view="year" role="tab">按年</button>
+        <button class="tab" data-view="year" role="tab">编年</button>
         <button class="tab" data-view="graph" role="tab">图谱</button>
         <button class="tab" data-view="axis" role="tab">时间轴</button>
         <button class="tab" data-view="list" role="tab">列表</button>
@@ -1699,9 +1808,14 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
       </div>
       <div class="hint">历史久远只记得年份时用这个。开始≠结束就自动算「时间段事件」</div>
     </div>
-    <div class="fld"><label>事件</label><input type="text" id="e-name" placeholder="如：居住在北京清河宝盛西里"></div>
+    <!-- ★ v131：标题改成 textarea —— <input type="text"> 会按浏览器规范
+         **把换行符直接吃掉**，Excel 里带换行的「事件描述」导进来后，
+         打开编辑框换行就没了，一保存就永久丢失。textarea 能原样存取。 -->
+    <div class="fld"><label>事件</label><textarea id="e-name" rows="2" placeholder="如：居住在北京清河宝盛西里"></textarea></div>
     <div class="fld"><label>分类</label><select id="e-cat"></select></div>
-    <div class="fld"><label>地点（可选）</label><input type="text" id="e-place" maxlength="60" placeholder="如 北京 / 上海 / 青海" autocomplete="off"></div>
+    <!-- ★ v131.1：地点也改成 textarea —— <input type="text"> 同样会吃掉换行符。
+         rows=1 保持单行视觉，maxlength 限制长度不变。 -->
+    <div class="fld"><label>地点（可选）</label><textarea id="e-place" rows="1" maxlength="60" placeholder="如 北京 / 上海 / 青海" autocomplete="off"></textarea></div>
     <div class="fld"><label>备注（可选）</label><textarea id="e-note" placeholder="想补充的细节…（可换行，多行会分行显示）"></textarea></div>
     <label class="key-pick" id="e-key-pick" title="标记为人生节点 / 重要时刻">
       <input type="checkbox" id="e-key">
@@ -3423,7 +3537,7 @@ function render() {
           </div>
           <div class="lv-r2">
             <span class="tag">${esc(ev.cat)}</span>
-            ${ev.place ? `<span class="tag place-tag">📍${esc(ev.place)}</span>` : ''}
+            ${ev.place ? `<span class="tag place-tag">📍${esc(oneLine(ev.place))}</span>` : ''}
             ${note1 ? `<span class="lv-n">${hl(note1.slice(0, 80), q)}</span>` : ''}
             <span class="lv-act">
               <button class="op" data-act="edit" data-id="${esc(ev.id)}">编辑</button>
@@ -3477,7 +3591,7 @@ function render() {
           <div class="ev-meta">
             <span class="ev-d">${dateTxt}</span>
             <span class="tag">${esc(ev.cat)}</span>
-            ${ev.place ? `<span class="tag place-tag">📍${esc(ev.place)}</span>` : ''}
+            ${ev.place ? `<span class="tag place-tag">📍${esc(oneLine(ev.place))}</span>` : ''}
             ${isKey ? '<span class="tag key-tag" title="重要事件">★ 重要</span>' : ''}
             ${lk ? '<span class="tag lock-tag" title="超过一年的记录不可删除，编辑不受限">🔒</span>' : ''}
           </div>
@@ -3920,7 +4034,9 @@ function saveEdit() {
   const title = $('e-name').value.trim();
   if (!title) { toast('请填写事件'); return; }
   const cat = $('e-cat').value;
-  const place = $('e-place').value.trim();          // ★ v127：地点
+  // ★ v131.1：textarea 的换行会保留 —— 只去首尾空白，
+  //   内部换行原样留着（数据层不丢）。
+  const place = $('e-place').value.replace(/^\s+|\s+$/g, '');   // ★ v127：地点
   const note = $('e-note').value.trim();
   const sortKey = from.length === 4 ? from + '-00-00'
                 : from.length === 7 ? from + '-00' : from;
@@ -4042,7 +4158,7 @@ function showImportPreview(items, bad, tip) {
     <div class="pv-list">${items.map((e, i) => `
       <div class="pv-item">
         <span class="d">${e.span ? e.from + '→' + e.to : e.from}</span>
-        <span class="t">${esc(e.title)}${e.place ? ' · <b class="pv-place">📍' + esc(e.place) + '</b>' : ''}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
+        <span class="t">${esc(e.title)}${e.place ? ' · <b class="pv-place">📍' + esc(oneLine(e.place)) + '</b>' : ''}${e.note ? ' · ' + esc(oneLine(e.note)) : ''}${isManualKey(e) ? (evKey(e) === 1 ? ' <b class="rs-hi">★手动</b>' : ' <b>☆手动不</b>') : ''}</span>
         <select class="pv-cat" data-i="${i}">${catList.map(c => `<option value="${esc(c)}"${c === e.cat ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
       </div>`).join('')}</div>
     ${bad.length ? `<div class="pv-bad">未识别：${bad.map(b => `第${b.line}行「${esc(b.text)}」`).join('；')}</div>` : ''}`;
@@ -5528,7 +5644,7 @@ function yvGroupsHtml(groups) {
           '<span class="dot" style="background:' + catColor(c) + '"></span>' +
           '<div class="bd"><div class="t">' + esc(e.title || '(未命名)') + '</div>' +
           '<div class="m">' + dateTxt +
-          (e.place ? ' · 📍' + esc(e.place) : '') +
+          (e.place ? ' · 📍' + esc(oneLine(e.place)) : '') +
           (e.note ? ' · ' + esc(oneLine(e.note)) : '') + '</div></div>' +
           '</div>';
       }).join('');
@@ -5537,6 +5653,130 @@ function yvGroupsHtml(groups) {
       '<b>' + esc(c) + '</b><span>' + evs.length + ' 条</span></div>' +
       rows + '</div>';
   }).join('');
+}
+
+/* ============================================================
+   v131 · 方案 D：混合网格块状 UI
+   ------------------------------------------------------------
+   不按分类分组（分组会把同色块拆散、网格出现空洞），
+   按时间顺序铺成 3 列网格。分类色收在卡头，一眼能扫。
+   ============================================================ */
+
+/* ---------- 块卡元信息 ---------- */
+function blkMeta(e) {
+  const dd = spanDays(e);
+  return {
+    isKey: evKey(e) === 1,
+    dd: dd,
+    md: (e.from || '').slice(5, 10).replace('-', '/'),
+    color: catColor(e.cat),
+  };
+}
+
+/* ---------- 单块 ---------- */
+function blkD(e) {
+  const m = blkMeta(e);
+  const c = m.color;
+  // N3：标题里的换行折叠成空格（与时间轴/列表/导入预览一致）
+  const title = oneLine(e.title || '(未命名)');
+  const full = String(e.title || '(未命名)');   // P2：悬停显示原文（含换行）
+  const long = title.length > 24;               // 大概率超 3 行 → 给展开按钮
+  return '<div class="bk-d' + (m.isKey ? ' k' : '') + '" data-eid="' + esc(e.id) + '" ' +
+    'style="--c:' + c + '">' +
+    '<div class="bd-head">' +
+    '<span class="bd-cat">' + esc(e.cat) + '</span>' +
+    (m.isKey ? '<span class="bd-star">★</span>' : '') +
+    '<span class="bd-dur">' + (e.span ? m.dd + '天' : esc(m.md)) + '</span>' +
+    '</div>' +
+    '<div class="bd-in">' +
+    (long ? '<button class="bd-more" title="展开全文">⋯</button>' : '') +
+    '<div class="bd-t' + (long ? ' has-tip' : '') + '"' +
+    (long ? ' data-full="' + esc(full).replace(/\n/g, '&#10;') + '"' : '') + '>' +
+    esc(title) + '</div>' +
+    '<div class="bd-m">' + esc(e.from) + (e.span ? ' → ' + esc(e.to) : '') + '</div>' +
+    (e.place ? '<div class="bd-p">📍' + esc(oneLine(e.place)) + '</div>' : '') +
+    '</div>' +
+    '<div class="bd-spark"></div></div>';
+}
+
+/* ---------- 网格容器 ---------- */
+function blkGridHtml(list) {
+  const sorted = list.slice().sort((a, b) => {
+    const ka = a.sortKey || a.from, kb = b.sortKey || b.from;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  return '<div class="bk-wrap bk-d">' + sorted.map(blkD).join('') + '</div>';
+}
+
+/* ============================================================
+   v134 · 倒叙卡片墙（编年页进入时的默认形态）
+   ------------------------------------------------------------
+   全部事件按时间**从新到旧**连续平铺，用块状卡片（与单年形态同一套样式）。
+   不分年份块、不分分类组 —— 年份只是左栏的筛选参数。
+   每年第一张卡的卡头左上角标年份，既能看出年份分界又不占整行。
+
+   排序：**按开始日期倒序**（跨年的长时段事件用开始时间定位，
+        与时间轴视图一致）。
+   ============================================================ */
+function blkWallHtml(list) {
+  const sorted = list.slice().sort((a, b) => {
+    const ka = a.sortKey || a.from, kb = b.sortKey || b.from;
+    return ka < kb ? 1 : ka > kb ? -1 : 0;
+  });
+  let html = '';
+  let curY = null;
+  sorted.forEach(e => {
+    const y = yearOf(e.sortKey || e.from);
+    const isNewYear = (y !== curY);
+    curY = y;
+    let h = blkD(e);
+    if (isNewYear) {
+      h = h.replace('class="bk-d', 'class="bk-d first-of-year');
+      h = h.replace('<div class="bd-head">',
+                    '<div class="bd-head"><span class="bd-y">' + esc(y) + '</span>');
+    }
+    html += h;
+  });
+  return '<div class="bk-wrap bk-d">' + html + '</div>';
+}
+
+/* ---------- P2：悬停弹完整原文 ---------- */
+let _bdTip = null;
+function bdTip() {
+  if (_bdTip) return _bdTip;
+  _bdTip = document.createElement('div');
+  _bdTip.className = 'bd-tip';
+  document.body.appendChild(_bdTip);
+  return _bdTip;
+}
+function bdTipShow(el) {
+  const full = el.getAttribute('data-full');
+  if (!full) return;
+  const t = bdTip();
+  t.textContent = full;
+  t.classList.add('on');
+  const r = el.getBoundingClientRect();
+  const tr = t.getBoundingClientRect();
+  const left = Math.min(window.innerWidth - tr.width - 12,
+                       Math.max(8, r.left + r.width / 2 - tr.width / 2));
+  let top = r.bottom + 8;
+  if (top + tr.height > window.innerHeight - 8) top = Math.max(8, r.top - tr.height - 8);
+  t.style.left = left + 'px';
+  t.style.top = top + 'px';
+}
+function bdTipHide() {
+  if (_bdTip) _bdTip.classList.remove('on');
+}
+
+/* ---------- P3：点「⋯」就地展开 / 收起 ---------- */
+function bdToggle(el) {
+  const card = el.closest ? el.closest('.bk-d') : null;
+  const t = card ? card.querySelector('.bd-t') : null;
+  if (!t) return;
+  const open = t.classList.toggle('open');
+  el.textContent = open ? '∨' : '⋯';
+  el.title = open ? '收起' : '展开全文';
+  bdTipHide();
 }
 
 /* ---------- 右栏：年视图 ---------- */
@@ -5585,7 +5825,11 @@ function renderYearView() {
       '<span class="yv-meta"><b>' + list.length + '</b> 条记录 · 跨 ' + yCount +
       ' 年 · ' + cCount + ' 个分类' +
       (filtering ? ' · <em class="yv-filtered">筛选中</em>' : '') +
-      '</span></div>';
+      '</span></div>' +
+      // 记录范围说明：2025 年起这个时间轴只记出行程，之前的年份是完整生活流水。
+      // 只在「全部年份」全览态出现 —— 单年视图里说「2025 年起」会没有上下文。
+      '<div class="yv-note" title="2025 年之前是完整的生活流水；2025 年起只保留旅游与异地看演出的行程">' +
+      '<span><em>※</em><b>2025 年起</b>只记录旅游 / 异地观看演出行程</span></div>';
   }
 
   // ---- 主体 ----
@@ -5599,40 +5843,30 @@ function renderYearView() {
       byCat.get(e.cat).push(e);
     });
     const groups = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length);
-    body.innerHTML = yvGroupsHtml(groups);
+    body.innerHTML = blkGridHtml(list);          // ★ v131：混合网格
   } else {
-    // 全览：按年份顺序分组，每年一块
-    const byY = new Map();
-    list.forEach(e => {
-      const y = yearOf(e.sortKey || e.from);
-      if (!y || y === '未知') return;
-      if (!byY.has(y)) byY.set(y, []);
-      byY.get(y).push(e);
-    });
-    const ys = [...byY.keys()].sort();
-    ys.reverse();
-    body.innerHTML = ys.map((y, idx) => {
-      const evs = byY.get(y);
-      const byCat = new Map();
-      evs.forEach(e => {
-        if (!byCat.has(e.cat)) byCat.set(e.cat, []);
-        byCat.get(e.cat).push(e);
-      });
-      const groups = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length);
-      // 默认只展开最近一年，其余折叠（首屏不是一堵卡片墙）
-      const open = filtering ? true : (idx === 0);
-      return '<section class="yv-yblock' + (open ? ' open' : '') + '" data-year="' + esc(y) + '">' +
-        '<div class="yv-yhead" role="button" tabindex="0" aria-expanded="' + open + '">' +
-        '<span class="yv-ybig">' + esc(y) + '</span>' +
-        '<span class="yv-ymeta">' + evs.length + ' 条 · ' + groups.length + ' 个分类</span>' +
-        '<span class="yv-ychev">›</span>' +
-        '</div>' +
-        '<div class="yv-ybody">' +
-        yvStatsHtml(groups, evs.length) +
-        yvGroupsHtml(groups) +
-        '</div></section>';
-    }).join('');
+    // ★ v134：全览态 = 倒叙卡片墙（全部事件从新到旧连续平铺 + 年份角标）
+    //   旧的「每年一块、可折叠」形态已删除 ——
+    //   你有 4 个年份只有 1 条记录，分块后每年只占一行，大片留白。
+    body.innerHTML = blkWallHtml(list);
   }
+
+  // ★ v131：网格卡片交互（点击编辑 / 「⋯」展开 / 悬停全文）
+  body.querySelectorAll('.bk-d').forEach(el => {
+    el.onclick = (ev) => {
+      // 点「⋯」不触发编辑
+      if (ev.target.closest && ev.target.closest('.bd-more')) return;
+      const e = DATA.find(x => x.id === el.getAttribute('data-eid'));
+      if (e) openEdit(e);
+    };
+  });
+  body.querySelectorAll('.bd-more').forEach(el => {
+    el.onclick = (ev) => { ev.stopPropagation(); bdToggle(el); };
+  });
+  body.querySelectorAll('.bd-t.has-tip').forEach(el => {
+    el.onmouseenter = () => bdTipShow(el);
+    el.onmouseleave = () => bdTipHide();
+  });
 
   // 交互：统计条 / 图例 → 切分类筛选
   head.querySelectorAll('[data-cat]').forEach(el => {
@@ -5650,18 +5884,7 @@ function renderYearView() {
     };
   });
   // 全览里点年份标题 → 切到该年
-  body.querySelectorAll('.yv-yhead').forEach(el => {
-    const go = () => {
-      const y = el.parentElement.getAttribute('data-year');
-      curYear = y; curCat = 'ALL';
-      render();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    el.onclick = go;
-    el.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
-    };
-  });
+  // ★ v134：yv-yhead（年份折叠头）已随「每年一块」形态一起移除
   // 事件卡 → 打开编辑
   body.querySelectorAll('.yv-ev').forEach(el => {
     el.onclick = () => {
@@ -5742,6 +5965,6 @@ function renderYearView() {
 })();
 </script>
 
-<div class="ver">v39 · 颜色修复</div>
+<div class="ver">v44 · 倒叙卡片墙 + 行程说明</div>
 </body>
 </html>
