@@ -93,11 +93,11 @@
     </div>
   </div>
   <div class="pkg">
-    <div class="nm" id="nm">sumer-pages-v139.zip</div>
-    <div class="meta" id="meta">🆕 最新 v139：35 个文件 · 1881 KB</div>
+    <div class="nm" id="nm">sumer-pages-v141.zip</div>
+    <div class="meta" id="meta">🆕 最新 v141：35 个文件 · 1885 KB</div>
   </div>
 
-  <a class="btn" id="dl" href="sumer-pages-v139.zip" download="sumer-pages-v139.zip">⬇ 下载 sumer-pages-v139.zip</a>
+  <a class="btn" id="dl" href="sumer-pages-v141.zip" download="sumer-pages-v141.zip">⬇ 下载 sumer-pages-v141.zip</a>
   <script>
   /* 下载地址自适应：
      沙箱网关有自己的文件白名单 —— 只放行页面与 assets/lib，.zip 会被它拦成 403，
@@ -115,16 +115,23 @@
   </script>
 
   <div class="chg">
-    <h2 id="chg-title">本次更新 · v139</h2>
+    <h2 id="chg-title">本次更新 · v141</h2>
     <ul id="chg">
-      <li><span class=tag>改版</span>编年页卡片墙按 **F 方案** 重做可读性：分类改成**药丸标签**（12.5px/800 字重、分类色底+描边）、时长改成**胶囊徽章**（13px/800，如「734天」）、日期与地点**各占一行**并加 **SVG 图标块**（自绘日历/定位针，13px 加粗）—— 分类、天数、城市三样一眼可见，不再是灰色小字</li>
-      <li><span class=tag>优化</span>年份角标改成实底反色（深色主题白底深字、浅色主题深底白字）、加大到 10.5px，卡头第一眼就能看到年份分界</li>
-      <li><span class=tag>修复</span>地点前的 📍 emoji 换成内联 SVG —— emoji 在部分设备/系统缺字形，会显示成空心方框</li>
-      <li><span class=tag>新增</span>门户打开工具后地址栏会记下当前工具（`?tool=time.html`）：**在工具里刷新不再跳回门户首页**，自动回到同一个工具页；点「← 返回首页」抹掉标记，浏览器后退也能回首页</li>
+      <li><span class=tag>新增</span>**卡片墙置顶功能** —— 编辑事件时勾「置顶（正在进行）」，这条记录就会钉在编年卡片墙**最前面**的独立「📌 置顶 · 正在进行的事」区里（金色描边 + 图钉角标），现居何处、待业中、在追的演出这类**正在进行**的事一眼就看到；取消勾选即回到正常时间流。列表视图同步显示图钉标记</li>
+      <li><span class=tag>新增</span>Excel/云端表格末列新增「置顶」列（老表格前 7 列顺序不变），置顶状态跨设备往返不丢</li>
+      <li><span class=tag>改版</span>**新增事件时分类不再默认预选「其他」** —— 下拉默认显示「— 请选择分类 —」，不选分类**不允许保存**。以前默认落到「其他」，随手记的条目全成了「其他」，后来再整理一遍就变成「同一段时间两条记录」（那 102 组重复的由来）</li>
+      <li><span class=tag>优化</span>去重时**优先保留置顶的那条**，不会因为同款记录并存而把「置顶中」的状态挤掉</li>
     </ul>
     <details id="chg-hist-box">
-      <summary>更早的更新（<b id="chg-hist-n">251</b> 条）</summary>
+      <summary>更早的更新（<b id="chg-hist-n">258</b> 条）</summary>
       <ul id="chg-hist">
+        <li><span class=tag>修复</span>**重复数据的老循环终于断了** —— 云端 `data/time.xlsx` 里一直躺着完全相同的重复行（查出来 12 组），因为拉取时虽然识别出重复、却**从不把去重结果写回云端**：重复留在文件里 → 你打开 Excel 看到重复 → 再用它导入/推送 → 又固化一轮。现在拉取时发现云端有重复就**主动清洗回写**（只删完全相同的行），手动拉取时提示「🧹 已顺手清理云端 N 条重复」</li>
+        <li><span class=tag>修复</span>本机 localStorage 读取去重后**写回存储** —— 以前只在内存里去重，存储里仍是脏数据（&quot;存着 252 条、显示 238 条&quot;），导出或换设备时又带一身重复出去</li>
+        <li><span class=tag>新增</span>`data/time-去重版.xlsx` 与 `data/time-合并疑似重复版.xlsx` 两个候选文件（只给文件、没动你的云端）：前者只删 12 条完全重复（240 条），后者再把 102 组&quot;同一段时间记了两次&quot;的记录合并（138 条）；另有《重复数据诊断报告.md》列出全部三类重复明细</li>
+        <li><span class=tag>改版</span>编年页卡片墙按 **F 方案** 重做可读性：分类改成**药丸标签**（12.5px/800 字重、分类色底+描边）、时长改成**胶囊徽章**（13px/800，如「734天」）、日期与地点**各占一行**并加 **SVG 图标块**（自绘日历/定位针，13px 加粗）—— 分类、天数、城市三样一眼可见，不再是灰色小字</li>
+        <li><span class=tag>优化</span>年份角标改成实底反色（深色主题白底深字、浅色主题深底白字）、加大到 10.5px，卡头第一眼就能看到年份分界</li>
+        <li><span class=tag>修复</span>地点前的 📍 emoji 换成内联 SVG —— emoji 在部分设备/系统缺字形，会显示成空心方框</li>
+        <li><span class=tag>新增</span>门户打开工具后地址栏会记下当前工具（`?tool=time.html`）：**在工具里刷新不再跳回门户首页**，自动回到同一个工具页；点「← 返回首页」抹掉标记，浏览器后退也能回首页</li>
         <li><span class=tag>清理</span>发布包与仓库**不再包含 `planet612-standalone.html`**（单文件版，近 3 MB）—— 体积大、且历史上多次与在线版脱节。现在只在本地构建保留，不入包、不上线，线上访问该路径直接 404</li>
         <li><span class=tag>新增</span>发版前新增**硬校验闸门**（`tools/verify_release.py`）：包里文件要齐全、每个文件都要与工作区**逐字节一致**（sha256）、不能混进清单之外的文件、根目录新增页面也不能漏发 —— 任何一条不通过就**中止发布**、线上保持上一版，保证每次发出去的都是最全、含最后修改的包</li>
         <li><span class=tag>优化</span>`使用说明.txt` 的【版本】行改为发版时自动填充（以前是手写的，实际长期停在 v120 / p612-v152）</li>
@@ -392,7 +399,7 @@
     </ol>
   </div>
 
-  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v162），否则页面看起来"没变化"</div>
+  <div class="tip" id="tip">务必确认 sw.js 一起上传（缓存版本 p612-v164），否则页面看起来"没变化"</div>
 </div>
 <script>
   /* 在线地址：域名兜底 + 一键复制 */

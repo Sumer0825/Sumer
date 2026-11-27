@@ -1030,6 +1030,8 @@ html[data-theme="dark"] .ev.key-ev { border-left-color: #ffd24a !important; }
 /* 列表视图里的重要标记 */
 .lv-t .key-star { color: #d19b00; }
 html[data-theme="dark"] .lv-t .key-star { color: #ffd24a; }
+/* ★ v141：列表里的置顶标记 */
+.lv-t .key-pin { font-size: 11px; margin-right: 4px; }
 /* 编辑弹窗里的「重要」勾选 */
 .key-pick {
   display: flex; align-items: center; gap: 9px;
@@ -1583,6 +1585,26 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
   @media (hover: none) { .bd-more { opacity: 1; } }
   /* 有展开按钮的卡片给底部留出位置（避免 ⋯ 压住地点文字） */
   .bd-in.bd-more-room { padding-bottom: 28px; }
+
+  /* ---------- v141：置顶（正在进行的事） ---------- */
+  .bd-pin { flex: 0 0 auto; display: inline-flex; color: #f0b45e; }
+  .bd-pin svg { width: 12px; height: 12px; display: block; }
+  .bk-d.pinned { box-shadow: inset 0 0 0 2px rgba(240,180,94,.55); }
+  .bk-d.pinned:hover {
+    box-shadow: inset 0 0 0 2px rgba(240,180,94,.85), 0 8px 22px rgba(0,0,0,.24);
+  }
+  .pin-zone { margin: 0 0 16px; }
+  .pin-h {
+    display: flex; align-items: center; gap: 7px; margin-bottom: 10px;
+    font-size: 13px; font-weight: 800; color: var(--text);
+  }
+  .pin-ico { display: inline-flex; color: #f0b45e; }
+  .pin-ico svg { width: 14px; height: 14px; display: block; }
+  .pin-n {
+    font-size: 11px; font-weight: 700; color: var(--muted);
+    background: rgba(255,255,255,.10); border: 1px solid var(--line);
+    padding: 1px 8px; border-radius: 99px;
+  }
   .bd-spark {
     height: 3px; margin-top: auto;
     background: linear-gradient(90deg, var(--c), transparent);
@@ -1848,6 +1870,11 @@ html[data-theme="dark"] .key-pick.on { border-color: rgba(255,210,74,.5); backgr
     <label class="key-pick" id="e-key-pick" title="标记为人生节点 / 重要时刻">
       <input type="checkbox" id="e-key">
       <span class="kp-txt"><b>★ 重要事件</b><span>手动标记：勾选＝重要，取消勾选＝不重要；完全不碰则交给关键词规则判定</span></span>
+    </label>
+    <!-- ★ v141：置顶 —— 给「正在进行中」的事（现居何处 / 待业 / 在追的演出） -->
+    <label class="key-pick" id="e-pin-pick" title="钉到卡片墙最前面">
+      <input type="checkbox" id="e-pin">
+      <span class="kp-txt"><b>置顶（正在进行）</b><span>钉在卡片墙最前面，一眼看到正在进行的事</span></span>
     </label>
     <div class="btns">
       <button class="btn" id="edit-cancel">取消</button>
@@ -2154,11 +2181,18 @@ function eventKey(e) {
 }
 /** 批内去重：同 key 只留第一条，返回 [保留项, 被去掉的项] */
 function dedupeList(arr) {
-  const seen = new Set(), keep = [], dropped = [];
+  const seen = new Map(), keep = [], dropped = [];
   for (const e of arr) {
     const k = eventKey(e);
-    if (seen.has(k)) { dropped.push(e); continue; }
-    seen.add(k);
+    if (seen.has(k)) {
+      const i = seen.get(k);
+      // ★ v141：同一组重复里，**置顶的那份优先保留** ——
+      //   否则「置顶中」的状态会被一条没置顶的同款记录挤掉（白置顶）。
+      if (keep[i].pin !== 1 && e.pin === 1) { dropped.push(keep[i]); keep[i] = e; }
+      else dropped.push(e);
+      continue;
+    }
+    seen.set(k, keep.length);
     keep.push(e);
   }
   return [keep, dropped];
@@ -2641,6 +2675,12 @@ function isManualKey(e) {
       || e.key === 0 || e.key === false || e.key === '0';
 }
 
+/** 置顶列的取值判定 —— 📌 / 是 / 1 / TRUE / Y 都算「置顶」 */
+function pinIsOn(v) {
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  if (!s) return 0;
+  return (s === '📌' || s === '是' || s === '1' || s === 'true' || s === 'y' || s === 'yes' || s === '置顶') ? 1 : 0;
+}
 function sanitizeEvent(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 120) : '';
@@ -2687,6 +2727,9 @@ function sanitizeEvent(raw) {
     key: (raw.key === 1 || raw.key === true || raw.key === '1') ? 1
        : (raw.key === 0 || raw.key === false || raw.key === '0') ? 0
        : undefined,
+    // ★ v141：置顶（钉在最前面）—— 给「正在进行中」的事用：
+    //   现居何处、待业中、在追的演出…… 置顶后固定在卡片墙最前面。
+    pin: (raw.pin === 1 || raw.pin === true || raw.pin === '1') ? 1 : 0,
     // 旧版（v26）判定结果的备份，迁移时留底，正常流程不读它
     keyLegacy: (raw.keyLegacy === 1 || raw.keyLegacy === true) ? 1
              : (raw.keyLegacy === 0 || raw.keyLegacy === false) ? 0
@@ -2728,6 +2771,10 @@ function loadLocal() {
   const [uniq] = dedupeList(out);
   if (uniq.length !== out.length) {
     console.warn('本机数据里有 ' + (out.length - uniq.length) + ' 条重复，已自动去重');
+    // ★ v140：**把去重后的结果写回本机** ——
+    //   原来只去重内存里的副本，localStorage 里那份仍然重复，
+    //   于是「本机存着 252 条、页面显示 238 条」，导出/换设备时又带一身重复出去。
+    try { safeSet(KEY, JSON.stringify(uniq)); } catch (e) {}
   }
   return uniq;
 }
@@ -3561,7 +3608,7 @@ function render() {
         <td class="lv-main">
           <div class="lv-r1">
             <span class="lv-d">${dateCell}</span>
-            <span class="lv-t">${evKey(ev) === 1 ? '<span class="key-star">★</span>' : ''}${hl(ev.title, q)}</span>
+            <span class="lv-t">${evKey(ev) === 1 ? '<span class="key-star">★</span>' : ''}${ev.pin === 1 ? '<span class="key-pin">📌</span>' : ''}${hl(ev.title, q)}</span>
           </div>
           <div class="lv-r2">
             <span class="tag">${esc(ev.cat)}</span>
@@ -4011,8 +4058,13 @@ function openEdit(ev) {
   $('e-place').value = ev ? (ev.place || '') : '';   // ★ v127：地点回填
   $('e-note').value = ev ? ev.note : '';
   const sel = $('e-cat');
-  sel.innerHTML = catList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  sel.value = ev ? ev.cat : '其他';
+  // ★ v141：新增时**不预选分类**（留空）——
+  //   以前默认选中「其他」，于是随手记的条目全成了「其他」，
+  //   后来再整理一遍就变成「同一段时间两条记录」（那 102 组重复的由来）。
+  //   现在必须显式选一个分类，分类质量才立得住。
+  sel.innerHTML = '<option value="">— 请选择分类 —</option>'
+    + catList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value = ev ? (catList.includes(ev.cat) ? ev.cat : '') : '';
   // **第二维度：重要程度** —— 已有记录回填其 key；新增时留空（不预设，
   // 由 inferKey 规则在读数据时推断，避免用户被「默认勾上」误导）
   const kp = $('e-key-pick');
@@ -4026,6 +4078,9 @@ function openEdit(ev) {
     kc.dataset.touched = '0';
     kp.classList.toggle('on', kc.checked);
   }
+  // ★ v141：置顶回填（显式状态，勾上就是置顶，不用 touched 那套）
+  const pn = $('e-pin');
+  if (pn) pn.checked = ev ? (ev.pin === 1) : false;
   $('edit-mask').classList.add('show');
 }
 function closeEdit() { $('edit-mask').classList.remove('show'); editingId = null; }
@@ -4062,6 +4117,9 @@ function saveEdit() {
   const title = $('e-name').value.trim();
   if (!title) { toast('请填写事件'); return; }
   const cat = $('e-cat').value;
+  // ★ v141：分类必须选 —— 空分类会被 sanitizeEvent 兜底成「其他」，
+  //   那样又回到"随手记成其他、以后再整理"的重复老路。
+  if (!cat) { toast('请选择分类'); $('e-cat').focus(); return; }
   // ★ v131.1：textarea 的换行会保留 —— 只去首尾空白，
   //   内部换行原样留着（数据层不丢）。
   const place = $('e-place').value.replace(/^\s+|\s+$/g, '');   // ★ v127：地点
@@ -4093,8 +4151,10 @@ function saveEdit() {
   // **带上 keyLegacy** —— v26 旧判定的留底。saveEdit 用新对象整体替换旧记录，
   // 不带这个字段就会把唯一的恢复途径弄丢（v26 里手动/推断本就无法区分）。
   const prevRec = isEdit ? DATA.find(x => x.id === editingId) : null;
+  const pinEl = $('e-pin');
+  const pin = (pinEl && pinEl.checked) ? 1 : 0;    // ★ v141：置顶是显式开关
   const obj = { id: editingId || ('e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
-                from, to, sortKey, span, title, note, cat, place, key,
+                from, to, sortKey, span, title, note, cat, place, key, pin,
                 keyLegacy: prevRec ? prevRec.keyLegacy : undefined };
   // ★ v123：新增时也查重 —— 之前直接 concat，加一条和已有完全相同的记录
   //   就会多一条（"上海·路演" 那条重复就是这么来的）。
@@ -4437,6 +4497,7 @@ const XLSX_COL_ALIASES = {
   note:    ['备注', '说明', 'note', 'remark', 'comment'],
   keyMan:  ['重要(手动)', '重要标记', '手动标记'],
   keyRule: ['规则判定', '重要'],
+  pin:     ['置顶', '钉住', '正在进行', 'pin'],
 };
 
 /* 找出表头所在行 —— 用户的表第 1 行是说明，第 2 行才是表头。
@@ -4464,7 +4525,7 @@ function findHeaderRow(rows) {
 
 /* 按表头语义解析出列下标 */
 function mapHeaderCols(head) {
-  const map = { from: -1, to: -1, title: -1, cat: -1, place: -1, note: -1, keyMan: -1, keyRule: -1 };
+  const map = { from: -1, to: -1, title: -1, cat: -1, place: -1, note: -1, keyMan: -1, keyRule: -1, pin: -1 };
   const used = new Set();
   head.forEach((c, i) => {
     const h = String(c == null ? '' : c).trim().toLowerCase();
@@ -4531,6 +4592,7 @@ function rowsToEventsByCols(rows) {
     if (!f) continue;                           // 没有开始日期 → 跳过（日期是主键）
     const to = t || f;
     const kc = g(r, cols.keyMan);
+    const pc = g(r, cols.pin);          // ★ v141：置顶列
     out.push({
       id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + i,
       from: f,
@@ -4544,6 +4606,8 @@ function rowsToEventsByCols(rows) {
       key: (cols.keyMan >= 0)
         ? (kcIsKey(kc) ? 1 : (kcIsNotKey(kc) ? 0 : undefined))
         : undefined,
+      // ★ v141：置顶 —— 📌 / 是 / 1 / TRUE 都算置顶
+      pin: (cols.pin >= 0) ? pinIsOn(pc) : 0,
     });
   }
   return { items: out, headerRow: hi, cols: cols };
@@ -4661,7 +4725,8 @@ function eventsToRows(arr) {
   // 表头带后缀，是为了让导入端认出这是新语义；旧表格第 6 列表头是「重要」。
   const rows = [
     ['说明：结束时间为空，则为单日事件'],
-    ['开始时间', '结束时间', '分类', '地点', '事件描述', '重要(手动)', '规则判定'],
+    // ★ v141：末列加「置顶」—— 放最后一位，老表格的前 7 列顺序不变，导入照样认得。
+    ['开始时间', '结束时间', '分类', '地点', '事件描述', '重要(手动)', '规则判定', '置顶'],
   ];
   sortDesc(arr).forEach(e => {
     const k = (e.key === 1 || e.key === true) ? '★'
@@ -4669,7 +4734,8 @@ function eventsToRows(arr) {
     const rk = inferKey(e) ? '★' : '';
     // 单日事件的结束时间留空 —— 与用户表格的约定一致（「结束时间为空=单日」）
     const toCell = (e.span && e.to && e.to !== e.from) ? ymdToNum(e.to) : '';
-    rows.push([ymdToNum(e.from), toCell, e.cat, e.place || '', e.title, k, rk]);
+    rows.push([ymdToNum(e.from), toCell, e.cat, e.place || '', e.title, k, rk,
+               (e.pin === 1 ? '📌' : '')]);
   });
   return rows;
 }
@@ -4682,7 +4748,7 @@ function ymdToNum(s) {
 }
 function buildXlsx(arr) {
   const ws = XLSX.utils.aoa_to_sheet(eventsToRows(arr));
-  ws['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 44 }, { wch: 11 }, { wch: 9 }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 44 }, { wch: 11 }, { wch: 9 }, { wch: 8 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
   // **规则词表跟着数据一起走** —— 只存本机的话，
@@ -4845,9 +4911,25 @@ async function doPull(silent) {
         persist(DATA, silent, silent);        // 静默启动拉取时只写本地，不自动回写云端
         render();
       }
+      // ★ v140：**云端有重复时，把去重后的文件写回云端** ——
+      //   老逻辑只在本机「忽略」这些重复，却从不回写云端，于是重复永远留在
+      //   data/time.xlsx 里：用户打开 Excel 看到重复 → 用它再导入/推送 → 又固化一轮，
+      //   于是出现「数据又重复了」的循环。
+      //   这里主动清洗一次：**只删完全相同的行**（同一 eventKey），
+      //   本机数据不受影响；清洗失败也不影响本次拉取结果。
+      let cleaned = 0;
+      if (dupInCloud.length) {
+        try {
+          await ghPush(uniqRemote);
+          cleaned = dupInCloud.length;
+        } catch (e) {
+          console.warn('云端去重回写失败（本机数据不受影响）:', e && e.message);
+        }
+      }
       if (!silent) {
         $('sync-msg').textContent = `✓ 已拉取云端数据（本次新增 ${fresh.length} 条）`
-          + (dupInCloud.length ? `　⚠ 云端文件里有 ${dupInCloud.length} 条重复，已自动忽略并去重` : '');
+          + (cleaned ? `　🧹 已顺手清理云端 ${cleaned} 条重复记录`
+                     : (dupInCloud.length ? `　⚠ 云端文件里有 ${dupInCloud.length} 条重复，已自动忽略（回写云端失败，请稍后再同步一次）` : ''));
       }
     } else if (!silent) {
       $('sync-msg').textContent = '云端文件是空的';
@@ -5708,6 +5790,10 @@ function blkMeta(e) {
    脚本在两千多行处就有顶层 render() 调用（早于这里），用 const 会触发
    「Cannot access 'ICON_CAL' before initialization」（TDZ），卡片直接渲染不出来。
    函数声明会被提升，任何调用点都拿得到。 */
+function iconPinMark() {
+  return '<svg viewBox="0 0 24 24" fill="currentColor">'
+    + '<path d="M14.8 2.6 21.4 9.2l-1.6 1.6-2-.5-3.5 3.5.6 3.1-1.4 1.4-4.5-4.5-5.4 5.4-1-1 5.4-5.4L3.7 8.3l1.4-1.4 3.1.6 3.5-3.5-.5-2 1.6-1.4z"/></svg>';
+}
 function iconCal() {
   return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" ' +
     'stroke-linecap="round"><rect x="2" y="3.2" width="12" height="10.6" rx="2"/>' +
@@ -5727,9 +5813,11 @@ function blkD(e) {
   const title = oneLine(e.title || '(未命名)');
   const full = String(e.title || '(未命名)');   // P2：悬停显示原文（含换行）
   const long = title.length > 24;               // 大概率超 3 行 → 给展开按钮
-  return '<div class="bk-d' + (m.isKey ? ' k' : '') + '" data-eid="' + esc(e.id) + '" ' +
+  const pinned = (e.pin === 1);
+  return '<div class="bk-d' + (m.isKey ? ' k' : '') + (pinned ? ' pinned' : '') + '" data-eid="' + esc(e.id) + '" ' +
     'style="--c:' + c + '">' +
     '<div class="bd-head">' +
+    (pinned ? '<span class="bd-pin" title="置顶中">' + iconPinMark() + '</span>' : '') +
     '<span class="bd-cat">' + esc(e.cat) + '</span>' +
     (m.isKey ? '<span class="bd-star">★</span>' : '') +
     '<span class="bd-dur">' + (e.span ? m.dd + '天' : esc(m.md)) + '</span>' +
@@ -5749,7 +5837,10 @@ function blkD(e) {
 
 /* ---------- 网格容器 ---------- */
 function blkGridHtml(list) {
+  // ★ v141：置顶优先（单年视图里置顶的也在最前）
   const sorted = list.slice().sort((a, b) => {
+    const pa = a.pin === 1 ? 0 : 1, pb = b.pin === 1 ? 0 : 1;
+    if (pa !== pb) return pa - pb;
     const ka = a.sortKey || a.from, kb = b.sortKey || b.from;
     return ka < kb ? -1 : ka > kb ? 1 : 0;
   });
@@ -5767,11 +5858,24 @@ function blkGridHtml(list) {
         与时间轴视图一致）。
    ============================================================ */
 function blkWallHtml(list) {
-  const sorted = list.slice().sort((a, b) => {
+  // ★ v141：**置顶的记录单独成区，钉在最前面** ——
+  //   「正在进行中」的事（现居何处 / 待业 / 在追的演出）不该埋在时间堆里。
+  const byDateDesc = arr => arr.slice().sort((a, b) => {
     const ka = a.sortKey || a.from, kb = b.sortKey || b.from;
     return ka < kb ? 1 : ka > kb ? -1 : 0;
   });
+  const pinned = list.filter(e => e.pin === 1);
+  const rest = list.filter(e => e.pin !== 1);
+  // ⚠️ 置顶区必须在**外层 grid 之外** —— 放进去会被当成一个 grid item，
+  //    整个区被压成 1 列宽（实测置顶卡片挤成一条）。
+  let pinHtml = '';
+  if (pinned.length) {
+    pinHtml = '<div class="pin-zone"><div class="pin-h"><span class="pin-ico">' + iconPinMark() + '</span>'
+      + '置顶 · 正在进行的事 <span class="pin-n">' + pinned.length + ' 条</span></div>'
+      + '<div class="bk-wrap bk-d">' + byDateDesc(pinned).map(blkD).join('') + '</div></div>';
+  }
   let html = '';
+  const sorted = byDateDesc(rest);
   let curY = null;
   sorted.forEach(e => {
     const y = yearOf(e.sortKey || e.from);
@@ -5785,7 +5889,7 @@ function blkWallHtml(list) {
     }
     html += h;
   });
-  return '<div class="bk-wrap bk-d">' + html + '</div>';
+  return pinHtml + '<div class="bk-wrap bk-d">' + html + '</div>';
 }
 
 /* ---------- P2：悬停弹完整原文 ---------- */
@@ -6013,6 +6117,6 @@ function renderYearView() {
 })();
 </script>
 
-<div class="ver">v45 · 卡片墙 F 方案</div>
+<div class="ver">v47 · 置顶进行中</div>
 </body>
 </html>
